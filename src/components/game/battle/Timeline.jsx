@@ -11,9 +11,9 @@ export default function Timeline({ combat }) {
   return (
     <div className="absolute top-12 left-1/2 -translate-x-1/2 flex items-center gap-1 px-2 animate-fade-in pointer-events-none max-w-[92vw] overflow-hidden">
       {items.map((it, i) => (
-        <React.Fragment key={i}>
-          {i > 0 && <span className="text-stone-600 text-[9px] shrink-0">▸</span>}
-          <span className={`px-1.5 py-0.5 rounded text-[9px] sm:text-[10px] font-heading tracking-wide border whitespace-nowrap shrink-0 ${
+        <span key={i} className="inline-flex items-center gap-1 shrink-0">
+          {i > 0 && <span className="text-stone-600 text-[9px]">▸</span>}
+          <span className={`px-1.5 py-0.5 rounded text-[9px] sm:text-[10px] font-heading tracking-wide border whitespace-nowrap ${
             i === 0
               ? 'bg-emerald-700/80 border-emerald-400/60 text-white shadow'
               : it.uid === 'player'
@@ -24,7 +24,7 @@ export default function Timeline({ combat }) {
           }`}>
             {i === 0 ? '▶ ' : ''}{label(it)}{it.telegraph ? ' ⚠' : ''}
           </span>
-        </React.Fragment>
+        </span>
       ))}
     </div>
   );
