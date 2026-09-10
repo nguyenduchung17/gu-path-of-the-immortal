@@ -111,6 +111,8 @@ export const DICT = {
     'creation.trueWarn': 'Confirm the warning above to begin',
     'creation.backSlots': '← Back to Save Slots',
     'creation.stepOf': 'Step {n} of 4',
+    'creation.needAptitude': 'Accept your aptitude result to continue',
+    'creation.needStarter': 'Choose your starter Gu to begin',
 
     // ---- aptitude ----
     'apt.title': 'CULTIVATION APTITUDE',
@@ -422,6 +424,8 @@ export const DICT = {
     'creation.trueWarn': 'Xác nhận cảnh báo phía trên để bắt đầu',
     'creation.backSlots': '← Trở về Ô Lưu',
     'creation.stepOf': 'Bước {n} / 4',
+    'creation.needAptitude': 'Hãy chấp nhận kết quả tư chất để tiếp tục',
+    'creation.needStarter': 'Hãy chọn Cổ Trùng đầu tiên để bắt đầu',
 
     // ---- aptitude ----
     'apt.title': 'TƯ CHẤT TU LUYỆN',

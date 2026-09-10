@@ -184,7 +184,7 @@ export default function CharacterCreation() {
               {step < 4 ? (
                 <button
                   onClick={() => setStep(s => s + 1)}
-                  disabled={step === 2 && isTrue && !understood}
+                  disabled={(step === 2 && isTrue && !understood) || (step === 3 && !aptitude)}
                   className="flex-[2] py-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium disabled:bg-stone-800 disabled:text-stone-500 disabled:cursor-not-allowed">
                   {t('ui.next')} →
                 </button>
@@ -197,6 +197,14 @@ export default function CharacterCreation() {
                 </button>
               )}
             </div>
+            {step === 3 && !aptitude && (
+              <div className="text-[10px] text-amber-300/80 text-center animate-fade-in">⚠ {t('creation.needAptitude')}</div>
+            )}
+            {step === 4 && !canBegin && (
+              <div className="text-[10px] text-amber-300/80 text-center animate-fade-in">
+                ⚠ {[!aptitude && t('creation.needAptitude'), !starterGu && t('creation.needStarter')].filter(Boolean).join(' · ')}
+              </div>
+            )}
             {step === 1 && (
               <button onClick={cancelCreate} className="w-full py-2 text-xs text-stone-500 hover:text-stone-300">{t('creation.backSlots')}</button>
             )}
