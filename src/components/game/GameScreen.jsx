@@ -31,6 +31,7 @@ import InnModal from './InnModal';
 import SleepOverlay from './SleepOverlay';
 import MemorialPanel from './MemorialPanel';
 import Toasts from './Toasts';
+import QuestTracker from './hud/QuestTracker';
 import DashboardScreen from './DashboardScreen';
 
 const PANEL_META = {
@@ -155,6 +156,7 @@ export default function GameScreen() {
       <PauseMenu open={paused} onClose={() => setPaused(false)} onOpenPanel={(id) => { setPaused(false); setPanel(id); }} />
 
       <Toasts />
+      <QuestTracker />
       <TutorialOverlay />
     </div>
   );

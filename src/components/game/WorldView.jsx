@@ -224,7 +224,7 @@ export default function WorldView({ paused, inputLocked }) {
       )}
 
       {/* controls reminder */}
-      <div className="absolute top-16 right-2.5 z-10 text-[9px] text-stone-400 bg-black/40 backdrop-blur rounded-full px-2 py-0.5 hidden sm:block">
+      <div className="absolute top-16 left-2.5 z-10 text-[9px] text-stone-400 bg-black/40 backdrop-blur rounded-full px-2 py-0.5 hidden sm:block">
         WASD / arrows move · E interact · Esc menu
       </div>
 

@@ -47,7 +47,7 @@ export function memorialOf(state) {
     gu: (state.ownedGu || []).length,
     recipes: (state.knownRecipes || []).length,
     kills: Object.values(state.quests?.kills || {}).reduce((a, b) => a + b, 0),
-    quests: (state.quests?.completed || []).length,
+    quests: Object.values(state.quests?.byId || {}).filter(r => r.status === 'TURNED_IN' || r.status === 'COMPLETED').length,
     stones: p.spiritStones || 0,
     place: (zoneAt(p.x, p.y) || {}).name || 'the Green Valley Region',
   };

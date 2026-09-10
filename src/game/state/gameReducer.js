@@ -1,6 +1,6 @@
 import { GU_BY_ID } from '../data/gu';
 import { ITEM_BY_ID } from '../data/items';
-import { QUEST_BY_ID } from '../data/quests';
+import { QUEST_BY_ID, QUESTS } from '../data/quests';
 import { NPC_BY_ID, guOfferOf } from '../data/npcs';
 import { MASTERS, MASTER_BY_ID, reqChecks, syncMasterSteps } from '../data/masters';
 import { EVENT_BY_ID } from '../data/events';
@@ -25,6 +25,7 @@ import { essenceCapFor, cultivateMulOf, normalizeAptitude, rollAptitudeScore, ro
 import { starterGuOf } from '../data/starterGu';
 import { SPECIES_BY_ID, wildCombatDef, captureChanceOf, initialWildGu } from '../data/wildGu';
 import { revealFog, seedFog, foodOf } from '../engine/guLife';
+import { QS, acceptQuest, turnInQuest, toggleTrack, abandonQuest, applyQuestEvent, emptyQuests, markDiscovered } from '../engine/questEngine';
 
 const START_STAGE = CULTIVATION_STAGES[0];
 
@@ -36,7 +37,7 @@ export function createNewGame(name, gender, age, difficulty, slot, appearance, a
   const essenceCap = essenceCapFor(START_STAGE.maxEssence, apt);
   const starterFood = foodOf(starter);
   return {
-    version: 10,
+    version: 11,
     difficulty: DIFFICULTIES[difficulty] ? difficulty : 'standard',
     slot: slot || 1,
     time: { day: BALANCE.time.startDay, min: BALANCE.time.startMinutes },
@@ -60,7 +61,7 @@ export function createNewGame(name, gender, age, difficulty, slot, appearance, a
     settings: { autoFeed: false },
     vitalGu: null,
     vitalSwitchDay: -99,
-    quests: { active: [], completed: [], kills: {}, flags: {} },
+    quests: emptyQuests(),
     reputation: { villagers: 0, merchants: 0, sect: 0, blackMarket: 0 },
     worldState: {
       gathered: {},
@@ -93,6 +94,27 @@ export function globalStage(p) { return p.rank * 4 + (p.stage || 0); }
 let _toastN = 0;
 function pushToast(s, t) {
   return { ...s, toasts: [...(s.toasts || []), { id: `t${Date.now().toString(36)}${_toastN++}`, ...t }] };
+}
+
+// Centralized quest-event application: advance every matching ACTIVE quest
+// objective, then celebrate each advance and each quest that just became
+// ready to turn in (or auto-completed).
+function withQuestEvents(s, event) {
+  const res = applyQuestEvent(s, event);
+  let out = res.state;
+  for (const u of res.updates) {
+    out = pushToast(out, { icon: '📜', title: 'OBJECTIVE UPDATED', lines: [`+${u.delta} ${u.label}`] });
+  }
+  for (const qid of res.ready) {
+    const q = QUEST_BY_ID[qid];
+    out = pushToast(out, { icon: '✅', title: 'OBJECTIVES COMPLETE', lines: [q.name, `Return to ${NPC_BY_ID[q.giver]?.name || 'the giver'}.`] });
+  }
+  for (const qid of res.autoCompleted) {
+    const q = QUEST_BY_ID[qid];
+    out = applyEffects(out, q.rewards || {});
+    out = pushToast(out, { icon: '🎉', title: 'QUEST COMPLETE', lines: [q.name] });
+  }
+  return out;
 }
 
 function objectiveMet(state, q) {
@@ -260,6 +282,7 @@ export function gameReducer(state, action) {
       let discovered = { zones: zonesFound, landmarks: lms };
       if (newLm) discovered = { zones: zonesFound, landmarks: { ...lms, [newLm.id]: true } };
       s = { ...s, worldState: { ...ws, discovered } };
+      if (!(ws.discovered?.zones || {})[zone.id]) s = withQuestEvents(s, { type: 'LOCATION_DISCOVERED', id: zone.id });
       if (newLm) {
         s = pushToast(s, { icon: '📍', title: 'Discovered', lines: [newLm.name] });
         logAdd.push(`Discovered: ${newLm.name}.`);
@@ -303,6 +326,7 @@ export function gameReducer(state, action) {
       const qty = 1 + nightBonus + gatherBonus(state) + (Math.random() < state.player.perception * 0.01 ? 1 : 0);
       let s = applyEffects(state, { items: { [node.type]: qty }, message: `Gathered ${qty} ${node.name}.` });
       s = { ...s, worldState: { ...s.worldState, gathered: { ...s.worldState.gathered, [node.id]: Date.now() } } };
+      s = withQuestEvents(s, { type: 'ITEM_COLLECTED', id: node.type, qty });
       return advanceTime(s, BALANCE.time.gatherMinutes);
     }
 
@@ -371,6 +395,8 @@ export function gameReducer(state, action) {
         const m = MASTER_BY_ID[action.npcId];
         for (const step of m?.steps || []) for (const rid of step.grants?.recipes || []) s = learnClue(s, rid, 'located');
       }
+      for (const qd of QUESTS) if (qd.giver === action.npcId) s = markDiscovered(s, qd.id);
+      s = withQuestEvents(s, { type: 'NPC_TALKED', id: action.npcId });
       return advanceTime(s, BALANCE.time.talkMinutes);
     }
     case 'CLOSE_DIALOGUE':
@@ -562,6 +588,7 @@ export function gameReducer(state, action) {
       const chance = Math.min(95, BALANCE.refinement.baseSuccess + p.intelligence * BALANCE.refinement.successPerInt + Math.floor(p.luck * BALANCE.refinement.successPerLuck) + (refFx.successPct || 0) + diffOf(state).refinePct);
       if (Math.random() * 100 < chance) {
         s = applyEffects(s, { giveGu: r.guId, message: `Refinement succeeds! You create ${GU_BY_ID[r.guId].name}.` });
+        s = withQuestEvents(s, { type: 'GU_REFINED', id: r.guId });
         s = grantMastery(s, 'refinement', BALANCE.mastery.xpRefineSuccess, 'refined', 'refine');
         s = grantMastery(s, r.path, Math.round(BALANCE.mastery.xpRefineSuccess * 0.6), 'refined', 'refine');
         if (Math.random() * 100 < (refFx.saveChancePct || 0)) {
@@ -717,25 +744,44 @@ export function gameReducer(state, action) {
 
     case 'ACCEPT_QUEST': {
       if (state.combat || state.recovery) return state;
-      if (state.quests.active.includes(action.questId) || state.quests.completed.includes(action.questId)) return state;
-      return { ...state, quests: { ...state.quests, active: [...state.quests.active, action.questId] }, log: [...state.log, `Accepted quest: ${QUEST_BY_ID[action.questId].name}`] };
+      const q = QUEST_BY_ID[action.questId];
+      if (!q) return state;
+      const res = acceptQuest(state, action.questId);
+      if (res.state === state) return state;
+      let s = res.state;
+      s = pushToast(s, { icon: '📜', title: 'QUEST ACCEPTED', lines: [q.name, `Giver: ${NPC_BY_ID[q.giver]?.name || q.giver}`, res.autoTracked ? 'Now tracking on the HUD.' : 'Open Quests (Q) to track.'] });
+      return syncMasterSteps({ ...s, log: [...s.log, `Accepted quest: ${q.name}`] });
     }
     case 'TURN_IN_QUEST': {
       if (state.combat || state.recovery) return state;
       const q = QUEST_BY_ID[action.questId];
-      if (!state.quests.active.includes(action.questId) || !objectiveMet(state, q)) return state;
-      let s = consumeForObjective(state, q);
-      s = applyEffects(s, q.rewards || {});
-      s = { ...s, quests: { ...s.quests, active: s.quests.active.filter(id => id !== action.questId), completed: [...s.quests.completed, action.questId] } };
-      return s;
+      const res = turnInQuest(state, action.questId);
+      if (res.state === state) return state;
+      let s = applyEffects(res.state, { ...(q.rewards || {}), ...(Object.keys(res.removeItems).length ? { removeItems: res.removeItems } : {}) });
+      s = pushToast(s, { icon: '🎉', title: 'QUEST COMPLETE', lines: [q.name, q.rewards?.message || 'Rewards received.'] });
+      return syncMasterSteps(s);
+    }
+    case 'TRACK_QUEST': {
+      const s = toggleTrack(state, action.questId);
+      return s === state ? state : s;
+    }
+    case 'ABANDON_QUEST': {
+      const q = QUEST_BY_ID[action.questId];
+      const s = abandonQuest(state, action.questId);
+      if (s === state) return state;
+      return { ...s, log: [...s.log, `Abandoned quest: ${q?.name} — it can be taken up again.`] };
     }
     case 'QUEST_CHOICE': {
       if (state.combat || state.recovery) return state;
       const q = QUEST_BY_ID[action.questId];
       const choice = q.choices[action.choiceIndex];
+      const rec = state.quests.byId?.[action.questId];
+      if (!choice || !rec || rec.status !== QS.ACTIVE) return state;
       let s = applyEffects(state, choice.effects);
-      s = { ...s, quests: { ...s.quests, active: s.quests.active.filter(id => id !== action.questId), completed: [...s.quests.completed, action.questId] } };
-      return s;
+      const quests = s.quests;
+      const byId = { ...quests.byId, [action.questId]: { ...rec, status: QS.COMPLETED } };
+      s = { ...s, quests: { ...quests, byId, order: (quests.order || []).filter(id => id !== action.questId), tracked: (quests.tracked || []).filter(id => id !== action.questId) } };
+      return syncMasterSteps(s);
     }
 
     // ---------- Combat ----------
@@ -786,6 +832,12 @@ export function gameReducer(state, action) {
             }),
           },
         };
+      }
+      // quest events — a valid kill and its loot advance objectives (flees never count)
+      if (c.result === 'victory') {
+        s = withQuestEvents(s, { type: 'ENEMY_KILLED', id: c.enemyId });
+        for (const [lootId, lootQty] of Object.entries(c.rewards?.items || {})) s = withQuestEvents(s, { type: 'ITEM_COLLECTED', id: lootId, qty: lootQty });
+        if (c.arena) s = withQuestEvents(s, { type: 'ARENA_WON' });
       }
       // arena resolution — stake was posted up front
       if (c.arena) {
@@ -868,6 +920,7 @@ export function gameReducer(state, action) {
       let s = action.itemId ? applyEffects(state, { removeItems: { [action.itemId]: 1 } }) : state;
       if (Math.random() * 100 < chance) {
         s = applyEffects(s, { giveGu: sp.guId, message: `Capture succeeds — ${sp.name} settles into your keeping. It will need to be fed.` });
+        s = withQuestEvents(s, { type: 'GU_CAPTURED', id: sp.guId });
         s = wildGuAfterEncounter(s, wg.id, true);
         s = pushToast(s, { icon: '🐉', title: 'WILD GU CAPTURED', lines: [`${sp.name} joins you.`, `Feeds on: ${ITEM_BY_ID[sp.foodType]?.name || sp.foodType}.`] });
         return advanceTime({ ...s, wildEncounter: null }, BALANCE.capture.attemptMinutes);
@@ -940,6 +993,7 @@ export function gameReducer(state, action) {
       let s = applyEffects(state, { essence: -list.essenceCost, spiritStones: -list.stonesCost, removeItems: list.materials });
       if (Math.random() * 100 < list.chance) {
         s = { ...s, ownedGu: s.ownedGu.map(g => g.instanceId === inst.instanceId ? { ...g, rank: list.target } : g) };
+        s = withQuestEvents(s, { type: 'GU_REFINED', id: gu.id });
         s = grantMastery(s, 'refinement', BALANCE.mastery.xpRefineSuccess, 'refined', 'refine');
         s = pushToast(s, { icon: '✦', title: 'GU REFINED', lines: [`${gu.name} rises to Rank ${list.target}.`, `Effect power +${cfg.rankPowerStep}%`] });
         s = { ...s, log: [...s.log, `Refinement succeeds — ${gu.name} rises to Rank ${list.target}!`] };

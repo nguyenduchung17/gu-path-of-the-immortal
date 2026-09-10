@@ -9,6 +9,7 @@ import { initialEnemies, BOSS_SPAWNS, LANDMARKS } from '../data/world';
 import { initialWildGu } from '../data/wildGu';
 import { seedFog } from '../engine/guLife';
 import { normalizeAptitude, essenceCapFor } from '../config/aptitude';
+import { normalizeQuestState } from '../engine/questEngine';
 
 // v4 aptitudes were flat strings — map them onto the v5 numeric scale.
 const LEGACY_APTITUDE = { Dull: 3, Ordinary: 5, Good: 6.5, Outstanding: 8, Heavenly: 9.5 };
@@ -172,5 +173,13 @@ export function migrateSave(old) {
     };
   }
 
-  return s;
+  // v11: quest records — one persistent, status-driven quest state replaces
+  // the shared active/completed arrays (healed on every load below).
+  if (s.version < 11) {
+    s = { ...s, version: 11, log: [...(s.log || []), 'Your journal settles — every quest now keeps its own record, progress and all.'] };
+  }
+
+  // Self-heal the quest state on every load: legacy shapes become per-quest
+  // records and hunt progress is rebuilt from the kill tally.
+  return normalizeQuestState(s);
 }

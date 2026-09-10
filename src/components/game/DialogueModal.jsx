@@ -3,7 +3,7 @@ import { useGame } from '@/game/state/GameContext';
 import { useT } from '@/game/i18n/LangContext';
 import { NPC_BY_ID, npcAvailable } from '@/game/data/npcs';
 import { QUESTS } from '@/game/data/quests';
-import { objectiveMet } from '@/game/state/gameReducer';
+import { questStatusOf, questView, QS } from '@/game/engine/questEngine';
 import { diffOf } from '@/game/config/balance';
 import { shopOpen } from '@/game/engine/time';
 import { INNS } from '@/game/data/world';
@@ -85,12 +85,10 @@ export default function DialogueModal({ onShop, onService, onInn }) {
           <div className="space-y-3">
             <button onClick={() => setView('main')} className="text-[11px] text-stone-400 hover:text-stone-200">← Back</button>
             {npcQuests.map(q => {
-              const isActive = state.quests.active.includes(q.id);
-              const isDone = state.quests.completed.includes(q.id);
-              if (isDone) return <div key={q.id} className="text-xs text-stone-500 px-3 py-2 rounded bg-black/20">✓ {q.name} — completed</div>;
-              if (q.requires?.flag && !state.quests.flags?.[q.requires.flag]) return null;
+              const status = questStatusOf(state, q);
+              if (status === QS.LOCKED) return null;
               if (q.objective?.type === 'choice') {
-                if (isActive) return (
+                if (status === QS.ACTIVE) return (
                   <div key={q.id} className="rounded-lg border border-violet-800/40 bg-violet-900/10 p-3">
                     <div className="text-sm font-semibold text-violet-100">{q.name}</div>
                     <p className="text-[11px] text-stone-400 mt-1 mb-2">{q.description}</p>
@@ -102,18 +100,37 @@ export default function DialogueModal({ onShop, onService, onInn }) {
                 );
                 return null;
               }
-              const met = isActive && objectiveMet(state, q);
+              if (status === QS.TURNED_IN || status === QS.COMPLETED) return (
+                <div key={q.id} className="text-xs text-stone-500 px-3 py-2 rounded bg-black/20">✓ {q.name} — "Thank you again."</div>
+              );
+              if (status === QS.TURN_IN_READY) return (
+                <div key={q.id} className="rounded-lg border border-amber-600/50 bg-amber-900/10 p-3">
+                  <div className="text-sm font-semibold text-amber-100">{q.name}</div>
+                  <p className="text-[11px] text-amber-300/80 mt-1">"You've completed the task."</p>
+                  <button onClick={() => dispatch({ type: 'TURN_IN_QUEST', questId: q.id })} className="mt-2 text-xs px-3 py-1.5 rounded bg-amber-600 hover:bg-amber-500 text-white">Turn In</button>
+                </div>
+              );
+              if (status === QS.ACTIVE) {
+                const view = questView(state, q);
+                return (
+                  <div key={q.id} className="rounded-lg border border-stone-800 bg-black/20 p-3">
+                    <div className="text-sm font-semibold text-emerald-100">{q.name}</div>
+                    <p className="text-[11px] text-stone-400 italic mt-1">"How is the task going?"</p>
+                    {view.map(o => (
+                      <div key={o.id} className={`text-[11px] mt-1 flex justify-between ${o.done ? 'text-emerald-300' : 'text-stone-300'}`}>
+                        <span>{o.done ? '✓' : '•'} {o.label}</span>
+                        <span>{o.cur} / {o.req}</span>
+                      </div>
+                    ))}
+                  </div>
+                );
+              }
               return (
                 <div key={q.id} className="rounded-lg border border-stone-800 bg-black/20 p-3">
                   <div className="text-sm font-semibold text-emerald-100">{q.name}</div>
                   <p className="text-[11px] text-stone-400 mt-1">{q.description}</p>
-                  {!isActive ? (
-                    <button onClick={() => dispatch({ type: 'ACCEPT_QUEST', questId: q.id })} className="mt-2 text-xs px-3 py-1.5 rounded bg-emerald-600 hover:bg-emerald-500 text-white">Accept</button>
-                  ) : met ? (
-                    <button onClick={() => { dispatch({ type: 'TURN_IN_QUEST', questId: q.id }); }} className="mt-2 text-xs px-3 py-1.5 rounded bg-amber-600 hover:bg-amber-500 text-white">Turn in</button>
-                  ) : (
-                    <div className="mt-2 text-[10px] text-stone-500">In progress…</div>
-                  )}
+                  <p className="text-[10px] text-stone-500 italic mt-1">"Would you help me?"</p>
+                  <button onClick={() => dispatch({ type: 'ACCEPT_QUEST', questId: q.id })} className="mt-2 text-xs px-3 py-1.5 rounded bg-emerald-600 hover:bg-emerald-500 text-white">Accept</button>
                 </div>
               );
             })}

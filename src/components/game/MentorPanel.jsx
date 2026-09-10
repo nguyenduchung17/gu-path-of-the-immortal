@@ -2,7 +2,7 @@ import React from 'react';
 import { useGame } from '@/game/state/GameContext';
 import { useT } from '@/game/i18n/LangContext';
 import { QUEST_BY_ID } from '@/game/data/quests';
-import { objectiveMet } from '@/game/state/gameReducer';
+import { questStatusOf, QS } from '@/game/engine/questEngine';
 import { MASTER_BY_ID, MASTER_STAGES, masterStageOf, reqChecks, syncMasterSteps } from '@/game/data/masters';
 import { GU_BY_ID } from '@/game/data/gu';
 import { PATH_BY_ID } from '@/game/data/paths';
@@ -44,9 +44,10 @@ export default function MentorPanel({ npc, onShop, onClose }) {
   const teach = step && grantLine(step.grants);
 
   const q = step?.kind === 'quest' ? QUEST_BY_ID[step.questId] : null;
-  const qActive = q && state.quests.active.includes(q.id);
-  const qDone = q && state.quests.completed.includes(q.id);
-  const qMet = q && qActive && objectiveMet(synced, q);
+  const qStatus = q ? questStatusOf(synced, q) : null;
+  const qActive = qStatus === QS.ACTIVE;
+  const qDone = qStatus === QS.TURNED_IN || qStatus === QS.COMPLETED;
+  const qMet = qStatus === QS.TURN_IN_READY;
 
   return (
     <div className="space-y-3">

@@ -1,3 +1,5 @@
+import { questDone } from '../engine/questEngine';
+
 // Advanced mentor / master NPCs. They are rare, found through exploration
 // (no quest markers — a proximity reveal only), and will NOT teach you at
 // first meeting: each has a progression of steps with different requirements
@@ -131,7 +133,7 @@ export function syncMasterSteps(state) {
     const ms = masters[m.id];
     if (!ms?.found) continue;
     let step = ms.step || 0;
-    while (step < m.steps.length && m.steps[step].kind === 'quest' && state.quests.completed.includes(m.steps[step].questId)) step++;
+    while (step < m.steps.length && m.steps[step].kind === 'quest' && questDone(state, m.steps[step].questId)) step++;
     if (step !== (ms.step || 0)) { masters = { ...masters, [m.id]: { ...ms, step } }; changed = true; }
   }
   return changed ? { ...state, masters } : state;
