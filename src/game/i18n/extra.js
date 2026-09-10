@@ -136,6 +136,24 @@ export const DICT_EXTRA = {
     'seclude.button': '🏯 Secluded Cultivation',
     'seclude.hint': 'Seal yourself away: cultivation sessions with overnight essence recovery until your aperture is ready to break through. Requires a settlement; in-game days pass.',
     'seclude.needTown': 'Secluded cultivation requires the safety of a settlement.',
+
+    // ---- enemy intent ----
+    'intent.title': 'NEXT INTENT',
+    'intent.attack': 'Strikes at you',
+    'intent.heavy': 'Charging a heavy attack',
+    'intent.guard': 'Braces its guard',
+    'intent.buff': 'Gathers speed',
+    'intent.poison': 'Sinks venomous fangs',
+    'intent.rough.attack': 'It stirs to strike…',
+    'intent.rough.heavy': 'It gathers monstrous power!',
+    'intent.rough.guard': 'It braces defensively…',
+    'intent.rough.buff': 'It gathers essence…',
+    'intent.rough.poison': 'Its fangs glint…',
+    'intent.interruptible': 'Interruptible — break its guard or stun it',
+    'intent.breakWeak': 'Break weakness',
+    'intent.dmgUnit': 'dmg',
+    'intent.venom': 'venom',
+    'intent.terrain': 'Terrain',
   },
   vi: {
     // ---- gặp Cổ Trùng hoang dã ----
@@ -270,5 +288,23 @@ export const DICT_EXTRA = {
     'seclude.button': '🏯 Bế Quan Tu Luyện',
     'seclude.hint': 'Bế quan: liên tục tu luyện, hồi phục chân nguyên qua đêm cho đến khi khiếu đầy sẵn sàng đột phá. Cần nơi an toàn; ngày trong game trôi qua.',
     'seclude.needTown': 'Bế quan cần sự an toàn của trấn/xã.',
+
+    // ---- ý định của địch ----
+    'intent.title': 'Ý ĐỊNH TIẾP THEO',
+    'intent.attack': 'Tấn công bạn',
+    'intent.heavy': 'Chuẩn bị đòn nặng',
+    'intent.guard': 'Xếp thế phòng thủ',
+    'intent.buff': 'Tụ khí tăng tốc',
+    'intent.poison': 'Nanh nọc cắm vào',
+    'intent.rough.attack': 'Nó chuyển mình chuẩn bị tấn công…',
+    'intent.rough.heavy': 'Nó tụ sức khủng khiếp!',
+    'intent.rough.guard': 'Nó chỉnh thế phòng thủ…',
+    'intent.rough.buff': 'Nó tụ nguyên khí…',
+    'intent.rough.poison': 'Nanh nọc của nó ánh lên…',
+    'intent.interruptible': 'Có thể ngăn — phá hộ thế hoặc choáng nó',
+    'intent.breakWeak': 'Điểm yếu hộ thế',
+    'intent.dmgUnit': 'sát thương',
+    'intent.venom': 'nọc',
+    'intent.terrain': 'Địa Hình',
   },
 };

@@ -107,6 +107,30 @@ export const ENEMIES = [
 
 export const ENEMY_BY_ID = Object.fromEntries(ENEMIES.map(e => [e.id, e]));
 
+// ---- Ecology & habits ----
+// activity:    'nocturnal' (sharper senses & bolder after dark) | 'diurnal' (day creature)
+// pack:        same-species kin nearby embolden a fighter and converge on a fight
+// ambusher:    can catch an unprepared traveler off guard — a scouting Gu negates it
+// stabMul:     how readily its GUARD (stability) shatters (higher = breaks easier)
+// stabWeakness: the Path whose techniques find the flaw in its stance (guard damage ×1.5)
+export const ECOLOGY = {
+  wildWolf:        { activity: 'nocturnal', pack: true, stabMul: 1.25 },
+  shadowHound:     { activity: 'nocturnal', pack: true, ambusher: true, stabMul: 1.15 },
+  ironfangAlpha:   { activity: 'nocturnal', pack: true, stabWeakness: 'wind' },
+  wildBoar:        { activity: 'diurnal' },
+  bloodCrow:       { activity: 'diurnal', stabMul: 1.3 },
+  forestSerpent:   { activity: 'diurnal', ambusher: true },
+  poisonSpider:    { activity: 'nocturnal', ambusher: true, stabMul: 1.2 },
+  stoneBeast:      { stabMul: 0.85, stabWeakness: 'earth' },
+  mutatedBeast:    { activity: 'nocturnal' },
+  bandit:          { activity: 'nocturnal', pack: true },
+  ancientGuardian: { stabMul: 0.8, stabWeakness: 'earth' },
+  mistDevourer:    { activity: 'nocturnal', stabWeakness: 'earth' },
+  ruinWarden:      { stabMul: 0.75, stabWeakness: 'earth' },
+  dreadMatriarch:  { activity: 'nocturnal', ambusher: true },
+};
+export const ecoOf = (id) => ECOLOGY[id] || {};
+
 // Monster visual identity — species kind (distinct silhouette in beastSprites),
 // cultivation rank label and danger rating for the proximity nameplate.
 // pace: world animation speed per species (ms per frame).

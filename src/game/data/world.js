@@ -241,6 +241,22 @@ export function initialEnemies() {
   }));
 }
 
+// Territory ecology — which species hold each zone. Logged on first entry
+// (knowledge is itself a reward) and grounds future spawns in habitats.
+export const ZONE_FAUNA = {
+  wildForest: ['wildWolf', 'poisonSpider', 'forestSerpent'],
+  deepForest: ['shadowHound', 'ironfangAlpha', 'mutatedBeast'],
+  forestOutskirts: ['wildWolf', 'wildBoar', 'bloodCrow'],
+  southernWilds: ['wildWolf', 'forestSerpent', 'stoneBeast'],
+  farmland: ['wildBoar'],
+  eastHills: ['bloodCrow', 'wildBoar', 'bandit'],
+  eastPlains: ['wildBoar', 'bandit'],
+  marsh: ['forestSerpent', 'poisonSpider'],
+  ruins: ['poisonSpider', 'ancientGuardian', 'shadowHound'],
+  banditCamp: ['bandit', 'banditChief'],
+  ironfangTerritory: ['ironfangAlpha', 'shadowHound'],
+};
+
 const TREE_DENSITY = { deepForest: 0.42, wildForest: 0.3, forestOutskirts: 0.17, southernWilds: 0.15, ruins: 0.05, marsh: 0.08, eastHills: 0.04, eastPlains: 0.05 };
 const ROCK_DENSITY = { eastHills: 0.12, southernWilds: 0.03 };
 

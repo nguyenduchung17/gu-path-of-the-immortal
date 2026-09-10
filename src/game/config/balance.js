@@ -72,6 +72,8 @@ export const BALANCE = {
     strike: { power: 4, perStr: 0.8, stab: 8, stabPerStr: 0.5 }, // free basic attack (0 essence)
     observe: { essence: 4, focusPct: 10 },    // free recon + Killer-Move focus
     defend: { dmgRedPct: 40, essenceRegenPct: 8 },
+    pack: { atkPct: 15, stabPct: 10 },     // packmates in sight embolden a fighter
+    ambush: { stabLossPct: 35, delayPct: 50 }, // striking the unaware; ambusher species catch travelers
     break: {
       dmgBonusPct: 30,        // a BROKEN enemy takes this much more damage
       delayPct: 80,           // …and its next action is pushed back this share of a delay

@@ -296,3 +296,33 @@ export function applyExploreGu(state, inst) {
 
   return { state, ok: false, reason: 'Unknown exploration effect.' };
 }
+
+// ---- Ambush ----
+// Who holds the opening edge. Striking an unaware foe (or one you are veiled
+// from by stealth) opens its guard; ambusher species catch an unprepared
+// traveler — unless a scouting Gu (vision/sense) is watching.
+// Returns { amb: 'player' | 'enemy' | null, note? }.
+export function ambushOf(state, e, initiatedByPlayer) {
+  const act = exploreActive(state);
+  const def = ENEMY_BY_ID[e.defId];
+  if (initiatedByPlayer) {
+    const unaware = !e.state || e.state === 'idle' || e.state === 'alert';
+    return { amb: (unaware || !!act.stealth) ? 'player' : null };
+  }
+  if (def?.ambusher) {
+    if (act.vision || act.sense) return { amb: null, note: `${def.name} lunges from hiding — but your scouting Gu caught the ambush. No edge gained!` };
+    return { amb: 'enemy' };
+  }
+  return { amb: null };
+}
+
+// Same-species kin within sight of a fight — they embolden the fighter
+// (applied in initCombat) and converge on the player afterwards.
+export function nearbyPackCount(state, defId, x, y, excludeId, r = 2) {
+  let n = 0;
+  for (const o of state.worldState.enemies || []) {
+    if (o.dead || o.id === excludeId || o.defId !== defId) continue;
+    if (Math.abs(o.x - x) <= r && Math.abs(o.y - y) <= r) n++;
+  }
+  return n;
+}
