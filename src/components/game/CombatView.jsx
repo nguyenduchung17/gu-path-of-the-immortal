@@ -69,7 +69,7 @@ export default function CombatView() {
     }
   }, [c.over]);
 
-  const useGu = (inst) => {
+  const strikeWithGu = (inst) => {
     const gu = GU_BY_ID[inst.guId];
     setCastColor(PATH_COLORS[gu.path] || '#8fd8a0');
     sfx('cast');
@@ -149,7 +149,7 @@ export default function CombatView() {
             const disabled = cd > 0 || noEssence;
             return (
               <button key={inst.instanceId} disabled={disabled}
-                onClick={() => useGu(inst)}
+                onClick={() => strikeWithGu(inst)}
                 className={`text-left px-2 py-1.5 rounded-lg text-xs border ${disabled ? 'border-stone-800 bg-stone-900/40 text-stone-500' : 'border-emerald-700/40 bg-emerald-900/20 text-emerald-100 hover:bg-emerald-800/30'}`}>
                 <div className="font-medium truncate">{gu.name}</div>
                 <div className={`text-[9px] ${disabled ? 'text-stone-500' : 'text-stone-400'}`}>{path.icon} {path.name} · ⚡{cost}{cd > 0 ? ` · ⏳${cd}` : ''}</div>

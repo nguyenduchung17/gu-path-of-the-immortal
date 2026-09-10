@@ -67,15 +67,24 @@ export default function GameScreen() {
   };
   useEffect(() => {
     const onKey = (e) => {
-      if (e.key !== 'Escape') return;
+      if (e.key === 'Escape') {
+        const s = escRef.current;
+        if (s.panel) setPanel(null);
+        else if (s.shop) setShop(null);
+        else if (s.service) setService(null);
+        else if (s.inn) setInn(null);
+        else if (s.recoveryOpen) setRecoveryOpen(false);
+        else if (s.paused) setPaused(false);
+        else if (!s.busy) setPaused(true);
+        return;
+      }
+      // hotbar hotkeys (C/G/R/M/I/Q/P) match the hotbar tooltips
+      const HOTKEYS = { c: 'cultivation', g: 'gu', r: 'recipes', m: 'dao', i: 'inventory', q: 'quests', p: 'map' };
+      const id = HOTKEYS[e.key.toLowerCase()];
+      if (!id || e.repeat) return;
       const s = escRef.current;
-      if (s.panel) setPanel(null);
-      else if (s.shop) setShop(null);
-      else if (s.service) setService(null);
-      else if (s.inn) setInn(null);
-      else if (s.recoveryOpen) setRecoveryOpen(false);
-      else if (s.paused) setPaused(false);
-      else if (!s.busy) setPaused(true);
+      if (s.busy) return;
+      setPanel(id);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
