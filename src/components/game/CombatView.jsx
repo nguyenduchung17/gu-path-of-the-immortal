@@ -24,24 +24,25 @@ const PATH_COLORS = {
   sword: '#dfe4f8',
 };
 
+// Every status shows icon, remaining duration and stacks — hover for details.
 const STATUS_META = {
-  burn: { icon: '🔥', tone: 'bg-orange-900/50 text-orange-200 border-orange-700/50' },
-  poison: { icon: '☠️', tone: 'bg-purple-900/50 text-purple-200 border-purple-700/50' },
-  stun: { icon: '💫', tone: 'bg-sky-900/50 text-sky-200 border-sky-700/50' },
-  control: { icon: '⛓️', tone: 'bg-blue-900/50 text-blue-200 border-blue-700/50' },
-  summon: { icon: '🐉', tone: 'bg-emerald-900/50 text-emerald-200 border-emerald-700/50' },
-  defense: { icon: '🛡️', tone: 'bg-stone-800/60 text-stone-200 border-stone-600/50' },
-  evasion: { icon: '🌪️', tone: 'bg-teal-900/50 text-teal-200 border-teal-700/50' },
-  barrier: { icon: '💠', tone: 'bg-cyan-900/50 text-cyan-200 border-cyan-700/50' },
-  buff: { icon: '✨', tone: 'bg-amber-900/50 text-amber-200 border-amber-700/50' },
-  haste: { icon: '💨', tone: 'bg-teal-900/50 text-teal-200 border-teal-600/50' },
-  slow: { icon: '🕸️', tone: 'bg-slate-800/60 text-slate-200 border-slate-500/50' },
-  guard: { icon: '🛡️', tone: 'bg-stone-700/60 text-stone-100 border-stone-400/50' },
-  focus: { icon: '🎯', tone: 'bg-amber-900/50 text-amber-200 border-amber-600/50' },
-  weakness: { icon: '💔', tone: 'bg-rose-900/50 text-rose-200 border-rose-600/50' },
-  armorBreak: { icon: '🔨', tone: 'bg-orange-900/50 text-orange-200 border-orange-600/50' },
-  soaked: { icon: '💧', tone: 'bg-sky-900/50 text-sky-200 border-sky-600/50' },
-  broken: { icon: '⚡', tone: 'bg-amber-800/60 text-amber-100 border-amber-400/60' },
+  burn: { icon: '🔥', label: 'Burn', desc: 'Fire damage every action — stacks.', tone: 'bg-orange-900/50 text-orange-200 border-orange-700/50' },
+  poison: { icon: '☠️', label: 'Poison', desc: 'Venom damage every action — stacks.', tone: 'bg-purple-900/50 text-purple-200 border-purple-700/50' },
+  stun: { icon: '💫', label: 'Stun', desc: 'Cannot act — charged attacks are interrupted.', tone: 'bg-sky-900/50 text-sky-200 border-sky-700/50' },
+  control: { icon: '⛓️', label: 'Bound', desc: 'Attacks weakened by the binding.', tone: 'bg-blue-900/50 text-blue-200 border-blue-700/50' },
+  summon: { icon: '🐉', label: 'Beast Pact', desc: 'Your enslaved beast strikes every action.', tone: 'bg-emerald-900/50 text-emerald-200 border-emerald-700/50' },
+  defense: { icon: '🛡️', label: 'Defense', desc: 'Reduces incoming damage.', tone: 'bg-stone-800/60 text-stone-200 border-stone-600/50' },
+  evasion: { icon: '🌪️', label: 'Evasion', desc: 'Chance to dodge attacks.', tone: 'bg-teal-900/50 text-teal-200 border-teal-700/50' },
+  barrier: { icon: '💠', label: 'Barrier', desc: 'Absorbs damage until it shatters — shows remaining strength · actions.', tone: 'bg-cyan-900/50 text-cyan-200 border-cyan-700/50' },
+  buff: { icon: '✨', label: 'Empower', desc: 'Element Gu damage increased.', tone: 'bg-amber-900/50 text-amber-200 border-amber-700/50' },
+  haste: { icon: '💨', label: 'Haste', desc: 'Actions come sooner.', tone: 'bg-teal-900/50 text-teal-200 border-teal-600/50' },
+  slow: { icon: '🕸️', label: 'Slow', desc: 'Actions come later.', tone: 'bg-slate-800/60 text-slate-200 border-slate-500/50' },
+  guard: { icon: '🛡️', label: 'Guard', desc: 'Incoming damage reduced.', tone: 'bg-stone-700/60 text-stone-100 border-stone-400/50' },
+  focus: { icon: '🎯', label: 'Focus', desc: 'Killer Move activation chance increased.', tone: 'bg-amber-900/50 text-amber-200 border-amber-600/50' },
+  weakness: { icon: '💔', label: 'Exposed', desc: 'Takes increased damage.', tone: 'bg-rose-900/50 text-rose-200 border-rose-600/50' },
+  armorBreak: { icon: '🔨', label: 'Armor Break', desc: 'Defense reduced.', tone: 'bg-orange-900/50 text-orange-200 border-orange-600/50' },
+  soaked: { icon: '💧', label: 'Soaked', desc: 'Lightning bites deeper; fire scalds.', tone: 'bg-sky-900/50 text-sky-200 border-sky-600/50' },
+  broken: { icon: '⚡', label: 'BROKEN', desc: 'Guard shattered — takes more damage, acts late.', tone: 'bg-amber-800/60 text-amber-100 border-amber-400/60' },
 };
 
 function guSound(gu, kinds) {
@@ -66,15 +67,30 @@ function Bar({ value, max, from, to, label }) {
   );
 }
 
+// Chips are grouped per status type: stacks collapse into one chip with a ×n
+// count, every chip shows the remaining duration, barriers show remaining
+// absorb strength — hover any chip for its full description.
 function StatusChips({ statuses }) {
   if (!statuses?.length) return null;
+  const groups = [];
+  for (const s of statuses) {
+    if (s.type === 'barrier') { groups.push({ type: s.type, count: 1, power: s.power || 0, duration: s.duration }); continue; }
+    const g = groups.find(x => x.type === s.type);
+    if (g) { g.count++; g.power = Math.max(g.power, s.power || 0); g.duration = Math.max(g.duration, s.duration); }
+    else groups.push({ type: s.type, count: 1, power: s.power || 0, duration: s.duration });
+  }
   return (
     <div className="mt-2 flex flex-wrap gap-1">
-      {statuses.map((s, i) => (
-        <span key={i} className={`text-[9px] px-1.5 py-0.5 rounded border ${STATUS_META[s.type]?.tone || 'bg-white/10 text-stone-300 border-stone-600/50'}`}>
-          {STATUS_META[s.type]?.icon || '•'} {s.type}{s.duration}
-        </span>
-      ))}
+      {groups.map((g, i) => {
+        const meta = STATUS_META[g.type];
+        const value = g.type === 'barrier' ? `${g.power}·${g.duration}` : `${g.count > 1 ? `×${g.count} ` : ''}${g.duration}`;
+        return (
+          <span key={i} title={`${meta?.label || g.type} — ${meta?.desc || ''}`}
+            className={`text-[9px] px-1.5 py-0.5 rounded border ${meta?.tone || 'bg-white/10 text-stone-300 border-stone-600/50'}`}>
+            {meta?.icon || '•'} {value}
+          </span>
+        );
+      })}
     </div>
   );
 }

@@ -99,6 +99,38 @@ export const DICT_EXTRA = {
     'sp.perMin': '+{n} essence / min',
     'sp.realm': 'Realm',
     'sp.stage': 'Stage',
+
+    // ---- combat roles ----
+    'role.attack': 'Attack',
+    'role.attackD': 'Deals the damage — bursts, multi-hits, damage over time or guard-breaking blows.',
+    'role.defense': 'Defense',
+    'role.defenseD': 'Protects the cultivator through barriers, armor, resistance or damage reduction.',
+    'role.movement': 'Movement',
+    'role.movementD': 'Speed and action order — act sooner, dodge more, escape better.',
+    'role.scouting': 'Scouting',
+    'role.scoutingD': 'Reveals enemy weaknesses, resistances and charged attacks before you commit.',
+    'role.healing': 'Healing',
+    'role.healingD': 'Restores HP and essence or washes away debuffs mid-battle.',
+    'role.control': 'Control',
+    'role.controlD': 'Manipulates enemy actions through delay, stun, bind or interruption.',
+    'role.support': 'Support',
+    'role.supportD': 'Empowers your other Gu — element buffs and essence recovery.',
+    'role.debuff': 'Debuff',
+    'role.debuffD': 'Weakens the enemy — burn, slow, exposure or armor break.',
+    'role.summon': 'Summon',
+    'role.summonD': 'Calls enslaved beasts that strike the foe every turn.',
+
+    // ---- loadout guidance ----
+    'loadout.roles': 'SQUAD ROLES',
+    'loadout.noDefense': 'No defensive Gu equipped — nothing blunts a heavy blow.',
+    'loadout.noHealing': 'No recovery option equipped — wounds only mend between battles.',
+    'loadout.hint': 'A balanced cultivator carries more than damage — defense, healing and control each answer a different threat.',
+
+    // ---- battle menu ----
+    'battle.tabAll': 'ALL',
+    'battle.tabSupport': 'SUPPORT',
+    'battle.tabUtility': 'UTILITY',
+    'battle.strikeHint': 'Free attack — costs no essence, chips the enemy guard.',
   },
   vi: {
     // ---- gặp Cổ Trùng hoang dã ----
@@ -196,5 +228,37 @@ export const DICT_EXTRA = {
     'sp.perMin': '+{n} nguyên khí / phút',
     'sp.realm': 'Cảnh Giới',
     'sp.stage': 'Tầng',
+
+    // ---- vai trò chiến đấu ----
+    'role.attack': 'Tấn Công',
+    'role.attackD': 'Gây sát thương — bộc phát, đa kích, sát thương kéo dài hoặc đòn phá hộ.',
+    'role.defense': 'Phòng Thủ',
+    'role.defenseD': 'Bảo hộ tu sĩ bằng kết giới, giáp trụ, kháng tính hoặc giảm sát thương.',
+    'role.movement': 'Thân Pháp',
+    'role.movementD': 'Tốc độ và thứ tự hành động — xuất chiêu sớm, né tránh và rút lui tốt hơn.',
+    'role.scouting': 'Trinh Sát',
+    'role.scoutingD': 'Phát hiện điểm yếu, kháng tính và chiêu chuẩn bị của địch trước khi ra tay.',
+    'role.healing': 'Hồi Phục',
+    'role.healingD': 'Hồi HP và chân nguyên, hoặc rửa trừ suy yếu giữa trận.',
+    'role.control': 'Khống Chế',
+    'role.controlD': 'Thao túng hành động của địch — trì hoãn, choáng, trói hoặc ngắt chiêu.',
+    'role.support': 'Hỗ Trợ',
+    'role.supportD': 'Cường hóa các cổ trùng khác — buff nguyên tố và hồi chân nguyên.',
+    'role.debuff': 'Suy Yếu',
+    'role.debuffD': 'Suy yếu địch — thiêu đốt, làm chậm, lộ sơ hở hoặc phá giáp.',
+    'role.summon': 'Triệu Hồi',
+    'role.summonD': 'Gọi dã thú bị thu phục đánh địch mỗi lượt.',
+
+    // ---- hướng dẫn đội hình ----
+    'loadout.roles': 'VAI TRÒ ĐỘI HÌNH',
+    'loadout.noDefense': 'Không có cổ trùng phòng thủ — không gì đỡ được đòn nặng.',
+    'loadout.noHealing': 'Không có khả năng hồi phục — vết thương chỉ lành giữa các trận.',
+    'loadout.hint': 'Tu sĩ toàn diện không chỉ mang sát thương — phòng thủ, hồi phục và khống chế mỗi thứ hóa giải một mối đe dọa.',
+
+    // ---- menu chiến đấu ----
+    'battle.tabAll': 'TẤT CẢ',
+    'battle.tabSupport': 'HỖ TRỢ',
+    'battle.tabUtility': 'TIỆN ÍCH',
+    'battle.strikeHint': 'Đòn đánh miễn phí — không tốn chân nguyên, phá hộ địch.',
   },
 };

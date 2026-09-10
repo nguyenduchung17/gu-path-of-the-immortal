@@ -3,23 +3,13 @@ import { useGame } from '@/game/state/GameContext';
 import { useT } from '@/game/i18n/LangContext';
 import { GU_BY_ID, isKillerMove } from '@/game/data/gu';
 import { PATH_BY_ID } from '@/game/data/paths';
+import { ROLES, rolesOf } from '@/game/data/roles';
 import { ITEM_BY_ID } from '@/game/data/items';
 import { BALANCE } from '@/game/config/balance';
 import { effectiveCost } from '@/game/engine/combat';
 import { HUNGER_META, foodOf, foodCount, feedingEstimate, guCondition } from '@/game/engine/guLife';
 import { effectSummary } from '../battle/BattleCommandMenu';
 import { sfx } from '@/game/audio/sfx';
-
-const TYPE_COLOR = {
-  Attack: 'text-rose-300 border-rose-700/40',
-  Defense: 'text-sky-300 border-sky-700/40',
-  Movement: 'text-emerald-300 border-emerald-700/40',
-  Control: 'text-violet-300 border-violet-700/40',
-  Healing: 'text-lime-300 border-lime-700/40',
-  Summon: 'text-fuchsia-300 border-fuchsia-700/40',
-  Investigation: 'text-amber-300 border-amber-700/40',
-  Support: 'text-fuchsia-300 border-fuchsia-700/40',
-};
 
 // One living companion: rank, hunger meter, injuries, Vital-Gu bond, feeding
 // and risky rank-up refinement — the card shows the Gu's whole life at a glance.
@@ -58,13 +48,15 @@ export default function GuCard({ inst, equipped, onEquip, onUnequip, onRefine })
       <div className="flex justify-between items-start">
         <div className="min-w-0">
           <div className="text-sm font-semibold text-stone-100 flex items-center gap-1.5">
-            {cond.vital && <span className="text-amber-300" title={t('vit.title')}>🩸</span>}
+            {cond.vital && <span className="text-amber-300" title={t('vit.title')}>◍</span>}
             {isKillerMove(gu) && <span className="text-amber-300">★</span>}
             <span className="truncate">{gu.name}</span>
             <span className="text-[10px] text-stone-400">R{rank}</span>
           </div>
           <div className="flex gap-1 items-center mt-0.5 flex-wrap">
-            <div className={`text-[10px] inline-block px-1.5 rounded border ${TYPE_COLOR[gu.type]}`}>{gu.type}</div>
+            {rolesOf(gu).map(r => (
+              <div key={r} title={t(`role.${r}D`)} className={`text-[10px] inline-block px-1.5 rounded border ${ROLES[r].tone}`}>{ROLES[r].icon} {t(`role.${r}`)}</div>
+            ))}
             <div className={`text-[10px] inline-block px-1.5 rounded border ${path.border} ${path.color}`}>{path.icon} {path.name}</div>
             {cond.injured && (
               <div className="text-[10px] px-1.5 rounded border border-rose-700/60 bg-rose-900/30 text-rose-200">🩹 {inst.injurySeverity === 'severe' ? t('hun.injuredSevere', { p: BALANCE.guRefine.severeEffPct, d: cond.injuredUntilDay }) : t('hun.injured', { p: BALANCE.guRefine.injuryEffPct, d: cond.injuredUntilDay })}</div>

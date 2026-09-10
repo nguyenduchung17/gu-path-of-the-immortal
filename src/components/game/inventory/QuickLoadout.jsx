@@ -4,6 +4,9 @@ import { GU_BY_ID, isKillerMove } from '@/game/data/gu';
 import { PATH_BY_ID } from '@/game/data/paths';
 import { ITEM_BY_ID } from '@/game/data/items';
 import { guCondition, HUNGER_META } from '@/game/engine/guLife';
+import { ROLES, rolesOf } from '@/game/data/roles';
+import { useT } from '@/game/i18n/LangContext';
+import LoadoutRoles from './inventory/LoadoutRoles';
 import { sfx } from '@/game/audio/sfx';
 
 const EQUIP_MAX = 6;
@@ -13,6 +16,7 @@ const EQUIP_MAX = 6;
 // combat-usable trail food) — no sub-menu navigation mid-exploration.
 export default function QuickLoadout() {
   const { state, dispatch } = useGame();
+  const { t } = useT();
   const equipped = new Set(state.player.equippedGu);
   const equippedCount = equipped.size;
 
@@ -51,9 +55,11 @@ export default function QuickLoadout() {
                 className={`flex items-center gap-1 rounded-lg border px-2 py-1 ${isEq ? 'border-emerald-500/60 bg-emerald-900/20' : 'border-stone-800 bg-black/30'}`}>
                 <span className="text-[11px]">{path.icon}</span>
                 <span className={`text-[11px] font-medium max-w-[9rem] truncate ${isEq ? 'text-emerald-100' : 'text-stone-300'}`}>
-                  {cond.vital && '🩸'}{isKillerMove(gu) && '★'}{gu.name}
+                  {cond.vital && <span className="text-amber-300" title={t('vit.title')}>◍</span>}{isKillerMove(gu) && <span className="text-amber-300">★</span>}{gu.name}
                 </span>
-                <span className="text-[9px] text-stone-500">R{inst.rank || gu.rank}</span>
+                <span className="text-[9px] text-stone-500">
+                  {rolesOf(gu).map(r => <span key={r} title={t(`role.${r}D`)}>{ROLES[r].icon}</span>)} R{inst.rank || gu.rank}
+                </span>
                 {cond.injured && <span title="Injured">🩹</span>}
                 {!cond.vital && <span className={meta.tone} title="Hunger">{meta.icon}</span>}
                 {isEq ? (
@@ -69,6 +75,8 @@ export default function QuickLoadout() {
           </div>
         </div>
       )}
+
+      <LoadoutRoles />
 
       {primary.length > 0 && (
         <div>

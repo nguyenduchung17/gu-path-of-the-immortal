@@ -133,6 +133,23 @@ export function activationChanceOf(gu, inst, state, combat) {
     + (cond?.stability || 0) + focus + broken)));
 }
 
+// Stacking caps: damage-over-time effects stack, but never without limit — at
+// the cap a fresh application refreshes the strongest stack instead.
+const STACK_CAPS = { burn: 3, poison: 3 };
+function addStatus(statuses, entry) {
+  const cap = STACK_CAPS[entry.type];
+  if (cap) {
+    const same = statuses.filter(s => s.type === entry.type);
+    if (same.length >= cap) {
+      const strongest = same.reduce((a, b) => ((b.power || 0) > (a.power || 0) ? b : a));
+      strongest.power = Math.max(strongest.power || 0, entry.power || 0);
+      strongest.duration = Math.max(strongest.duration || 0, entry.duration || 0);
+      return;
+    }
+  }
+  statuses.push(entry);
+}
+
 const effValue = (statuses, type) => (statuses || []).filter(s => s.type === type).reduce((a, s) => a + (s.power || 0), 0);
 const hasStatus = (statuses, type) => (statuses || []).some(s => s.type === type);
 
@@ -245,7 +262,7 @@ function applyGu(gu, player, enemy, pSt, eSt, combat, push, fx, syn, weather, mu
       for (let i = eSt.length - 1; i >= 0; i--) if (eSt[i].type === 'soaked') eSt.splice(i, 1);
       push('The flames flash the water to scalding steam!');
     }
-    eSt.push({ type: 'burn', power, duration: dur });
+    addStatus(eSt, { type: 'burn', power, duration: dur });
     push(`${enemy.name} is set ablaze!`);
     meaningful = true;
   }
@@ -311,7 +328,7 @@ function enemyAct(enemy, player, pSt, push, windEvasion, thorns) {
   if (enemy.abilities && enemy.abilities.includes('poison')) {
     const resist = (player.foodBuffs || []).filter(b => b.type === 'poisonResist').reduce((a, b) => a + (b.power || 0), 0);
     if (Math.random() < 0.4 * (1 - Math.min(90, resist) / 100)) {
-      pSt.push({ type: 'poison', power: 3, duration: 3 }); push('You are poisoned!');
+      addStatus(pSt, { type: 'poison', power: 3, duration: 3 }); push('You are poisoned!');
     }
   }
 }
@@ -353,7 +370,7 @@ function enemyAI(enemy, player, pSt, eSt, push, windEvasion, thorns) {
     let dmg = Math.max(1, Math.round(enemy.attack * 0.6) - effValue(pSt, 'defense'));
     dmg = playerGuardDr(pSt, dmg, push);
     player.hp -= dmg;
-    pSt.push({ type: 'poison', power: 3, duration: 3 });
+    addStatus(pSt, { type: 'poison', power: 3, duration: 3 });
     push(`${enemy.name} sinks its fangs in for ${dmg} damage — venom floods your veins!`);
     return;
   }
