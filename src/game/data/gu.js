@@ -12,7 +12,7 @@ export const GU = [
     id: 'windStep', name: 'Wind Step Gu', rank: 1, type: 'Movement', path: 'wind', element: 'wind', rarity: 'common',
     description: 'Your form blurs like the wind. Greatly raises evasion and escape chance.',
     energyCost: 5, cooldown: 3,
-    effect: { evasion: { power: 45, duration: 2 } },
+    effect: { evasion: { power: 45, duration: 2 }, self: { haste: { power: 25, duration: 2 } } },
   },
   {
     id: 'thunderPalm', name: 'Thunder Palm Gu', rank: 2, type: 'Attack', path: 'wind', element: 'lightning', rarity: 'rare',
@@ -24,13 +24,13 @@ export const GU = [
     id: 'galeBlade', name: 'Gale Blade Gu', rank: 1, type: 'Attack', path: 'wind', element: 'wind', rarity: 'uncommon',
     description: 'A blade of cutting wind that strikes twice in a single breath.',
     energyCost: 6, cooldown: 1,
-    effect: { attack: { power: 6, hits: 2 } },
+    effect: { attack: { power: 6, hits: 2 }, advance: { pct: 10 } },
   },
   {
     id: 'tempestGu', name: 'Tempest Gu', rank: 2, type: 'Attack', path: 'wind', element: 'wind', rarity: 'epic',
     description: 'A howling tempest tears at the enemy while hastening your own form.',
-    energyCost: 10, cooldown: 3,
-    effect: { attack: { power: 18 }, evasion: { power: 30, duration: 2 } },
+    energyCost: 14, cooldown: 3,
+    effect: { attack: { power: 18 }, evasion: { power: 30, duration: 2 }, self: { haste: { power: 20, duration: 2 } } },
   },
   // ---- Fire ----
   {
@@ -54,8 +54,8 @@ export const GU = [
   {
     id: 'scarletInferno', name: 'Scarlet Inferno Gu', rank: 3, type: 'Attack', path: 'fire', element: 'fire', rarity: 'legendary',
     description: 'A catastrophic bloom of scarlet fire. Few enemies survive its burning.',
-    energyCost: 14, cooldown: 3,
-    effect: { attack: { power: 30 }, burn: { power: 5, duration: 3 } },
+    energyCost: 22, cooldown: 5,
+    effect: { attack: { power: 30 }, burn: { power: 5, duration: 3 }, selfDelay: { pct: 20 } },
   },
   // ---- Earth ----
   {
@@ -80,7 +80,7 @@ export const GU = [
     id: 'mountainGuard', name: 'Mountain Guard Gu', rank: 2, type: 'Defense', path: 'earth', element: 'earth', rarity: 'rare',
     description: 'Raises a bulwark like a mountain slope — a mighty, long-lasting barrier.',
     energyCost: 9, cooldown: 3,
-    effect: { barrier: { power: 24, duration: 3 } },
+    effect: { barrier: { power: 24, duration: 3 }, selfDelay: { pct: 15 } },
   },
   // ---- Water ----
   {
@@ -93,25 +93,25 @@ export const GU = [
     id: 'tideBinding', name: 'Tide Binding Gu', rank: 1, type: 'Control', path: 'water', element: 'water', rarity: 'uncommon',
     description: 'Waters coil like chains around the foe, sapping its strength.',
     energyCost: 7, cooldown: 3,
-    effect: { control: { power: 6, duration: 3 } },
+    effect: { control: { power: 6, duration: 3 }, delay: { pct: 25 }, soak: true, stab: 6 },
   },
   {
     id: 'mistVeil', name: 'Mist Veil Gu', rank: 2, type: 'Movement', path: 'water', element: 'water', rarity: 'rare',
     description: 'A veil of cold mist hides your form and knits your wounds.',
     energyCost: 8, cooldown: 3,
-    effect: { evasion: { power: 40, duration: 2 }, heal: { power: 8 } },
+    effect: { evasion: { power: 40, duration: 2 }, heal: { power: 8 }, soak: true },
   },
   {
     id: 'jadeMarrow', name: 'Jade Marrow Gu', rank: 2, type: 'Healing', path: 'water', element: 'wood', rarity: 'uncommon',
     description: 'Nourishes the marrow with jade essence, restoring primeval essence instead of health.',
-    energyCost: 0, cooldown: 2,
+    energyCost: 3, cooldown: 2,
     effect: { essence: { power: 14 } },
   },
   {
     id: 'shadowThread', name: 'Shadow Thread Gu', rank: 2, type: 'Control', path: 'water', element: 'shadow', rarity: 'uncommon',
     description: 'Tangles the enemy in threads of shadow, slowing and weakening their attacks.',
     energyCost: 6, cooldown: 3,
-    effect: { control: { power: 5, duration: 3 } },
+    effect: { control: { power: 5, duration: 3 }, slow: { power: 30, duration: 2 } },
   },
   // ---- Enslavement ----
   {
@@ -123,7 +123,7 @@ export const GU = [
   {
     id: 'serpentSwarm', name: 'Serpent Swarm Gu', rank: 2, type: 'Summon', path: 'enslavement', element: 'shadow', rarity: 'epic',
     description: 'Commands a swarm of enslaved serpents that strike every turn they prowl.',
-    energyCost: 12, cooldown: 4,
+    energyCost: 15, cooldown: 4,
     effect: { summon: { power: 10, duration: 3 } },
   },
   {
@@ -136,19 +136,19 @@ export const GU = [
   {
     id: 'phantomTide', name: 'Phantom Tide Gu', rank: 3, type: 'Attack', path: 'water', element: 'water', rarity: 'legendary',
     description: 'A tide of phantom mist-water torn from the Devourer\u2019s own breath. Strikes hard and leaves your form hidden in fog.',
-    energyCost: 13, cooldown: 3,
-    effect: { attack: { power: 15 }, evasion: { power: 40, duration: 2 } },
+    energyCost: 20, cooldown: 3,
+    effect: { attack: { power: 15 }, evasion: { power: 40, duration: 2 }, soak: true },
   },
   {
     id: 'jadeColossus', name: 'Jade Colossus Gu', rank: 3, type: 'Defense', path: 'earth', element: 'earth', rarity: 'legendary',
     description: 'Raises a colossus of living jade around you — a mighty barrier that hardens your guard while it stands.',
-    energyCost: 12, cooldown: 3,
-    effect: { barrier: { power: 34, duration: 3 }, defense: { power: 5, duration: 3 } },
+    energyCost: 16, cooldown: 3,
+    effect: { barrier: { power: 34, duration: 3 }, defense: { power: 5, duration: 3 }, selfDelay: { pct: 15 } },
   },
   {
     id: 'nightSwarm', name: 'Night Swarm Gu', rank: 3, type: 'Summon', path: 'enslavement', element: 'shadow', rarity: 'epic',
     description: 'Calls a swarm of shadow-fed beasts bound by the Matriarch\u2019s marrow. They maul your foe every turn they prowl.',
-    energyCost: 13, cooldown: 4,
+    energyCost: 18, cooldown: 4,
     effect: { summon: { power: 13, duration: 3 } },
   },
   // ---- Starter Gu (chosen at character creation) ----
@@ -181,12 +181,12 @@ export const GU = [
     id: 'flyingSword', name: 'Flying Sword Gu', rank: 2, type: 'Attack', path: 'sword', element: 'metal', rarity: 'rare',
     description: 'A spirit blade that leaves your hand, strikes and returns — the signature of the Sword Path.',
     energyCost: 8, cooldown: 2,
-    effect: { attack: { power: 16 } },
+    effect: { attack: { power: 16 }, expose: { power: 20, duration: 2 }, stab: 8 },
   },
   {
     id: 'swordRain', name: 'Sword Rain Gu', rank: 3, type: 'Attack', path: 'sword', element: 'metal', rarity: 'legendary',
     description: 'The fabled Sword Rain — a storm of flying blades few ever live to see twice. A Killer Move of Master Jian\u2019s lineage.',
-    energyCost: 13, cooldown: 3,
+    energyCost: 24, cooldown: 5,
     effect: { attack: { power: 12, hits: 3 } },
   },
   // ---- Refinement-adjacent ----

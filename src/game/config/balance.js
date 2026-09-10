@@ -53,8 +53,34 @@ export const BALANCE = {
       base: 85,
       perMasteryLevel: 3,   // + per path mastery level
       repeatPenalty: 10,    // − per prior use of the same Gu this battle
+      brokenBonus: 15,      // + while the enemy is BROKEN
       min: 40, max: 100,
     },
+    // Action-order system: every combatant's next action comes after
+    // act / Speed time units — Speed decides who moves when, not rigid turns.
+    gauge: {
+      act: 1000,              // action points per action (delay = act / speed)
+      playerBase: 100,        // player Speed = base + agility × perAgi
+      perAgi: 4,
+      enemyBase: 55,          // enemy Speed = base + data speed × perEnemySpeed
+      perEnemySpeed: 9,
+      speedMulMin: 0.55,      // Haste/Slow clamps — speed is powerful, never broken
+      speedMulMax: 1.9,
+      catchUpFactor: 1.6,     // an enemy never falls more than 1.6× its delay behind
+    },
+    stability: { base: 40, perDefense: 6 },  // enemy GUARD pool = base + defense × perDefense
+    strike: { power: 4, perStr: 0.8, stab: 8, stabPerStr: 0.5 }, // free basic attack (0 essence)
+    observe: { essence: 4, focusPct: 10 },    // free recon + Killer-Move focus
+    defend: { dmgRedPct: 40, essenceRegenPct: 8 },
+    break: {
+      dmgBonusPct: 30,        // a BROKEN enemy takes this much more damage
+      delayPct: 80,           // …and its next action is pushed back this share of a delay
+      brokenDuration: 2,      // statuses tick on the owner's actions
+      stabRegenPctPerAction: 25,
+    },
+    // Natural enemy recovery between fights (% of max HP per in-game minute).
+    // Slow by design — fleeing leaves a wound that persists for a long while.
+    regen: { defaultPctPerMin: 0.25, elitePctPerMin: 0.5, stabilityPctPerMin: 5 },
   },
   world: {
     respawnMs: 4 * 60 * 1000,        // world enemy respawn timer
