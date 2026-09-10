@@ -165,8 +165,7 @@ export default function WorldView({ paused, inputLocked }) {
       // a diagonal step covers √2 tiles, so it must wait √2 × STEP_MS; total
       // travel speed is identical in all 8 directions (~1 tile / STEP_MS).
       const STEP_MS = 170;
-      const locked = propsRef.current.inputLocked || propsRef.current.paused
-        || s.combat || s.pendingEvent || s.dialogue || s.recovery || s.sleeping || s.deceased || s.wildEncounter;
+      const locked = isLocked(s);
       const step = stepRef.current;
       if (step.prev == null) step.prev = t;
       const dtMs = Math.min(100, t - step.prev); // cap gaps (tab switches) so no burst of steps

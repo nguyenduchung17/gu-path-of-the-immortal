@@ -35,6 +35,8 @@ import {
   locQuestName, locQuestRewardMsg, locMissionName, locContribName, locArenaOpponentName,
   locSpeciesName, locPathName, locEventMsg, locResourceName,
 } from '../i18n/tr';
+import { TUTORIAL_STEPS, TUTORIAL_SUPPLIES, TUTORIAL_STONES } from '../data/tutorial';
+import { tutorialObserve } from '../engine/tutorial';
 
 const START_STAGE = CULTIVATION_STAGES[0];
 
@@ -69,6 +71,9 @@ export function createNewGame(name, gender, age, difficulty, slot, appearance, a
     ownedGu: [{ instanceId: 'g_start', guId: starter.id, rank: starter.rank }],
     inventory: { materials: { herb: 3 }, medicine: { medicine: 1 }, food: { ration: 2 }, guFood: starterFood ? { [starterFood]: 2 } : {}, guGear: { sealingJar: 1 }, questItems: {} },
     settings: { autoFeed: false },
+    // Staged tutorial — every fresh character is offered the welcome screen and
+    // guided lessons (old saves get the same shape from migration v13).
+    tutorial: { welcome: true, active: false, completed: false, skipped: false, step: 0, moves: 0, tipsSeen: {} },
     vitalGu: null,
     vitalSwitchDay: -99,
     quests: emptyQuests(),
@@ -260,7 +265,7 @@ function wildGuAfterEncounter(state, worldId, gone) {
   };
 }
 
-export function gameReducer(state, action) {
+function baseReducer(state, action) {
   // a deceased (True Cultivation) character can no longer act — only leave or reset
   if (state && state.deceased && !['LOAD', 'RESET', 'END_COMBAT'].includes(action.type)) return state;
   switch (action.type) {
@@ -1211,9 +1216,50 @@ export function gameReducer(state, action) {
     case 'DISMISS_TOAST':
       return { ...state, toasts: (state.toasts || []).filter(t => t.id !== action.id) };
 
+    // ---------- Staged tutorial ----------
+    // The UI (welcome card, lesson cards, tips) dispatches these; the fresh-
+    // save seed and migration v13 provide the `tutorial` record they act on.
+    case 'TUTORIAL_START':
+      return { ...state, tutorial: { ...state.tutorial, welcome: false, active: true, step: 0 } };
+    case 'TUTORIAL_SKIP': {
+      // skipping still grants the starter supplies — no one is punished for it
+      const s = applyEffects(state, { items: TUTORIAL_SUPPLIES, spiritStones: TUTORIAL_STONES, message: T('tut.done.rewards') });
+      return { ...s, tutorial: { ...s.tutorial, welcome: false, active: false, skipped: true, completed: true, currentTip: null } };
+    }
+    case 'TUTORIAL_STEP': {
+      const tut = state.tutorial;
+      if (!tut?.active || tut.completed) return state;
+      return { ...state, tutorial: { ...tut, step: Math.min(TUTORIAL_STEPS.length - 1, (tut.step || 0) + 1) } };
+    }
+    case 'TUTORIAL_PANEL': {
+      const tut = state.tutorial;
+      const step = TUTORIAL_STEPS[tut?.step];
+      if (!tut?.active || tut.completed || !step || step.panel !== action.panel) return state;
+      return { ...state, tutorial: { ...tut, step: tut.step + 1 } };
+    }
+    case 'TUTORIAL_TIP':
+      if (!state.tutorial || state.tutorial.currentTip) return state;
+      return { ...state, tutorial: { ...state.tutorial, currentTip: action.id } };
+    case 'TUTORIAL_TIP_SEEN':
+      if (!state.tutorial?.currentTip) return state;
+      return { ...state, tutorial: { ...state.tutorial, currentTip: null, tipsSeen: { ...(state.tutorial.tipsSeen || {}), [action.id]: true } } };
+    case 'TUTORIAL_COMPLETE': {
+      const s = applyEffects(state, { items: TUTORIAL_SUPPLIES, spiritStones: TUTORIAL_STONES, message: T('tut.done.rewards') });
+      return { ...s, tutorial: { ...s.tutorial, active: false, completed: true, currentTip: null } };
+    }
+
     default:
       return state;
   }
+}
+
+// Outer wrapper: every action flows through the tutorial observer so guided
+// lessons advance from real play (moves counted, NPCs talked to, battles won).
+// An unchanged state passes through untouched.
+export function gameReducer(state, action) {
+  const next = baseReducer(state, action);
+  if (!next || next === state) return next;
+  return tutorialObserve(next, action);
 }
 
 export { objectiveMet };
