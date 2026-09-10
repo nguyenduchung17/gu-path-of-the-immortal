@@ -113,7 +113,13 @@ export default function WorldView({ paused, inputLocked }) {
     const onDown = (e) => {
       primeAudio();
       const k = e.key.toLowerCase();
-      if (DIR_KEYS.includes(k)) { e.preventDefault(); keysRef.current.add(k); }
+      if (DIR_KEYS.includes(k)) {
+        e.preventDefault();
+        keysRef.current.add(k);
+        // a fresh press moves on the very next frame — a quick tap shorter
+        // than the 170ms hold-gate must not be swallowed silently
+        if (!e.repeat) lastMoveRef.current = 0;
+      }
       else if ((k === 'e' || k === ' ' || k === 'enter') && !e.repeat) { e.preventDefault(); interactRef.current(); }
     };
     const onUp = (e) => keysRef.current.delete(e.key.toLowerCase());
@@ -223,10 +229,12 @@ export default function WorldView({ paused, inputLocked }) {
         </div>
       )}
 
-      {/* controls reminder */}
-      <div className="absolute top-16 left-2.5 z-10 text-[9px] text-stone-400 bg-black/40 backdrop-blur rounded-full px-2 py-0.5 hidden sm:block">
-        WASD / arrows move · E interact · Esc menu
-      </div>
+      {/* controls reminder — only shown while movement is actually possible */}
+      {!inputLocked && !paused && (
+        <div className="absolute top-16 left-2.5 z-10 text-[9px] text-stone-400 bg-black/40 backdrop-blur rounded-full px-2 py-0.5 hidden sm:block">
+          WASD / arrows move · E interact · Esc menu
+        </div>
+      )}
 
       {/* touch d-pad */}
       <div className="absolute bottom-3 right-3 z-10 grid grid-cols-3 gap-1 sm:hidden">

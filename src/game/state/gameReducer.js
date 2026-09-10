@@ -652,7 +652,9 @@ export function gameReducer(state, action) {
 
     // ---------- Cultivation ----------
     case 'CULTIVATE': {
-      if (state.combat || state.recovery) return state;
+      if (state.combat) return state;
+      // recovery is a deliberate activity that blocks cultivation — never a silent ignore
+      if (state.recovery) return { ...state, log: [...state.log, 'You are recovering essence — cultivation resumes once you stop recovering.'] };
       const cfg = BALANCE.cultivation;
       const p = state.player;
       const cost = cfg.essenceCostBase + cfg.essenceCostPerStage * (p.rank * 4 + (p.stage || 0));

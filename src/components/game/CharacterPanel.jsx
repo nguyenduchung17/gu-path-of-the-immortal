@@ -121,14 +121,21 @@ export default function CharacterPanel({ onRecover }) {
           </div>
           <div className="grid grid-cols-2 gap-2 mb-3">
             <button onClick={() => dispatch({ type: 'CULTIVATE' })} disabled={state.recovery || state.combat}
+              aria-disabled={state.recovery || state.combat}
               className={`py-2.5 rounded-lg text-white text-sm font-medium transition ${(state.recovery || state.combat || p.primevalEssence < cost) ? 'bg-stone-800 text-stone-500 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-500'}`}>
-              🧘 {t('ui.cultivate')} ({cost} {t('ui.essence')}{atSect ? ' · sect ×1.5' : ''})
+              {state.recovery ? '🧘 Cultivate — paused while recovering' : <>🧘 {t('ui.cultivate')} ({cost} {t('ui.essence')}{atSect ? ' · sect ×1.5' : ''})</>}
             </button>
             <button onClick={onRecover} disabled={state.combat}
               className={`py-2.5 rounded-lg text-sm font-medium transition border border-sky-700/50 bg-sky-900/20 text-sky-200 hover:bg-sky-800/30 ${state.combat ? 'opacity-40 cursor-not-allowed' : ''}`}>
               {state.recovery ? `💧 ${t('ui.viewRecovery')}` : `💧 ${t('ui.recoverEssence')}`}
             </button>
           </div>
+
+          {state.recovery && (
+            <div className="text-[10px] text-sky-300/90 mb-3 animate-fade-in">
+              💧 Recovering essence — cultivation is paused until you stop recovering.
+            </div>
+          )}
 
           {breakthroughReady && (
             <div className="rounded-lg border border-amber-800/40 bg-amber-900/10 p-3">
