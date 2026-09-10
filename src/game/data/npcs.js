@@ -78,6 +78,21 @@ export const NPCS = [
     service: 'arena',
   },
   {
+    id: 'guPeddler', name: 'Gu Peddler Wan', area: 'willowHamlet', avatar: '🧳',
+    greeting: 'Fresh off the mist-forest trails — recipes and rarities straight from my pack. Stones only, friend.',
+    shop: {
+      sells: [
+        { itemId: 'moonPetal', price: 10 }, { itemId: 'windCrystal', price: 18 },
+        { itemId: 'shadowSilk', price: 14 }, { itemId: 'serpentGland', price: 22 },
+        { itemId: 'mistSilk', price: 15 }, { itemId: 'beastBlood', price: 10 },
+        { itemId: 'ironOre', price: 9 }, { itemId: 'essencePill', price: 30 },
+        { itemId: 'healingPill', price: 35 },
+      ],
+      buys: ['herb', 'spiritGrass', 'medicine', 'ration', 'beastCore', 'beastBlood', 'moonPetal', 'windCrystal', 'shadowSilk', 'mistSilk', 'serpentGland', 'fireEssence', 'ironOre', 'ore'],
+      recipes: [{ recipeId: 'tideBinding', price: 50 }, { recipeId: 'flameSerpent', price: 95 }],
+    },
+  },
+  {
     id: 'villageElder', name: 'Willow Elder Shu', area: 'greenValleyRegion', avatar: '👴',
     greeting: 'The hamlet is small but its hearth is warm. Rest if the road has worn you, and trade a little if you must.',
     shop: {

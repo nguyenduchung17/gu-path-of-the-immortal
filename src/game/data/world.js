@@ -78,6 +78,7 @@ export const NPC_POSITIONS = {
   arenaManager: [49, 49],
   sectElder: [50, 43],
   villageElder: [62, 44],
+  guPeddler: [57, 44],
   blackMarketMerchant: [58, 43],
   mysteriousTraveler: [59, 42],
 };
