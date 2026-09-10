@@ -171,7 +171,7 @@ export default function CombatView() {
   const equippedCount = p.equippedGu.length;
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-[#0a0f0c] animate-pop">
+    <div className="fixed inset-0 z-[60] flex flex-col bg-[#0a0f0c] animate-pop">
       {/* encounter transition flash */}
       <div className="absolute inset-0 bg-white animate-battle-flash pointer-events-none z-10" />
 
