@@ -4,6 +4,7 @@ import { RECIPES, RECIPE_BY_ID } from '@/game/data/recipes';
 import { GU_BY_ID } from '@/game/data/gu';
 import { PATH_BY_ID } from '@/game/data/paths';
 import { refineChecklist } from '@/game/state/gameReducer';
+import { CLUE_RANK } from '@/game/engine/mastery';
 import { BALANCE } from '@/game/config/balance';
 
 function ReqLine({ met, text }) {
@@ -48,33 +49,69 @@ function RecipeCard({ recipeId }) {
   );
 }
 
+// An undiscovered recipe shows ONLY what this character has heard:
+// rumored → name/path/requirements all ???; identified → name, path and a
+// general connection; located → a reliable lead naming its source.
+// Exact sources, materials and costs never appear before acquisition.
+function RumorCard({ r, level }) {
+  const gu = GU_BY_ID[r.guId];
+  const path = PATH_BY_ID[r.path];
+  return (
+    <div className="rounded-lg border border-stone-900 bg-black/10 p-3 opacity-80">
+      {level === 'rumored' ? (
+        <>
+          <div className="text-sm text-stone-500">🔒 Unknown Recipe</div>
+          <div className="text-[10px] text-stone-600 mt-0.5">Path: ??? · Rank: ??? · Requirements: ??? · Source: Unknown</div>
+          <div className="text-[10px] text-stone-500 italic mt-1">Clue: {r.rumor}</div>
+        </>
+      ) : (
+        <>
+          <div className="text-sm text-stone-400">🔒 {gu?.name || 'Unknown'} Gu Recipe</div>
+          <div className="text-[10px] text-stone-500 mt-0.5">{path ? `${path.icon} ${path.name} ` : 'Path: ???'}· requires Mastery Level {r.masteryReq} · not yet in your hands</div>
+          <div className="text-[10px] text-stone-500 italic mt-1">Clue: {r.clue}</div>
+          {level === 'located' && <div className="text-[10px] text-amber-300/70 mt-0.5">Lead: {r.lead}</div>}
+        </>
+      )}
+    </div>
+  );
+}
+
+// The recipe menu is a KNOWLEDGE JOURNAL — it displays what the character
+// knows, never what the developer knows. Completely unknown recipes are not
+// listed at all; they surface as rumors from travelers, tavern talk and
+// conversation.
 export default function RecipesPanel() {
   const { state } = useGame();
   const known = RECIPES.filter(r => state.knownRecipes.includes(r.id));
-  const unknown = RECIPES.filter(r => !state.knownRecipes.includes(r.id));
+  const clues = RECIPES
+    .filter(r => !state.knownRecipes.includes(r.id) && state.recipeKnowledge?.[r.id])
+    .sort((a, b) => (CLUE_RANK[state.recipeKnowledge[b.id]] || 0) - (CLUE_RANK[state.recipeKnowledge[a.id]] || 0));
+  const mysterious = RECIPES.length - known.length - clues.length;
 
   return (
     <div className="pt-3 space-y-4 animate-fade-in">
       <p className="text-xs text-stone-400">
-        A Gu cannot be refined without its recipe. Recipes are bought, found, rewarded — or granted by deep Path mastery.
+        A Gu cannot be refined without its recipe — and a recipe unwritten in your journal is only a rumor. Talk to people, listen in taverns, buy whispers from those who wander.
       </p>
       <div>
         <h3 className="text-sm font-semibold text-stone-300 mb-2">Known Recipes ({known.length})</h3>
         {known.length === 0
-          ? <div className="text-stone-500 text-sm">You know no recipes yet — the Gu Master and herbalist in Green Valley sell some.</div>
+          ? <div className="text-stone-500 text-sm">You know no recipes yet — the valley&apos;s Gu merchants and herbalists sell a few openly.</div>
           : <div className="grid sm:grid-cols-2 gap-2">{known.map(r => <RecipeCard key={r.id} recipeId={r.id} />)}</div>}
       </div>
-      <div>
-        <h3 className="text-sm font-semibold text-stone-400 mb-2">Undiscovered ({unknown.length})</h3>
-        <div className="grid sm:grid-cols-2 gap-2">
-          {unknown.map(r => (
-            <div key={r.id} className="rounded-lg border border-stone-900 bg-black/10 p-3 opacity-75">
-              <div className="text-sm text-stone-500">🔒 Unknown Recipe</div>
-              <div className="text-[10px] text-stone-600 italic mt-1">{r.hint}</div>
-            </div>
-          ))}
+      {clues.length > 0 && (
+        <div>
+          <h3 className="text-sm font-semibold text-stone-400 mb-2">Rumors & Leads ({clues.length})</h3>
+          <div className="grid sm:grid-cols-2 gap-2">
+            {clues.map(r => <RumorCard key={r.id} r={r} level={state.recipeKnowledge[r.id]} />)}
+          </div>
         </div>
-      </div>
+      )}
+      {mysterious > 0 && (
+        <div className="text-[11px] text-stone-600 italic text-center py-1">
+          {mysterious} recipe{mysterious > 1 ? 's' : ''} remain complete mysteries — the world is wider than your knowledge of it.
+        </div>
+      )}
     </div>
   );
 }

@@ -8,7 +8,7 @@ import { ENEMY_BY_ID } from '../data/enemies';
 import { initCombat, executeRound } from '../engine/combat';
 import { advanceTime, phaseOf } from '../engine/time';
 import { applyEffects } from '../engine/effects';
-import { grantMastery, learnRecipe, bonusOf } from '../engine/mastery';
+import { grantMastery, learnRecipe, bonusOf, learnClue, CLUE_RANK } from '../engine/mastery';
 import { CULTIVATION_STAGES, BREAKTHROUGH_REQS } from '../data/cultivation';
 import { BALANCE, DIFFICULTIES, diffOf, shopPrice } from '../config/balance';
 import { RECIPE_BY_ID } from '../data/recipes';
@@ -36,7 +36,7 @@ export function createNewGame(name, gender, age, difficulty, slot, appearance, a
   const essenceCap = essenceCapFor(START_STAGE.maxEssence, apt);
   const starterFood = foodOf(starter);
   return {
-    version: 8,
+    version: 9,
     difficulty: DIFFICULTIES[difficulty] ? difficulty : 'standard',
     slot: slot || 1,
     time: { day: BALANCE.time.startDay, min: BALANCE.time.startMinutes },
@@ -70,7 +70,7 @@ export function createNewGame(name, gender, age, difficulty, slot, appearance, a
       fog: seedFog(42, 44, 6),
     },
     mastery: {}, masteryStats: {},
-    knownPaths: [starter.path], knownRecipes: [],
+    knownPaths: [starter.path], knownRecipes: [], recipeKnowledge: {},
     contribution: { greenValley: 0 },
     masters: {},
     bestiary: {},
@@ -359,9 +359,20 @@ export function gameReducer(state, action) {
       return advanceTime({ ...state, log: [...state.log, 'The formation hums with dormant power — no distant regions are charted yet.'] }, BALANCE.time.talkMinutes);
     }
 
-    case 'TALK_NPC':
+    case 'TALK_NPC': {
       if (state.combat || state.recovery) return state;
-      return advanceTime(syncMasterSteps({ ...state, dialogue: { npcId: action.npcId } }), BALANCE.time.talkMinutes);
+      const npc = NPC_BY_ID[action.npcId];
+      let s = syncMasterSteps({ ...state, dialogue: { npcId: action.npcId } });
+      // Speaking with people is how knowledge spreads. A merchant openly
+      // identifies what he sells; a found mentor is a reliable source for the
+      // recipes he teaches. Neither reveals anything until met in person.
+      if (npc?.shop?.recipes) for (const o of npc.shop.recipes) s = learnClue(s, o.recipeId, 'identified');
+      if (npc?.mentor) {
+        const m = MASTER_BY_ID[action.npcId];
+        for (const step of m?.steps || []) for (const rid of step.grants?.recipes || []) s = learnClue(s, rid, 'located');
+      }
+      return advanceTime(s, BALANCE.time.talkMinutes);
+    }
     case 'CLOSE_DIALOGUE':
       return { ...state, dialogue: null };
 
@@ -399,6 +410,23 @@ export function gameReducer(state, action) {
       if (have < qty) return state;
       const price = Math.floor(ITEM_BY_ID[action.itemId].value * 0.5 * qty);
       return advanceTime(applyEffects(state, { removeItems: { [action.itemId]: qty }, spiritStones: price, message: `Sold ${qty} ${ITEM_BY_ID[action.itemId].name} for ${price} primordial stones.` }), BALANCE.time.tradeMinutes);
+    }
+
+    // ---------- Rumors & intel ----------
+    case 'BUY_INTEL': {
+      if (state.combat || state.recovery) return state;
+      const npc = NPC_BY_ID[action.npcId];
+      const offer = (npc?.shop?.intel || []).find(o => o.id === action.offerId);
+      if (!offer) return state;
+      // never pay for what is already known (or owned outright)
+      const already = state.knownRecipes.includes(offer.clue.recipeId)
+        || ((CLUE_RANK[state.recipeKnowledge?.[offer.clue.recipeId]] || 0) >= (CLUE_RANK[offer.clue.level] || 0));
+      if (already) return state;
+      const total = shopPrice(offer.price, state);
+      if (state.player.spiritStones < total) return { ...state, log: [...state.log, 'Not enough primordial stones for this whisper.'] };
+      let s = { ...state, player: { ...state.player, spiritStones: state.player.spiritStones - total } };
+      s = learnClue(s, offer.clue.recipeId, offer.clue.level);
+      return advanceTime(s, BALANCE.time.tradeMinutes);
     }
 
     // ---------- Missions & contribution ----------
@@ -535,15 +563,15 @@ export function gameReducer(state, action) {
       const chance = Math.min(95, BALANCE.refinement.baseSuccess + p.intelligence * BALANCE.refinement.successPerInt + Math.floor(p.luck * BALANCE.refinement.successPerLuck) + (refFx.successPct || 0) + diffOf(state).refinePct);
       if (Math.random() * 100 < chance) {
         s = applyEffects(s, { giveGu: r.guId, message: `Refinement succeeds! You create ${GU_BY_ID[r.guId].name}.` });
-        s = grantMastery(s, 'refinement', BALANCE.mastery.xpRefineSuccess, 'refined');
-        s = grantMastery(s, r.path, Math.round(BALANCE.mastery.xpRefineSuccess * 0.6), 'refined');
+        s = grantMastery(s, 'refinement', BALANCE.mastery.xpRefineSuccess, 'refined', 'refine');
+        s = grantMastery(s, r.path, Math.round(BALANCE.mastery.xpRefineSuccess * 0.6), 'refined', 'refine');
         if (Math.random() * 100 < (refFx.saveChancePct || 0)) {
           const firstMat = Object.keys(r.materials)[0];
           if (firstMat) s = applyEffects(s, { items: { [firstMat]: 1 }, message: `Your refinement craft lets you keep one ${ITEM_BY_ID[firstMat]?.name}.` });
         }
       } else {
         s = { ...s, log: [...s.log, 'Refinement failed. The materials are lost.'] };
-        s = grantMastery(s, 'refinement', BALANCE.mastery.xpRefineFail, 'refined');
+        s = grantMastery(s, 'refinement', BALANCE.mastery.xpRefineFail, 'refined', 'refine');
       }
       return advanceTime(s, BALANCE.time.refineMinutes);
     }
@@ -896,11 +924,11 @@ export function gameReducer(state, action) {
       let s = applyEffects(state, { essence: -list.essenceCost, spiritStones: -list.stonesCost, removeItems: list.materials });
       if (Math.random() * 100 < list.chance) {
         s = { ...s, ownedGu: s.ownedGu.map(g => g.instanceId === inst.instanceId ? { ...g, rank: list.target } : g) };
-        s = grantMastery(s, 'refinement', BALANCE.mastery.xpRefineSuccess, 'refined');
+        s = grantMastery(s, 'refinement', BALANCE.mastery.xpRefineSuccess, 'refined', 'refine');
         s = pushToast(s, { icon: '✦', title: 'GU REFINED', lines: [`${gu.name} rises to Rank ${list.target}.`, `Effect power +${cfg.rankPowerStep}%`] });
         s = { ...s, log: [...s.log, `Refinement succeeds — ${gu.name} rises to Rank ${list.target}!`] };
       } else {
-        s = grantMastery(s, 'refinement', BALANCE.mastery.xpRefineFail, 'refined');
+        s = grantMastery(s, 'refinement', BALANCE.mastery.xpRefineFail, 'refined', 'refine');
         if (Math.random() * 100 >= cfg.injuryChance) {
           s = { ...s, log: [...s.log, `Refinement fails — the essence scatters. ${gu.name} survives unharmed, but the materials are lost.`] };
         } else if (list.vital) {

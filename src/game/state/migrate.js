@@ -151,5 +151,12 @@ export function migrateSave(old) {
     };
   }
 
+  // v9: recipe knowledge journal — undiscovered recipes reveal only what the
+  // character has actually heard (rumored → identified → located); exact
+  // sources are earned through conversation and purchase, never given.
+  if (s.version < 9) {
+    s = { ...s, version: 9, recipeKnowledge: s.recipeKnowledge || {} };
+  }
+
   return s;
 }

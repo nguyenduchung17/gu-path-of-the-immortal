@@ -56,6 +56,16 @@ export const NPCS = [
   {
     id: 'mysteriousTraveler', name: 'Mysterious Traveler', area: 'blackMarket', role: 'unknown', avatar: '🎭',
     greeting: '...You have the look of someone who listens. There are ruins in the mist. Old Gu sleep there. Fetch one for me, and I\u2019ll owe you.',
+    // Information is stock here — rumors cheap, reliable leads dear.
+    shop: {
+      intel: [
+        { id: 'it_sword', name: 'A rumor of flying steel', price: 40, clue: { recipeId: 'flyingSword', level: 'rumored' } },
+        { id: 'it_tempest', name: 'Whispers of a storm Gu', price: 70, clue: { recipeId: 'tempestGu', level: 'rumored' } },
+        { id: 'it_mist', name: 'A devourer\u2019s secret', price: 160, clue: { recipeId: 'phantomTide', level: 'located' } },
+        { id: 'it_warden', name: 'Runes of the ruin warden', price: 160, clue: { recipeId: 'jadeColossus', level: 'located' } },
+        { id: 'it_matriarch', name: 'A pact of marrow', price: 160, clue: { recipeId: 'nightSwarm', level: 'located' } },
+      ],
+    },
   },
   {
     id: 'blackMarketMerchant', name: 'The Broker', area: 'blackMarket', role: 'blackmarket', avatar: '🦝',
@@ -80,6 +90,11 @@ export const NPCS = [
     shop: {
       sells: [{ itemId: 'simpleMeal', price: 3 }, { itemId: 'ration', price: 4 }, { itemId: 'gingerTea', price: 3 }],
       buys: [],
+      // Tavern talk — cheap rumors overheard at the inn.
+      intel: [
+        { id: 'it_tide', name: 'Tavern talk: a sealed scroll', price: 25, clue: { recipeId: 'tideBinding', level: 'rumored' } },
+        { id: 'it_veil', name: 'Tavern talk: the veil of adepts', price: 45, clue: { recipeId: 'mistVeil', level: 'rumored' } },
+      ],
     },
   },
   {

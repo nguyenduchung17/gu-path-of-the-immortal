@@ -14,7 +14,7 @@ export const EVENTS = [
     options: [
       { label: 'Help them', effects: { essence: -10, reputation: { villagers: 2 }, message: 'You tend their wounds. They bless your name. (-10 essence, +villager rep)' } },
       { label: 'Search them', effects: { items: { spiritStone: 15 }, reputation: { villagers: -3 }, message: 'You take their stones. Word will spread. (+15 stones, -villager rep)' } },
-      { label: 'Question them', effects: { exp: 10, message: 'They speak of dangers ahead. (+10 insight)' } },
+      { label: 'Question them', effects: { exp: 10, randomRumor: true, message: 'They speak of dangers ahead — and of stranger knowledge on far trails. (+10 insight, a new rumor)' } },
       { label: 'Leave them', effects: { message: 'You walk on.' } },
     ],
   },
@@ -42,6 +42,7 @@ export const EVENTS = [
     options: [
       { label: 'Buy it (40 stones)', effects: { spiritStones: -40, items: { moonPetal: 1 }, flag: 'hasMoonPetal', message: 'You acquire a Moon Petal.' } },
       { label: 'Rob him', effects: { items: { moonPetal: 1 }, spiritStones: 20, flag: 'hasMoonPetal', reputation: { merchants: -4 }, startCombat: 'bandit', message: 'You snatch his wares and coin — but he has friends! (-merchant rep)' } },
+      { label: 'Ask what he has heard (15 stones)', effects: { spiritStones: -15, randomRumor: true, message: 'The merchant lowers his voice and shares a whisper from the roads. (-15 stones)' } },
       { label: 'Decline', effects: { message: 'You walk away.' } },
     ],
   },
