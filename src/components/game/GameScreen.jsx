@@ -15,6 +15,7 @@ import DaoMasteryPanel from './DaoMasteryPanel';
 import InventoryPanel from './InventoryPanel';
 import QuestsPanel from './QuestsPanel';
 import MapPanel from './MapPanel';
+import BestiaryPanel from './BestiaryPanel';
 import CombatView from './CombatView';
 import EventModal from './EventModal';
 import DialogueModal from './DialogueModal';
@@ -38,6 +39,7 @@ const PANEL_META = {
   inventory: { titleKey: 'ui.inventory', icon: '🎒' },
   quests: { titleKey: 'ui.quests', icon: '📜' },
   map: { titleKey: 'ui.map', icon: '🧭', wide: true },
+  bestiary: { titleKey: 'ui.bestiary', icon: '🐾' },
 };
 
 export default function GameScreen() {
@@ -81,7 +83,7 @@ export default function GameScreen() {
         return;
       }
       // hotbar hotkeys (C/G/R/M/I/Q/P) match the hotbar tooltips
-      const HOTKEYS = { c: 'cultivation', g: 'gu', r: 'recipes', m: 'dao', i: 'inventory', q: 'quests', p: 'map' };
+      const HOTKEYS = { c: 'cultivation', g: 'gu', r: 'recipes', m: 'dao', i: 'inventory', q: 'quests', p: 'map', b: 'bestiary' };
       const id = HOTKEYS[e.key.toLowerCase()];
       if (!id || e.repeat) return;
       const s = escRef.current;
@@ -115,6 +117,7 @@ export default function GameScreen() {
           {panel === 'inventory' && <InventoryPanel />}
           {panel === 'quests' && <QuestsPanel />}
           {panel === 'map' && <MapPanel />}
+          {panel === 'bestiary' && <BestiaryPanel />}
         </OverlayWindow>
       )}
 

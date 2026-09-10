@@ -4,6 +4,7 @@ import { sfx, isMuted, toggleMuted } from '@/game/audio/sfx';
 import { CULTIVATION_STAGES } from '@/game/data/cultivation';
 import { diffOf } from '@/game/config/balance';
 import { phaseOf, timeLabel, PHASE_ICON } from '@/game/engine/time';
+import { weatherOf, weatherEffectLine } from '@/game/engine/weather';
 import { zoneAt, DEFAULT_ZONE } from '@/game/data/world';
 import { appearanceOf } from '@/game/data/appearance';
 import { tierOf, constitutionName } from '@/game/config/aptitude';
@@ -37,6 +38,7 @@ export default function HUDTop() {
   const stage = CULTIVATION_STAGES[Math.min(19, p.rank * 4 + (p.stage || 0))];
   const t = state.time || { day: 1, min: 420 };
   const zone = zoneAt(p.x, p.y) || DEFAULT_ZONE;
+  const weather = weatherOf(t);
   const tier = tierOf(p.aptitude);
   const conName = constitutionName(p.aptitude, lang);
 
@@ -80,6 +82,12 @@ export default function HUDTop() {
           <div className="text-[11px] px-2.5 py-1.5 rounded-full bg-black/45 backdrop-blur border border-amber-500/30 text-amber-200" title="Primordial Stones">💎 {p.spiritStones}</div>
           <div className="text-[11px] px-2.5 py-1.5 rounded-full bg-black/45 backdrop-blur border border-stone-700 text-stone-300" title={`${tr('ui.day')} ${t.day}`}>
             {tr('ui.day')} {t.day} · {PHASE_ICON[phaseOf(t.min)]} {timeLabel(t.min)}
+          </div>
+          <div
+            className="text-[11px] px-2.5 py-1.5 rounded-full bg-black/45 backdrop-blur border border-stone-700 text-stone-300"
+            title={weatherEffectLine(weather) || 'No effect on Gu'}
+          >
+            {weather.icon} {tr(`weather.${weather.id}`)}
           </div>
           <div className={`text-[11px] px-2.5 py-1.5 rounded-full bg-black/45 backdrop-blur border ${DANGER_CHIP[zone.danger] ?? DANGER_CHIP[2]}`} title={zone.safe ? 'Safe zone' : zone.dangerLabel}>
             {zone.name}

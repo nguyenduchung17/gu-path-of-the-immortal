@@ -65,6 +65,7 @@ export function createNewGame(name, gender, age, difficulty, slot, appearance, a
     knownPaths: [starter.path], knownRecipes: [],
     contribution: { greenValley: 0 },
     masters: {},
+    bestiary: {},
     missions: { active: [], completed: [] },
     arena: { wins: 0, losses: 0 },
     recovery: null, breakthrough: null, toasts: [],
@@ -635,6 +636,13 @@ export function gameReducer(state, action) {
     case 'PLAYER_ACTION': {
       if (state.recovery) return state;
       let s = executeRound(state, { type: action.action, guInstanceId: action.guInstanceId, itemId: action.itemId });
+      // the first clash records the foe in your bestiary
+      if (state.combat && !state.combat.seen && ENEMY_BY_ID[state.combat.enemyId]) {
+        const b = { ...(state.bestiary || {}) };
+        const prev = b[state.combat.enemyId] || { seen: 0, kills: 0 };
+        b[state.combat.enemyId] = { seen: prev.seen + 1, kills: prev.kills };
+        s = { ...s, bestiary: b, combat: { ...s.combat, seen: true } };
+      }
       s = advanceTime(s, BALANCE.time.combatRoundMinutes);
       if (s.combat && s.combat.usedItem) {
         const it = ITEM_BY_ID[s.combat.usedItem];

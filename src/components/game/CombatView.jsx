@@ -12,6 +12,7 @@ import { zoneAt } from '@/game/data/world';
 import BattleScene from './battle/BattleScene';
 import BattleCommandMenu from './battle/BattleCommandMenu';
 import { biomeOf } from './battle/biomes';
+import { weatherOf } from '@/game/engine/weather';
 import PortraitFrame from './PortraitFrame';
 import { sfx } from '@/game/audio/sfx';
 
@@ -82,6 +83,7 @@ export default function CombatView() {
   const app = appearanceOf(p);
   const tier = tierOf(p.aptitude);
   const biome = biomeOf(zoneAt(p.x, p.y)?.id, !!c.arena);
+  const weather = weatherOf(state.time);
 
   const [fx, setFx] = useState(null);
   const [casting, setCasting] = useState(null);
@@ -221,6 +223,15 @@ export default function CombatView() {
             busy ? 'border-rose-700/50 text-rose-200' : 'border-emerald-600/50 text-emerald-200 animate-pulse'
           }`}>
             {busy ? t('battle.acting') : t('battle.turn')}
+          </div>
+        )}
+
+        {/* weather conditions — Gu power shifts with the sky */}
+        {weather.id !== 'clear' && !c.over && (
+          <div className="absolute top-3 right-3 px-3 py-1.5 rounded-full bg-black/55 backdrop-blur border border-stone-700/60 text-[10px] text-stone-300 whitespace-nowrap animate-pop">
+            {weather.icon} {t(`weather.${weather.id}`)} · <span className="text-amber-200/80">
+              {Object.entries(weather.mods).map(([p, m]) => `${PATH_BY_ID[p]?.name || p} ${m > 0 ? '+' : ''}${m}%`).join(' · ')}
+            </span>
           </div>
         )}
 

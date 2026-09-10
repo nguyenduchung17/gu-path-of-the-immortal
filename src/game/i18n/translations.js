@@ -259,6 +259,24 @@ export const DICT = {
     'shop.gu': 'Gu',
     'shop.guRotating': 'rare stock — rotates daily',
 
+    // ---- bestiary ----
+    'ui.bestiary': 'Bestiary',
+    'pause.bestiary': '🐾 Bestiary',
+    'bestiary.progress': '{known}/{total} encountered · {slain} slain',
+    'bestiary.notMet': 'Not yet encountered.',
+    'bestiary.locked': 'Defeat this foe to inscribe its weakness, spoils and lore.',
+    'bestiary.seen': 'Encountered {n} · Slain {k}',
+    'bestiary.stats': 'HP {hp} · ATK {atk} · DEF {def}',
+    'bestiary.weakness': 'Weakness',
+    'bestiary.drops': 'Spoils',
+
+    // ---- weather ----
+    'weather.clear': 'Clear Skies',
+    'weather.rain': 'Rain',
+    'weather.heatwave': 'Heat Wave',
+    'weather.gale': 'Gale Winds',
+    'weather.mist': 'Spirit Mist',
+
     // ---- battle: master trials ----
     'battle.trial': 'TRIAL PASSED',
 
@@ -535,6 +553,24 @@ export const DICT = {
     // ---- shop ----
     'shop.gu': 'Cổ Trùng',
     'shop.guRotating': 'hàng hiếm — đổi theo ngày',
+
+    // ---- bestiary ----
+    'ui.bestiary': 'Sổ Quái Thú',
+    'pause.bestiary': '🐾 Sổ Quái Thú',
+    'bestiary.progress': 'Đã chạm mặt {known}/{total} · Đã hạ {slain}',
+    'bestiary.notMet': 'Chưa từng gặp.',
+    'bestiary.locked': 'Hạ gục để ghi khắc chế, chiến lợi phẩm và truyền thuyết của nó.',
+    'bestiary.seen': 'Gặp {n} · Hạ {k}',
+    'bestiary.stats': 'Máu {hp} · Tấn công {atk} · Phòng ngự {def}',
+    'bestiary.weakness': 'Khắc Chế',
+    'bestiary.drops': 'Chiến Lợi Phẩm',
+
+    // ---- weather ----
+    'weather.clear': 'Trời Trong',
+    'weather.rain': 'Mưa Rào',
+    'weather.heatwave': 'Nắng Nhiệt',
+    'weather.gale': 'Gió Lốc',
+    'weather.mist': 'Sương Linh',
 
     // ---- battle: master trials ----
     'battle.trial': 'VƯỢT THÍ',

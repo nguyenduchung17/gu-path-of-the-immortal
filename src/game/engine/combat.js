@@ -6,6 +6,7 @@ import { applyEffects } from './effects';
 import { grantMastery, bonusOf } from './mastery';
 import { BALANCE, DIFFICULTIES } from '../config/balance';
 import { applyDeath } from './death';
+import { weatherOf, weatherModOf, weatherEffectLine } from './weather';
 
 export function initCombat(enemyId, player, opts = {}) {
   const def = opts.def || ENEMY_BY_ID[enemyId];
@@ -64,7 +65,7 @@ function activeSynergies(state) {
   return new Set(SYNERGIES.filter(sy => sy.paths.every(p => equipped.has(p))).map(sy => sy.id));
 }
 
-function applyGu(gu, player, enemy, pSt, eSt, combat, push, fx, syn) {
+function applyGu(gu, player, enemy, pSt, eSt, combat, push, fx, syn, weather) {
   const e = gu.effect;
   let meaningful = false;
   if (e.attack) {
@@ -72,6 +73,7 @@ function applyGu(gu, player, enemy, pSt, eSt, combat, push, fx, syn) {
     for (let h = 0; h < hits; h++) {
       let dmg = e.attack.power + Math.floor(player.strength * 0.5);
       dmg = Math.floor(dmg * elementBuffMul(pSt, gu.element));
+      dmg = Math.floor(dmg * (1 + weatherModOf(weather, gu.path) / 100));
       dmg = Math.floor(dmg * (1 + (fx.damagePct || 0) / 100));
       if (gu.path === enemy.weakness) {
         dmg = Math.floor(dmg * (1 + BALANCE.combat.weaknessBonusPct / 100));
@@ -164,6 +166,11 @@ function finishVictory(state, combat, player, pending) {
   const droppedRecipes = (enemy.recipeDrops || []).filter(d => Math.random() * 100 < (d.chance || 100)).map(d => d.recipeId);
   let s = { ...state, player, combat: { ...combat, over: true, result: 'victory', rewards: { items, spiritStones, progress, mastery: [] } } };
   s = applyEffects(s, { items, spiritStones, progress, recipes: droppedRecipes, message: `Victory! +${spiritStones} primordial stones, +${progress}% cultivation progress.` });
+  // a kill is inscribed in the bestiary
+  const b = { ...(state.bestiary || {}) };
+  const rec = b[enemy.id] || { seen: 0, kills: 0 };
+  b[enemy.id] = { ...rec, kills: rec.kills + 1 };
+  s = { ...s, bestiary: b };
   const masteryGains = [];
   for (const pathId of Object.keys(combat.contributed)) {
     s = grantMastery(s, pathId, BALANCE.mastery.xpVictoryBonus, 'kills');
@@ -204,6 +211,12 @@ export function executeRound(state, action) {
   const windFx = bonusOf(state, 'wind');
   const earthFx = bonusOf(state, 'earth');
   const pending = [];
+  const weather = weatherOf(state.time);
+  if (!combat.weatherNoted) {
+    combat.weatherNoted = true;
+    const wl = weatherEffectLine(weather);
+    if (wl) push(wl);
+  }
 
   if (action.type === 'flee') {
     const hasWind = state.player.equippedGu.some(id => { const g = state.ownedGu.find(o => o.instanceId === id); return g && GU_BY_ID[g.guId].id === 'windStep'; });
@@ -244,7 +257,7 @@ export function executeRound(state, action) {
       }
     }
     const fx = bonusOf(state, gu.path);
-    const meaningful = applyGu(gu, player, enemy, pSt, eSt, combat, push, fx, syn);
+    const meaningful = applyGu(gu, player, enemy, pSt, eSt, combat, push, fx, syn, weather);
     if (meaningful) {
       combat.contributed[gu.path] = true;
       const uses = (combat.masteryUses[inst.instanceId] || 0) + 1;
