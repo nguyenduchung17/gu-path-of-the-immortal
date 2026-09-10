@@ -28,8 +28,12 @@ import { revealFog, seedFog, foodOf } from '../engine/guLife';
 import { applyExploreGu, carryIntoCombat, visionRadiusOf, checkHiddenPaths, hazardStep, moveOverride, exploreActive, ambushOf, nearbyPackCount } from '../engine/exploration';
 import { startInstability } from '../engine/vitalGu';
 import { QS, acceptQuest, turnInQuest, toggleTrack, abandonQuest, applyQuestEvent, emptyQuests, markDiscovered } from '../engine/questEngine';
-import { TUTORIAL_STEPS, TUTORIAL_SUPPLIES, TUTORIAL_STONES } from '../data/tutorial';
-import { tutorialObserve } from '../engine/tutorial';
+import { PATH_BY_ID } from '../data/paths';
+import {
+  T, locGuName, locItemName, locEnemyName, locZoneName, locLandmarkName, locStageName,
+  locQuestName, locQuestRewardMsg, locMissionName, locContribName, locArenaOpponentName,
+  locSpeciesName, locPathName, locEventMsg, locResourceName,
+} from '../i18n/tr';
 
 const START_STAGE = CULTIVATION_STAGES[0];
 
@@ -41,8 +45,7 @@ export function createNewGame(name, gender, age, difficulty, slot, appearance, a
   const essenceCap = essenceCapFor(START_STAGE.maxEssence, apt);
   const starterFood = foodOf(starter);
   return {
-    version: 13,
-    tutorial: { welcome: true, active: false, completed: false, skipped: false, step: 0, moves: 0, tipsSeen: {} },
+    version: 12,
     difficulty: DIFFICULTIES[difficulty] ? difficulty : 'standard',
     slot: slot || 1,
     time: { day: BALANCE.time.startDay, min: BALANCE.time.startMinutes },
@@ -85,8 +88,8 @@ export function createNewGame(name, gender, age, difficulty, slot, appearance, a
     recovery: null, breakthrough: null, toasts: [],
     combat: null, pendingEvent: null, dialogue: null,
     log: [
-      'You stand in Green Valley Town — a Rank 1 · Early Stage cultivator of the Wind Path. Roads lead out into the wilds.',
-      `${starter.name} responds to your essence — your first companion on the path.`,
+      T('wld.intro1', { stage: `${T('cult.rank0')} · ${T('cult.stage0')}`, path: locPathName(PATH_BY_ID[starter.path]) }),
+      T('wld.intro2', { gu: locGuName(starter) }),
     ],
     createdAt: Date.now(),
   };
@@ -108,16 +111,16 @@ function withQuestEvents(s, event) {
   const res = applyQuestEvent(s, event);
   let out = res.state;
   for (const u of res.updates) {
-    out = pushToast(out, { icon: '📜', title: 'OBJECTIVE UPDATED', lines: [`+${u.delta} ${u.label}`] });
+    out = pushToast(out, { icon: '📜', title: T('toast.objUpdated'), lines: [T('qs.objLine', { delta: u.delta, label: u.label })] });
   }
   for (const qid of res.ready) {
     const q = QUEST_BY_ID[qid];
-    out = pushToast(out, { icon: '✅', title: 'OBJECTIVES COMPLETE', lines: [q.name, `Return to ${NPC_BY_ID[q.giver]?.name || 'the giver'}.`] });
+    out = pushToast(out, { icon: '✅', title: T('toast.objComplete'), lines: [locQuestName(q), T('qs.returnTo', { name: NPC_BY_ID[q.giver]?.name || '?' })] });
   }
   for (const qid of res.autoCompleted) {
     const q = QUEST_BY_ID[qid];
-    out = applyEffects(out, q.rewards || {});
-    out = pushToast(out, { icon: '🎉', title: 'QUEST COMPLETE', lines: [q.name] });
+    out = applyEffects(out, { ...q.rewards, message: locQuestRewardMsg(q) || undefined });
+    out = pushToast(out, { icon: '🎉', title: T('toast.questComplete'), lines: [locQuestName(q)] });
   }
   return out;
 }
@@ -160,11 +163,11 @@ export function breakthroughChecklist(state) {
   const matEntries = Object.entries(req.items || {});
   const maxMastery = Math.max(0, ...Object.values(state.mastery || {}).map(m => m.level || 1));
   return metReq([
-    { key: 'progress', met: p.cultivationProgress >= 100, text: '100% Cultivation Progress' },
-    { key: 'essence', met: p.primevalEssence >= req.essence, text: `Essence: ${Math.floor(p.primevalEssence)}/${req.essence}` },
-    ...(req.stones ? [{ key: 'stones', met: p.spiritStones >= req.stones, text: `Primordial Stones: ${p.spiritStones}/${req.stones}` }] : []),
-    ...matEntries.map(([id, qty]) => ({ key: `item-${id}`, met: (state.inventory.materials?.[id] || 0) >= qty, text: `${ITEM_BY_ID[id]?.name || id}: ${state.inventory.materials?.[id] || 0}/${qty}` })),
-    ...(req.masteryLevel ? [{ key: 'mastery', met: maxMastery >= req.masteryLevel, text: `Any Dao Path at Mastery Level ${req.masteryLevel}` }] : []),
+    { key: 'progress', met: p.cultivationProgress >= 100, text: T('chk.progress') },
+    { key: 'essence', met: p.primevalEssence >= req.essence, text: T('chk.essence', { cur: Math.floor(p.primevalEssence), req: req.essence }) },
+    ...(req.stones ? [{ key: 'stones', met: p.spiritStones >= req.stones, text: T('chk.stones', { cur: p.spiritStones, req: req.stones }) }] : []),
+    ...matEntries.map(([id, qty]) => ({ key: `item-${id}`, met: (state.inventory.materials?.[id] || 0) >= qty, text: T('chk.item', { name: ITEM_BY_ID[id] ? locItemName(ITEM_BY_ID[id]) : id, cur: state.inventory.materials?.[id] || 0, req: qty }) })),
+    ...(req.masteryLevel ? [{ key: 'mastery', met: maxMastery >= req.masteryLevel, text: T('chk.mastery', { n: req.masteryLevel }) }] : []),
   ]);
 }
 
@@ -185,12 +188,12 @@ export function refineChecklist(state, recipeId) {
       && mats.every(([id, q]) => (state.inventory.materials?.[id] || 0) >= q),
     essenceCost,
     checks: [
-      { key: 'site', met: atSite, text: 'At a settlement (refinement grounds)' },
-      { key: 'stage', met: globalStage(p) >= r.stageReq, text: `Cultivation: ${CULTIVATION_STAGES[r.stageReq].name}` },
-      { key: 'mastery', met: (state.mastery?.[r.path]?.level || 1) >= r.masteryReq, text: `${r.path[0].toUpperCase() + r.path.slice(1)} Mastery Level ${r.masteryReq}` },
-      ...mats.map(([id, q]) => ({ key: `item-${id}`, met: (state.inventory.materials?.[id] || 0) >= q, text: `${ITEM_BY_ID[id]?.name || id}: ${state.inventory.materials?.[id] || 0}/${q}` })),
-      { key: 'essence', met: p.primevalEssence >= essenceCost, text: `Essence: ${Math.floor(p.primevalEssence)}/${essenceCost}` },
-      { key: 'stones', met: p.spiritStones >= r.stones, text: `Primordial Stones: ${p.spiritStones}/${r.stones}` },
+      { key: 'site', met: atSite, text: T('chk.site') },
+      { key: 'stage', met: globalStage(p) >= r.stageReq, text: T('chk.stage', { stage: locStageName(CULTIVATION_STAGES[r.stageReq]) }) },
+      { key: 'mastery', met: (state.mastery?.[r.path]?.level || 1) >= r.masteryReq, text: T('chk.pathMastery', { path: locPathName(PATH_BY_ID[r.path]), n: r.masteryReq }) },
+      ...mats.map(([id, q]) => ({ key: `item-${id}`, met: (state.inventory.materials?.[id] || 0) >= q, text: T('chk.item', { name: ITEM_BY_ID[id] ? locItemName(ITEM_BY_ID[id]) : id, cur: state.inventory.materials?.[id] || 0, req: q }) })),
+      { key: 'essence', met: p.primevalEssence >= essenceCost, text: T('chk.essence', { cur: Math.floor(p.primevalEssence), req: essenceCost }) },
+      { key: 'stones', met: p.spiritStones >= r.stones, text: T('chk.stones', { cur: p.spiritStones, req: r.stones }) },
     ],
   };
 }
@@ -218,12 +221,12 @@ export function refineGuChecklist(state, inst) {
   const blocked = (inst.refineBlockedUntilDay || 0) > day;
   const matEntries = Object.entries(materials);
   const checks = [
-    { key: 'max', met: cur < cfg.maxRank, text: `Rank below ${cfg.maxRank}` },
-    { key: 'rank', met: p.rank >= target - 1, text: `Your cultivation: needs Rank ${target - 1}+ (you are Rank ${p.rank})` },
-    { key: 'injury', met: !injured && !blocked, text: injured ? `Injured — recovers Day ${inst.injuredUntilDay}` : blocked ? `Cannot refine again until Day ${inst.refineBlockedUntilDay}` : 'Not injured or recovering' },
-    ...matEntries.map(([id, q]) => ({ key: `item-${id}`, met: (state.inventory[ITEM_BY_ID[id].category]?.[id] || 0) >= q, text: `${ITEM_BY_ID[id]?.name || id}: ${state.inventory[ITEM_BY_ID[id].category]?.[id] || 0}/${q}` })),
-    { key: 'essence', met: p.primevalEssence >= essenceCost, text: `Essence: ${Math.floor(p.primevalEssence)}/${essenceCost}` },
-    { key: 'stones', met: p.spiritStones >= stonesCost, text: `Primordial Stones: ${p.spiritStones}/${stonesCost}` },
+    { key: 'max', met: cur < cfg.maxRank, text: T('chk.maxRank', { n: cfg.maxRank }) },
+    { key: 'rank', met: p.rank >= target - 1, text: T('chk.rank', { need: T(`cult.rank${target - 2}`), cur: T(`cult.rank${p.rank}`) }) },
+    { key: 'injury', met: !injured && !blocked, text: injured ? T('chk.injured', { d: inst.injuredUntilDay }) : blocked ? T('chk.blocked', { d: inst.refineBlockedUntilDay }) : T('chk.healthy') },
+    ...matEntries.map(([id, q]) => ({ key: `item-${id}`, met: (state.inventory[ITEM_BY_ID[id].category]?.[id] || 0) >= q, text: T('chk.item', { name: locItemName(ITEM_BY_ID[id]), cur: state.inventory[ITEM_BY_ID[id].category]?.[id] || 0, req: q }) })),
+    { key: 'essence', met: p.primevalEssence >= essenceCost, text: T('chk.essence', { cur: Math.floor(p.primevalEssence), req: essenceCost }) },
+    { key: 'stones', met: p.spiritStones >= stonesCost, text: T('chk.stones', { cur: p.spiritStones, req: stonesCost }) },
   ];
   return {
     ok: checks.every(c => c.met), cur, target, vital, chance, stonesCost, essenceCost, materials,
@@ -251,7 +254,7 @@ function wildGuAfterEncounter(state, worldId, gone) {
   };
 }
 
-function coreReducer(state, action) {
+export function gameReducer(state, action) {
   // a deceased (True Cultivation) character can no longer act — only leave or reset
   if (state && state.deceased && !['LOAD', 'RESET', 'END_COMBAT'].includes(action.type)) return state;
   switch (action.type) {
@@ -284,10 +287,12 @@ function coreReducer(state, action) {
       const logAdd = [];
       if (!zonesFound[zone.id]) {
         zonesFound[zone.id] = true;
-        logAdd.push(`Entered ${zone.name} — ${zone.dangerLabel.toLowerCase()}.`);
+        const dangerTxt = zone.safe ? T('danger.safe')
+          : T(zone.danger >= 5 ? 'danger.extreme' : zone.danger >= 4 ? 'danger.high' : zone.danger >= 3 ? 'danger.moderate' : 'danger.low');
+        logAdd.push(T('wld.entered', { zone: locZoneName(zone), danger: dangerTxt }));
         // territory knowledge — learning what haunts a land is itself a reward
         const fauna = ZONE_FAUNA[zone.id];
-        if (fauna?.length) logAdd.push(`Territory — ${fauna.map(id => ENEMY_BY_ID[id]?.name || id).join(', ')} ${fauna.length > 1 ? 'haunt' : 'haunts'} these lands.`);
+        if (fauna?.length) logAdd.push(T(fauna.length > 1 ? 'wld.territoryPl' : 'wld.territory', { fauna: fauna.map(id => ENEMY_BY_ID[id] ? locEnemyName(ENEMY_BY_ID[id]) : id).join(', ') }));
       }
       const lms = ws.discovered?.landmarks || {};
       let newLm = null;
@@ -299,8 +304,8 @@ function coreReducer(state, action) {
       s = { ...s, worldState: { ...ws, discovered } };
       if (!(ws.discovered?.zones || {})[zone.id]) s = withQuestEvents(s, { type: 'LOCATION_DISCOVERED', id: zone.id });
       if (newLm) {
-        s = pushToast(s, { icon: '📍', title: 'Discovered', lines: [newLm.name] });
-        logAdd.push(`Discovered: ${newLm.name}.`);
+        s = pushToast(s, { icon: '📍', title: T('toast.discovered'), lines: [locLandmarkName(newLm)] });
+        logAdd.push(T('wld.discovered', { name: locLandmarkName(newLm) }));
       }
       if (passNote) logAdd.push(passNote);
       if (logAdd.length) s = { ...s, log: [...s.log, ...logAdd] };
@@ -342,11 +347,11 @@ function coreReducer(state, action) {
       if (Date.now() - last < BALANCE.world.gatherRespawnMs) return state;
       // rare harvests hide their essence — only a sensing Gu can gather them
       if (node.rare && !exploreActive(state).sense) {
-        return { ...state, log: [...state.log, `${node.name} eludes your grasp — its essence hides from mundane senses. A sensing Gu could reveal it.`] };
+        return { ...state, log: [...state.log, T('gather.rareHidden', { name: locResourceName(node) })] };
       }
       const nightBonus = phaseOf((state.time || {}).min) === 'night' ? (BALANCE.time.nightGatherBonus[node.type] || 0) : 0;
       const qty = 1 + nightBonus + gatherBonus(state) + (Math.random() < state.player.perception * 0.01 ? 1 : 0);
-      let s = applyEffects(state, { items: { [node.type]: qty }, message: `Gathered ${qty} ${node.name}.` });
+      let s = applyEffects(state, { items: { [node.type]: qty }, message: T('gather.gathered', { qty, name: locResourceName(node) }) });
       s = { ...s, worldState: { ...s.worldState, gathered: { ...s.worldState.gathered, [node.id]: Date.now() } } };
       s = withQuestEvents(s, { type: 'ITEM_COLLECTED', id: node.type, qty });
       return advanceTime(s, BALANCE.time.gatherMinutes);
@@ -366,7 +371,7 @@ function coreReducer(state, action) {
         hp: e.hp, stability: e.stability, statuses: carry.statuses, playerStatuses: carry.playerStatuses,
         worldId: e.id, difficulty: state.difficulty, zoneId: zoneAt(p.x, p.y)?.id,
         ambush: amb.amb, allies: pack, scouted: !!exploreActive(state).vision,
-        intro: amb.amb === 'player' ? `AMBUSH! You strike from cover — the ${def.name} reels!` : `You strike first — the ${def.name} turns on you!`,
+        intro: amb.amb === 'player' ? T('cmt.ambushIntroPlayer', { enemy: locEnemyName(def) }) : T('cmt.strikeFirst', { enemy: locEnemyName(def) }),
       });
       // the pack answers: same-species kin nearby converge on the fight
       let s = { ...state, combat };
@@ -384,12 +389,12 @@ function coreReducer(state, action) {
       if (!inn) return state;
       const p = state.player;
       const cost = Math.max(1, Math.round(inn.cost * diffOf(state).priceMul));
-      if (p.spiritStones < cost) return { ...state, log: [...state.log, `Not enough primordial stones — the room costs ${cost}.`] };
+      if (p.spiritStones < cost) return { ...state, log: [...state.log, T('inn.noStones', { cost })] };
       // sleep restores HP (not essence) and includes one free morning meal
       let s = applyEffects(state, {
         hp: p.maxHp, spiritStones: -cost,
         items: { [BALANCE.inn.mealItemId]: 1 },
-        message: `You rent a room and sleep until morning. (-${cost} primordial stones)`,
+        message: T('inn.rented', { cost }),
       });
       const t = s.time || { day: BALANCE.time.startDay, min: BALANCE.time.startMinutes };
       const wake = t.min < BALANCE.time.sleepToMinutes
@@ -400,7 +405,7 @@ function coreReducer(state, action) {
         time: wake,
         sleeping: { wakeAt: Date.now() + BALANCE.time.sleepFadeMs },
         worldState: { ...s.worldState, discovered: { ...s.worldState.discovered, inns: { ...(s.worldState.discovered.inns || {}), [inn.id]: true } } },
-        log: [...s.log, `Day ${wake.day}, 07:00 — you wake rested, a simple morning meal from the innkeeper in your pack.`],
+        log: [...s.log, T('inn.wake', { day: wake.day })],
       };
       return s;
     }
@@ -410,16 +415,16 @@ function coreReducer(state, action) {
     case 'REST_CAMP': {
       if (state.combat || state.recovery) return state;
       const p = state.player;
-      let s = advanceTime(applyEffects(state, { hp: Math.floor(p.maxHp * 0.35), message: 'You rest at the campsite. Beasts rarely stray here.' }), BALANCE.time.campRestMinutes);
+      let s = advanceTime(applyEffects(state, { hp: Math.floor(p.maxHp * 0.35), message: T('camp.rest') }), BALANCE.time.campRestMinutes);
       if (s.player.primevalEssence < s.player.maxPrimevalEssence) {
-        s = { ...s, recovery: { mode: 'camp', startedAt: Date.now() }, log: [...s.log, 'You begin recovering essence by the fire — it will not be interrupted here.'] };
+        s = { ...s, recovery: { mode: 'camp', startedAt: Date.now() }, log: [...s.log, T('camp.recovery')] };
       }
       return s;
     }
 
     case 'USE_FORMATION': {
       if (state.combat || state.recovery) return state;
-      return advanceTime({ ...state, log: [...state.log, 'The formation hums with dormant power — no distant regions are charted yet.'] }, BALANCE.time.talkMinutes);
+      return advanceTime({ ...state, log: [...state.log, T('wld.formation')] }, BALANCE.time.talkMinutes);
     }
 
     case 'TALK_NPC': {
@@ -473,7 +478,7 @@ function coreReducer(state, action) {
       const have = state.inventory[ITEM_BY_ID[action.itemId].category]?.[action.itemId] || 0;
       if (have < qty) return state;
       const price = Math.floor(ITEM_BY_ID[action.itemId].value * 0.5 * qty);
-      return advanceTime(applyEffects(state, { removeItems: { [action.itemId]: qty }, spiritStones: price, message: `Sold ${qty} ${ITEM_BY_ID[action.itemId].name} for ${price} primordial stones.` }), BALANCE.time.tradeMinutes);
+      return advanceTime(applyEffects(state, { removeItems: { [action.itemId]: qty }, spiritStones: price, message: T('shop.sold', { qty, name: locItemName(ITEM_BY_ID[action.itemId]), price }) }), BALANCE.time.tradeMinutes);
     }
 
     // ---------- Rumors & intel ----------
@@ -487,7 +492,7 @@ function coreReducer(state, action) {
         || ((CLUE_RANK[state.recipeKnowledge?.[offer.clue.recipeId]] || 0) >= (CLUE_RANK[offer.clue.level] || 0));
       if (already) return state;
       const total = shopPrice(offer.price, state);
-      if (state.player.spiritStones < total) return { ...state, log: [...state.log, 'Not enough primordial stones for this whisper.'] };
+      if (state.player.spiritStones < total) return { ...state, log: [...state.log, T('shop.noStonesWhisper')] };
       let s = { ...state, player: { ...state.player, spiritStones: state.player.spiritStones - total } };
       s = learnClue(s, offer.clue.recipeId, offer.clue.level);
       return advanceTime(s, BALANCE.time.tradeMinutes);
@@ -498,7 +503,7 @@ function coreReducer(state, action) {
       if (state.combat || state.recovery) return state;
       const m = MISSION_BY_ID[action.missionId];
       if (!m || state.missions.active.includes(m.id) || state.missions.completed.includes(m.id)) return state;
-      return advanceTime({ ...state, missions: { ...state.missions, active: [...state.missions.active, m.id] }, log: [...state.log, `Mission accepted: ${m.name}.`] }, BALANCE.time.tradeMinutes);
+      return advanceTime({ ...state, missions: { ...state.missions, active: [...state.missions.active, m.id] }, log: [...state.log, T('qs.missionAccepted', { name: locMissionName(m) })] }, BALANCE.time.tradeMinutes);
     }
     case 'MISSION_TURN_IN': {
       if (state.combat || state.recovery) return state;
@@ -508,7 +513,7 @@ function coreReducer(state, action) {
       s = applyEffects(s, {
         ...(m.rewards || {}),
         contribution: (m.rewards && m.rewards.contribution) || 0,
-        message: `Mission complete: ${m.name}. (+${(m.rewards && m.rewards.contribution) || 0} contribution)`,
+        message: T('qs.missionDone', { name: locMissionName(m), c: (m.rewards && m.rewards.contribution) || 0 }),
       });
       s = { ...s, missions: { ...s.missions, active: s.missions.active.filter(id => id !== m.id), completed: [...s.missions.completed, m.id] } };
       return advanceTime(s, BALANCE.time.tradeMinutes);
@@ -518,18 +523,18 @@ function coreReducer(state, action) {
       const offer = CONTRIBUTION_OFFERS.find(o => o.id === action.offerId);
       if (!offer) return state;
       const contrib = (state.contribution && state.contribution.greenValley) || 0;
-      if (contrib < offer.cost) return { ...state, log: [...state.log, 'Not enough contribution points.'] };
+      if (contrib < offer.cost) return { ...state, log: [...state.log, T('shop.noContribution')] };
       if (offer.grant.recipe && state.knownRecipes.includes(offer.grant.recipe)) return state;
       if (offer.req) {
         if (offer.req.stageReq !== undefined && globalStage(state.player) < offer.req.stageReq)
-          return { ...state, log: [...state.log, 'Your cultivation is not sufficient for this reward.'] };
+          return { ...state, log: [...state.log, T('shop.needStage')] };
         if (offer.req.mastery && (state.mastery?.[offer.req.mastery.path]?.level || 1) < offer.req.mastery.level)
-          return { ...state, log: [...state.log, 'Your path mastery is not sufficient for this reward.'] };
+          return { ...state, log: [...state.log, T('shop.needMastery')] };
       }
       let s = { ...state, contribution: { ...state.contribution, greenValley: contrib - offer.cost } };
       if (offer.grant.recipe) s = learnRecipe(s, offer.grant.recipe);
-      if (offer.grant.items) s = applyEffects(s, { items: offer.grant.items, message: `Exchanged contribution for ${offer.name}. (-${offer.cost} contribution)` });
-      else s = { ...s, log: [...s.log, `Exchanged contribution for ${offer.name}. (-${offer.cost} contribution)`] };
+      if (offer.grant.items) s = applyEffects(s, { items: offer.grant.items, message: T('shop.contribExchanged', { name: locContribName(offer), cost: offer.cost }) });
+      else s = { ...s, log: [...s.log, T('shop.contribExchanged', { name: locContribName(offer), cost: offer.cost })] };
       return s;
     }
 
@@ -538,15 +543,15 @@ function coreReducer(state, action) {
       if (busy(state)) return state;
       const ch = ARENA_BY_ID[action.challengeId];
       if (!ch) return state;
-      if (state.player.spiritStones < ch.stake) return { ...state, log: [...state.log, `You need ${ch.stake} primordial stones to post this stake.`] };
-      let s = applyEffects(state, { spiritStones: -ch.stake, message: `You post your stake of ${ch.stake} primordial stones. The bout begins!` });
+      if (state.player.spiritStones < ch.stake) return { ...state, log: [...state.log, T('arena.needStake', { n: ch.stake })] };
+      let s = applyEffects(state, { spiritStones: -ch.stake, message: T('arena.stakePosted', { n: ch.stake }) });
       s = {
         ...s,
         combat: initCombat(null, s.player, {
           def: ch.opponent,
           difficulty: s.difficulty,
           arena: { challengeId: ch.id, stake: ch.stake, opponentStake: ch.opponentStake },
-          intro: `${ch.opponent.name} salutes — the duel begins!`,
+          intro: T('arena.intro', { name: locArenaOpponentName(ch) }),
         }),
       };
       return advanceTime(s, BALANCE.time.arenaMinutes);
@@ -561,7 +566,7 @@ function coreReducer(state, action) {
       const step = m.steps[ms.step];
       if (!step || step.kind !== 'req') return state;
       const list = reqChecks(state, step.req);
-      if (!list.ok) return { ...state, log: [...state.log, 'You do not yet meet the master\u2019s requirements.'] };
+      if (!list.ok) return { ...state, log: [...state.log, T('master.noReq')] };
       let s = applyEffects(state, step.grants || {});
       s = syncMasterSteps({ ...s, masters: { ...s.masters, [m.id]: { ...ms, step: ms.step + 1 } } });
       return advanceTime(s, BALANCE.time.talkMinutes);
@@ -625,11 +630,11 @@ function coreReducer(state, action) {
     // ---------- Saved loadout presets ----------
     case 'SAVE_LOADOUT': {
       const loadouts = [...(state.loadouts || [])];
-      if (loadouts.length >= 3) return { ...state, log: [...state.log, 'Loadout slots full — delete one first.'] };
+      if (loadouts.length >= 3) return { ...state, log: [...state.log, T('lo.full')] };
       if (!state.player.equippedGu.length) return state;
       const name = (action.name || '').trim().slice(0, 18) || `Loadout ${loadouts.length + 1}`;
       loadouts.push({ id: `lo_${Date.now().toString(36)}`, name, guIds: [...state.player.equippedGu] });
-      return { ...state, loadouts, log: [...state.log, `Loadout saved: ${name} (${state.player.equippedGu.length} Gu equipped).`] };
+      return { ...state, loadouts, log: [...state.log, T('lo.saved', { name, n: state.player.equippedGu.length })] };
     }
     case 'APPLY_LOADOUT': {
       const lo = (state.loadouts || []).find(l => l.id === action.loadoutId);
@@ -637,7 +642,7 @@ function coreReducer(state, action) {
       // presets only re-equip Gu that still exist in the collection
       const owned = new Set(state.ownedGu.map(g => g.instanceId));
       const guIds = lo.guIds.filter(id => owned.has(id));
-      return { ...state, player: { ...state.player, equippedGu: guIds }, log: [...state.log, `Loadout applied: ${lo.name} (${guIds.length} Gu equipped).`] };
+      return { ...state, player: { ...state.player, equippedGu: guIds }, log: [...state.log, T('lo.applied', { name: lo.name, n: guIds.length })] };
     }
     case 'DELETE_LOADOUT':
       return { ...state, loadouts: (state.loadouts || []).filter(l => l.id !== action.loadoutId) };
@@ -647,7 +652,7 @@ function coreReducer(state, action) {
       const r = RECIPE_BY_ID[action.recipeId];
       const list = refineChecklist(state, action.recipeId);
       if (!r || !state.knownRecipes.includes(r.id)) return state;
-      if (!list.ok) return { ...state, log: [...state.log, 'You cannot refine yet — requirements are unmet.'] };
+      if (!list.ok) return { ...state, log: [...state.log, T('refine.cannot')] };
       const p = state.player;
       const refFx = bonusOf(state, 'refinement');
       let s = applyEffects(state, {
@@ -1166,53 +1171,9 @@ function coreReducer(state, action) {
     case 'DISMISS_TOAST':
       return { ...state, toasts: (state.toasts || []).filter(t => t.id !== action.id) };
 
-    // ---------- Tutorial ----------
-    case 'TUTORIAL_START':
-      return { ...state, tutorial: { ...state.tutorial, welcome: false, active: true, step: 0 } };
-    case 'TUTORIAL_SKIP': {
-      // skippers receive the same starter supplies — the tutorial is help, never a toll
-      let s = applyEffects(state, {
-        items: TUTORIAL_SUPPLIES, spiritStones: TUTORIAL_STONES,
-        message: 'Starter supplies received — rations, herbs, a beast core and a few stones.',
-      });
-      return { ...s, tutorial: { ...s.tutorial, welcome: false, active: false, skipped: true } };
-    }
-    case 'TUTORIAL_STEP':
-      if (!state.tutorial?.active) return state;
-      return { ...state, tutorial: { ...state.tutorial, step: Math.min(TUTORIAL_STEPS.length - 1, state.tutorial.step + 1) } };
-    case 'TUTORIAL_PANEL': {
-      if (!state.tutorial?.active) return state;
-      const step = TUTORIAL_STEPS[state.tutorial.step];
-      return (step && step.panel === action.panel)
-        ? { ...state, tutorial: { ...state.tutorial, step: Math.min(TUTORIAL_STEPS.length - 1, state.tutorial.step + 1) } }
-        : state;
-    }
-    case 'TUTORIAL_COMPLETE': {
-      let s = applyEffects(state, {
-        items: TUTORIAL_SUPPLIES, spiritStones: TUTORIAL_STONES,
-        message: 'Tutorial complete — starter supplies received.',
-      });
-      return { ...s, tutorial: { ...s.tutorial, active: false, completed: true } };
-    }
-    case 'TUTORIAL_TIP':
-      if (!state.tutorial || state.tutorial.currentTip) return state;
-      return { ...state, tutorial: { ...state.tutorial, currentTip: action.id } };
-    case 'TUTORIAL_TIP_SEEN':
-      if (!state.tutorial) return state;
-      return { ...state, tutorial: { ...state.tutorial, currentTip: null, tipsSeen: { ...(state.tutorial.tipsSeen || {}), [action.id]: true } } };
-    case 'TUTORIAL_REPLAY':
-      return { ...state, tutorial: { ...state.tutorial, active: true, completed: false, skipped: false, step: 0, currentTip: null } };
-
     default:
       return state;
   }
 }
 
 export { objectiveMet };
-
-// Outer reducer: core game logic first, then the tutorial observer records
-// progression counters (steps walked, first talk, first battle, …) so the
-// guided lessons advance as the player actually plays.
-export function gameReducer(state, action) {
-  return tutorialObserve(coreReducer(state, action), action);
-}
