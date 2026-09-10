@@ -161,6 +161,201 @@ function treeSprite(seed) {
   return c;
 }
 
+// ---- functional vegetation (walkable cover tiles) ----
+// Tall grass 'g': knee-to-shoulder blades over the normal ground tone —
+// visually distinct from a decorative tuft, so cover reads as cover.
+function tallGrassTile(seed, dry) {
+  const c = makeCanvas(S, S), g = c.getContext('2d');
+  rect(g, 0, 0, S, S, dry ? '#5a6b38' : '#3a6b34');
+  speckle(g, [dry ? '#6b7d42' : '#44803c', dry ? '#4a5a2c' : '#2f5a2a'], 10, seed);
+  const r = prng(seed + 13);
+  const blade = dry ? '#8a9a4a' : '#5d9a4c';
+  const dark = dry ? '#54642e' : '#3f7038';
+  for (let i = 0; i < 7; i++) {
+    const x = 1 + ((r() * 14) | 0);
+    const h = 6 + ((r() * 5) | 0);
+    const sway = r() < 0.5 ? 1 : 0;
+    for (let y = 0; y < h; y++) px(g, x + (y > h / 2 ? sway : 0), S - 1 - y, y < 2 ? blade : dark);
+    if (r() < 0.4) px(g, x + 1, S - 2 - h, blade);
+  }
+  return c;
+}
+
+// Dense growth 'G': reeds / thick bushes — darker, fuller, taller than 'g'.
+function denseGrowthTile(seed, reed) {
+  const c = makeCanvas(S, S), g = c.getContext('2d');
+  rect(g, 0, 0, S, S, reed ? '#3a5a42' : '#2f5230');
+  speckle(g, ['#3f6b4a', '#28422a'], 10, seed);
+  const r = prng(seed + 17);
+  for (let i = 0; i < 6; i++) {
+    const x = 1 + ((r() * 14) | 0);
+    const h = 9 + ((r() * 4) | 0);
+    const col = reed ? '#4f8a58' : '#357a3e';
+    for (let y = 0; y < h; y++) px(g, x, S - 1 - y, y < 3 ? '#66a86e' : col);
+    if (reed && r() < 0.5) px(g, x, S - h, '#8a6a43'); // seed head
+  }
+  return c;
+}
+
+// Cave mouth 'H': a dark opening in living rock.
+function caveMouthTile(seed) {
+  const c = makeCanvas(S, S), g = c.getContext('2d');
+  rect(g, 0, 0, S, S, '#5a5148');
+  rect(g, 0, 0, S, 3, '#7a7062');
+  rect(g, 0, 3, S, 1, '#3c352e');
+  // the black opening
+  g.fillStyle = '#0d0d12';
+  g.beginPath();
+  g.ellipse(8, 10, 6, 7, 0, 0, Math.PI * 2);
+  g.fill();
+  rect(g, 2, 10, 12, 6, '#0d0d12');
+  // rubble around the mouth
+  const r = prng(seed + 3);
+  for (let i = 0; i < 6; i++) px(g, 1 + ((r() * 14) | 0), 8 + ((r() * 7) | 0), r() < 0.5 ? '#6b6255' : '#453d35');
+  rect(g, 0, S - 2, S, 2, '#453d35');
+  return c;
+}
+
+// ---- cave tiles (darker than the surface, never pure black) ----
+function caveFloorTile(seed) {
+  const c = makeCanvas(S, S), g = c.getContext('2d');
+  rect(g, 0, 0, S, S, '#332e2a');
+  speckle(g, ['#3d3733', '#2a2521', '#453f39'], 16, seed);
+  const r = prng(seed + 5);
+  for (let i = 0; i < 3; i++) rect(g, 2 + ((r() * 11) | 0), 2 + ((r() * 11) | 0), 2, 1, r() < 0.5 ? '#3d3733' : '#292420');
+  return c;
+}
+
+function caveWallTile(seed) {
+  const c = makeCanvas(S, S), g = c.getContext('2d');
+  rect(g, 0, 0, S, S, '#211d1b');
+  const r = prng(seed + 7);
+  for (let y = 0; y < S; y += 5) {
+    const shift = ((y / 5) % 2) * 4;
+    for (let x = 0; x < S; x += 8) {
+      rect(g, x + shift, y, 7, 4, '#2c2723');
+      rect(g, x + shift, y, 7, 1, '#3a342e');
+      px(g, x + shift + 2 + ((r() * 4) | 0), y + 2, '#191513');
+    }
+  }
+  speckle(g, ['#3a342e', '#181412'], 8, seed + 9);
+  return c;
+}
+
+function caveWaterFrame(base, wave, phase) {
+  const c = makeCanvas(S, S), g = c.getContext('2d');
+  rect(g, 0, 0, S, S, base);
+  for (let y = 2; y < S; y += 5) {
+    const off = ((y + phase) % 10) < 5 ? 0 : 3;
+    for (let x = 0; x < S; x += 7) rect(g, (x + off) % S, y, 3, 1, wave);
+  }
+  return c;
+}
+
+function crystalTile(seed, col) {
+  const c = makeCanvas(S, S), g = c.getContext('2d');
+  rect(g, 0, 0, S, S, '#332e2a');
+  speckle(g, ['#3d3733', '#2a2521'], 12, seed);
+  const r = prng(seed + 3);
+  for (let i = 0; i < 3; i++) {
+    const x = 3 + ((r() * 9) | 0);
+    const h = 5 + ((r() * 5) | 0);
+    for (let y = 0; y < h; y++) {
+      const w = y < 2 ? 1 : 2;
+      rect(g, x, S - 4 - y, w, 1, y < 2 ? '#eaf6ff' : col);
+    }
+  }
+  return c;
+}
+
+function mushroomTile(seed) {
+  const c = makeCanvas(S, S), g = c.getContext('2d');
+  rect(g, 0, 0, S, S, '#332e2a');
+  speckle(g, ['#3d3733', '#2a2521'], 12, seed);
+  const r = prng(seed + 11);
+  for (let i = 0; i < 3; i++) {
+    const x = 2 + ((r() * 11) | 0);
+    const h = 2 + ((r() * 3) | 0);
+    rect(g, x, S - 2 - h, 1, h + 1, '#cfc3a8');
+    const cap = r() < 0.5 ? '#7fd8e8' : '#b088ff';
+    rect(g, x - 1, S - 3 - h, 3, 2, cap);
+    px(g, x, S - 2 - h, '#e8fbff');
+  }
+  return c;
+}
+
+function bonesTile(seed) {
+  const c = makeCanvas(S, S), g = c.getContext('2d');
+  rect(g, 0, 0, S, S, '#332e2a');
+  speckle(g, ['#3d3733', '#2a2521'], 12, seed);
+  const r = prng(seed + 19);
+  for (let i = 0; i < 3; i++) {
+    const x = 2 + ((r() * 11) | 0), y = 3 + ((r() * 9) | 0);
+    rect(g, x, y, 3, 1, '#d8d2c0');
+    px(g, x, y - 1, '#b8b0a0'); px(g, x + 2, y - 1, '#b8b0a0');
+  }
+  return c;
+}
+
+function torchTile() {
+  const c = makeCanvas(S, S), g = c.getContext('2d');
+  rect(g, 0, 0, S, S, '#332e2a');
+  rect(g, 7, 5, 2, 9, '#4a3018');
+  rect(g, 6, 2, 4, 4, '#241f18');
+  rect(g, 7, 3, 2, 2, '#e07a2a');
+  return c;
+}
+
+function columnTile(seed) {
+  const c = makeCanvas(S, S), g = c.getContext('2d');
+  rect(g, 0, 0, S, S, '#332e2a');
+  rect(g, 4, 1, 8, 14, '#494339');
+  rect(g, 4, 1, 8, 2, '#5f5850');
+  rect(g, 4, 13, 8, 2, '#3a342e');
+  rect(g, 4, 4, 8, 1, '#3a342e');
+  const r = prng(seed + 23);
+  for (let i = 0; i < 3; i++) px(g, 5 + ((r() * 6) | 0), 3 + ((r() * 10) | 0), '#2c2723');
+  return c;
+}
+
+function crackTile(seed) {
+  const c = makeCanvas(S, S), g = c.getContext('2d');
+  rect(g, 0, 0, S, S, '#2c2723');
+  for (let y = 0; y < S; y += 5) {
+    const shift = ((y / 5) % 2) * 4;
+    for (let x = 0; x < S; x += 8) {
+      rect(g, x + shift, y, 7, 4, '#2c2723');
+      rect(g, x + shift, y, 7, 1, '#3a342e');
+    }
+  }
+  // the crack — a jagged seam of daylight-black
+  g.strokeStyle = '#0d0d12';
+  g.lineWidth = 1.5;
+  g.beginPath();
+  g.moveTo(4, 1); g.lineTo(7, 6); g.lineTo(5, 9); g.lineTo(9, 13); g.lineTo(7, 15);
+  g.stroke();
+  return c;
+}
+
+// stairs / exits: carved steps out of the cave
+function exitTile(dir) {
+  const c = makeCanvas(S, S), g = c.getContext('2d');
+  rect(g, 0, 0, S, S, '#332e2a');
+  speckle(g, ['#3d3733', '#2a2521'], 12, 31);
+  // stacked steps narrowing into the dark
+  for (let i = 0; i < 4; i++) {
+    rect(g, 2 + i * 1.5, 12 - i * 3, 12 - i * 3, 3, i % 2 ? '#453f39' : '#3d3733');
+    rect(g, 2 + i * 1.5, 12 - i * 3, 12 - i * 3, 1, '#544d45');
+  }
+  // direction glyph: ▲ out · ▼ deeper · ▲▲ up a level
+  g.fillStyle = '#f0c95a';
+  const cx = 8;
+  if (dir === 'out') { g.fillRect(cx - 3, 2, 6, 1); g.fillRect(cx - 2, 3, 4, 1); g.fillRect(cx - 1, 4, 2, 2); }
+  else if (dir === 'down') { g.fillRect(cx - 1, 2, 2, 2); g.fillRect(cx - 2, 4, 4, 1); g.fillRect(cx - 3, 5, 6, 1); }
+  else { g.fillRect(cx - 2, 2, 4, 1); g.fillRect(cx - 3, 3, 6, 2); }
+  return c;
+}
+
 export function buildTiles() {
   return {
     '.': makeVariants((s) => grassTile('#3e6b3a', '#4f7f46', '#32582e', '#5d8a4c', s), 4, 10),
@@ -175,6 +370,30 @@ export function buildTiles() {
     '~': [waterFrame('#1c4a72', '#2f6a9a', '#63a8d8', 0), waterFrame('#1c4a72', '#2f6a9a', '#63a8d8', 5)],
     '*': [terraceTile(0), terraceTile(1)],
     'F': [formationTile(0), formationTile(1)],
+    // functional vegetation + cave mouths (walkable)
+    'g': [tallGrassTile(51, false), tallGrassTile(52, false), tallGrassTile(53, true), tallGrassTile(54, false)],
+    'G': [denseGrowthTile(61, false), denseGrowthTile(62, true), denseGrowthTile(63, false)],
+    'H': [caveMouthTile(71), caveMouthTile(72)],
+  };
+}
+
+// The underground tile set — one palette for every cave, darker than the
+// surface but always readable (never pure black).
+export function buildCaveTiles() {
+  return {
+    '.': makeVariants((s) => caveFloorTile(s), 4, 210),
+    '#': makeVariants((s) => caveWallTile(s), 3, 220),
+    '~': [caveWaterFrame('#122e44', '#1f4a68', 0), caveWaterFrame('#122e44', '#1f4a68', 5)],
+    'C': [crystalTile(231, '#54d8e8'), crystalTile(232, '#b088ff')],
+    'M': makeVariants((s) => mushroomTile(s), 3, 240),
+    'B': makeVariants((s) => bonesTile(s), 2, 250),
+    't': [torchTile()],
+    'O': makeVariants((s) => columnTile(s), 2, 260),
+    'K': makeVariants((s) => crackTile(s), 2, 270),
+    'E': [exitTile('out')],
+    '>': [exitTile('down')],
+    '<': [exitTile('up')],
+    '*': [terraceTile(0), terraceTile(1)],
   };
 }
 

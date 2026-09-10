@@ -3,6 +3,7 @@
 // formation hints at distant regional travel (reserved for future regions).
 import { ENEMY_BY_ID } from './enemies';
 import { WILD_GU_SPAWNS } from './wildGu';
+import { CAVES, CAVE_LANDMARKS } from './caves';
 
 export const W = 84;
 export const H = 57;
@@ -61,6 +62,8 @@ export const LANDMARKS = [
   { id: 'mistLair', name: 'Devourer Hollow', x: 13, y: 6, r: 3, hidden: true },
   { id: 'wardenLair', name: 'Warden Court', x: 73, y: 41, r: 3, hidden: true },
   { id: 'matriarchLair', name: 'Matriarch Web', x: 5, y: 3, r: 3, hidden: true },
+  // cave mouths — hidden until approached; discovery marks them on the map
+  ...CAVE_LANDMARKS,
 ];
 
 // Buildings are solid blocks ('#' tiles) with a label rendered on their centre.
@@ -142,6 +145,12 @@ export const RESOURCES = [
   // cultivator's first taste of what a sensing Gu can find, and a short walk
   // from the Serpent's Stepping Stones ford it can reveal
   { id: 'rn3', x: 32, y: 27, type: 'moonSilver', name: 'Moon Silver Bloom', rare: true },
+  // functional-vegetation harvests — gatherable in the tall grass belts: path
+  // foods for Gu, herbs and medicinal plants (#23)
+  { id: 'gg1', x: 20, y: 46, type: 'spiritGrass', name: 'Wildgrass Bundle' },
+  { id: 'gg2', x: 40, y: 32, type: 'flameGrass', name: 'Sun-Warmed Flame Grass' },
+  { id: 'gg3', x: 63, y: 51, type: 'venomSac', name: 'Marsh Venom Bulb' },
+  { id: 'gg4', x: 33, y: 16, type: 'herb', name: 'Shade Herb' },
 ];
 export const WORLD_RESOURCES = RESOURCES;
 
@@ -152,6 +161,13 @@ export const HIDDEN_PATHS = [
   { id: 'stones', name: "Serpent's Stepping Stones", x: 26, y: 30, r: 3, cells: [[26, 30], [27, 30]] },
   { id: 'moonFord', name: 'Moonlit Ford', x: 26, y: 10, r: 3, cells: [[26, 10], [27, 10]] },
 ];
+
+// Fire interplay hooks for future terrain combat (#25, #26): dry tall grass
+// catches and burns; dense reeds and marsh growth stay damp and resist it.
+export const GRASS_META = {
+  g: { flammable: true, wet: false },
+  G: { flammable: false, wet: true },
+};
 
 // Environmental hazards — each demands a specific Gu to bypass safely, and
 // every unprotected step costs extra game minutes (movement efficiency).
@@ -290,6 +306,22 @@ export const ZONE_FAUNA = {
 
 const TREE_DENSITY = { deepForest: 0.42, wildForest: 0.3, forestOutskirts: 0.17, southernWilds: 0.15, ruins: 0.05, marsh: 0.08, eastHills: 0.04, eastPlains: 0.05 };
 const ROCK_DENSITY = { eastHills: 0.12, southernWilds: 0.03 };
+// FUNCTIONAL VEGETATION — walkable tall grass ('g') and dense reeds/bushes
+// ('G'), region-flavored: dry tall grass on the eastern plains and hills,
+// lush dense growth in the southern wilds, reeds in the marsh. Detection cover
+// and travel cost live in BALANCE.grass; fire interplay in GRASS_META below.
+const GRASS_DENSITY = {
+  southernWilds: { g: 0.10, G: 0.05 },
+  eastPlains: { g: 0.13, G: 0.01 },
+  eastHills: { g: 0.07, G: 0.02 },
+  farmland: { g: 0.06, G: 0 },
+  forestOutskirts: { g: 0.08, G: 0.02 },
+  wildForest: { g: 0.07, G: 0.03 },
+  deepForest: { g: 0.05, G: 0.02 },
+  marsh: { g: 0.03, G: 0.08 },
+  ruins: { g: 0.04, G: 0.01 },
+  ironfangTerritory: { g: 0.04, G: 0.01 },
+};
 
 function mulberry32(seed) {
   let a = seed;
@@ -355,6 +387,8 @@ function buildTiles() {
   });
   // never scatter trees over hidden masters' spots
   Object.values(NPC_POSITIONS).forEach(([x, y]) => protect(x, y));
+  // cave mouths stay clear and open
+  CAVES.forEach(c => protect(c.x, c.y));
   const rng = mulberry32(20260910);
   for (let y = 0; y < H; y++) {
     for (let x = 0; x < W; x++) {
@@ -364,13 +398,19 @@ function buildTiles() {
       if (!z || z.safe) continue;
       if (prot.has(`${x},${y}`)) continue;
       const rocks = ROCK_DENSITY[z.id] || 0;
+      const gr = GRASS_DENSITY[z.id] || { g: 0.03, G: 0 };
+      const tree = TREE_DENSITY[z.id] || 0;
       const r = rng();
       if (r < rocks) set(x, y, 'R');
-      else if (r < rocks + (TREE_DENSITY[z.id] || 0)) set(x, y, 'T');
+      else if (r < rocks + tree) set(x, y, 'T');
+      else if (r < rocks + tree + gr.g) set(x, y, 'g');
+      else if (r < rocks + tree + gr.g + gr.G) set(x, y, 'G');
     }
   }
   // secret passages — blocked ('P') until a scouting Gu reveals them
   HIDDEN_PATHS.forEach(hp => hp.cells.forEach(([x, y]) => set(x, y, 'P')));
+  // cave mouths — dark walkable openings ('H') into the underground
+  CAVES.forEach(c => set(c.x, c.y, 'H'));
   // world border
   rect(0, 0, W, 2, 'T'); rect(0, H - 2, W, 2, 'T');
   rect(0, 0, 2, H, 'T'); rect(W - 2, 0, 2, H, 'T');

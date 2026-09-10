@@ -221,6 +221,24 @@ export const BALANCE = {
     refineBlockDays: 2,
     rankPowerStep: 25,              // +25% effect power per rank above base
   },
+  // FUNCTIONAL VEGETATION — tall grass ('g') and dense growth ('G'): cover that
+  // trades a little travel time for a big drop in how far enemies notice you.
+  // Keen-nosed species (ECOLOGY.keenSmell) barely fall for it.
+  grass: {
+    slowMul: { g: 1.1, G: 1.25 },        // step-time multiplier per tile
+    detectMul: { g: 0.75, G: 0.65 },     // enemy detection multiplier while the player hides inside
+    keenDetectMul: 0.9,                  // keen senses are almost never fooled
+    revealDist: 2,                       // a lurking beast rouses within this range
+  },
+  // CAVES — separate underground maps with their own fog. Vision underground
+  // is a fraction of surface sight; a scouting Gu claws most of it back.
+  cave: {
+    visionMul: 0.65,                      // surface → cave reveal radius scale
+    scoutedMul: 0.9,                      // while a scouting Gu's eye is active
+    dark: 0.3,                            // base darkness overlay underground (readable, never black)
+    firstEnterInsight: 10,                // Realm Insight for a cave's first descent
+    secretInsight: 8,                    // for finding a secret passage
+  },
   // Fog of war — the map is discovered by walking, not given.
   fog: {
     revealRadius: 5,                 // tiles revealed around the player as she moves
