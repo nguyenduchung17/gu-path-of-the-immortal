@@ -16,7 +16,13 @@ function loadSlotRaw(i) {
 }
 
 function saveSlot(i, s) {
-  try { localStorage.setItem(slotKey(i), JSON.stringify({ ...s, toasts: [], breakthrough: null })); } catch {}
+  try {
+    localStorage.setItem(slotKey(i), JSON.stringify({ ...s, toasts: [], breakthrough: null }));
+  } catch (err) {
+    // silent data loss is the worst failure mode a save system can have —
+    // surface it so it shows in the runtime logs
+    console.warn('[save] failed to write slot', i, err);
+  }
 }
 
 // One-time: adopt the old pre-slot single save file (if any) as Save Slot 1.
