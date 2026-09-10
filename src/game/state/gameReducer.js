@@ -591,7 +591,12 @@ export function gameReducer(state, action) {
         cultivationProgress: progress,
         totalInsight: (p.totalInsight || 0) + gain,
       };
-      return advanceTime({ ...state, player: np, log: [...state.log, `You cultivate. (+${gain}% progress${atSect ? ' · terrace bonus' : ''})`] }, BALANCE.time.cultivateMinutes);
+      let s = { ...state, player: np, log: [...state.log, `You cultivate. (+${gain}% progress${atSect ? ' · terrace bonus' : ''})`] };
+      // the moment the aperture fills, a milestone alert fires
+      if (progress >= 100 && (p.cultivationProgress || 0) < 100) {
+        s = pushToast(s, { icon: '✦', title: 'BREAKTHROUGH READY', lines: ['Your aperture brims with essence — a new stage awaits.', 'Open Cultivation (C) to break through.'] });
+      }
+      return advanceTime(s, BALANCE.time.cultivateMinutes);
     }
 
     case 'BREAKTHROUGH': {

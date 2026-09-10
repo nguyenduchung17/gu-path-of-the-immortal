@@ -52,7 +52,7 @@ export default async function(req) {
 
     let body = {};
     try { body = await req.json(); } catch {}
-    const mode = body?.mode === 'sync' ? 'sync' : 'check';
+    const mode = body?.mode === 'sync' || body?.mode === 'history' ? body.mode : 'check';
     const sheetId = parseSheetId(body?.sheetUrl);
     if (!sheetId) {
       return Response.json({ error: 'Paste a valid Google Sheets URL (https://docs.google.com/spreadsheets/d/...).' }, { status: 400 });
@@ -73,6 +73,23 @@ export default async function(req) {
     const rng = (r) => `'${title.replace(/'/g, "''")}'!${r}`;
 
     if (mode === 'check') return Response.json({ ok: true, sheetTitle: title });
+
+    // ---- history: the synced milestone rows, for the dashboard trends chart ----
+    if (mode === 'history') {
+      const vals = await sheets(`/${sheetId}/values/${encodeURIComponent(rng(`A2:${LAST_COL}`))}`, accessToken);
+      if (!vals.ok) return Response.json({ error: friendly(vals.status) }, { status: 400 });
+      const rows = (vals.data?.values || [])
+        .filter(r => r && /^\d{4}-\d{2}-\d{2}$/.test(String(r[0] || '')))
+        .slice(-90)
+        .map(r => ({
+          date: String(r[0]), inGameDay: num(r[1]), character: str(r[2]), stageName: str(r[3]),
+          cultivationProgress: num(r[4]), maxEssence: num(r[5]), currentEssence: num(r[6]),
+          hp: num(r[7]), maxHp: num(r[8]), spiritStones: num(r[9]), totalInsight: num(r[10]),
+          topMasteryLevel: num(r[11]), masterySummary: str(r[12]), synergies: str(r[13]),
+          guOwned: num(r[14]), playtimeMin: num(r[15]),
+        }));
+      return Response.json({ ok: true, sheetTitle: title, rows });
+    }
 
     // ---- sync: one row per calendar day, upserted as the day's stats grow ----
     const snap = body?.snapshot || {};

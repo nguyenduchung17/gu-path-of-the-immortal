@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
+import TrendsChart from './TrendsChart';
 
 const CONNECTOR_ID = '6aa275bc0c0dd19bfd382374'; // Cultivation Tracker Sheets (app-user)
 const URL_KEY = 'gu_sheets_url';
@@ -15,6 +16,7 @@ export default function SheetSyncPanel({ snapshot }) {
   const [sheetTitle, setSheetTitle] = useState(null);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState(null);
+  const [history, setHistory] = useState(null);
   const [error, setError] = useState(null);
 
   const invoke = (payload) => base44.functions.invoke('syncCultivationMilestones', payload);
@@ -34,6 +36,8 @@ export default function SheetSyncPanel({ snapshot }) {
       const res = await invoke({ mode: 'check', sheetUrl: url });
       setConnected(true);
       setSheetTitle(res.data?.sheetTitle || 'Sheet');
+      const h = await invoke({ mode: 'history', sheetUrl: url });
+      setHistory(h.data?.rows || []);
     } catch (e) {
       setConnected(false); setSheetTitle(null);
       setError(e.response?.data?.error || e.message || 'Could not reach the spreadsheet.');
@@ -83,6 +87,8 @@ export default function SheetSyncPanel({ snapshot }) {
       setResult(res.data);
       setConnected(true);
       setSheetTitle(res.data?.sheetTitle || sheetTitle);
+      const h = await invoke({ mode: 'history', sheetUrl });
+      setHistory(h.data?.rows || []);
     } catch (e) {
       const msg = e.response?.data?.error || e.message || 'Sync failed.';
       setError(msg);
@@ -139,6 +145,7 @@ export default function SheetSyncPanel({ snapshot }) {
           Milestone row for {result.date} {result.action} in “{result.sheetTitle}”.
         </div>
       )}
+      <TrendsChart history={history} />
       {connected && (
         <button onClick={handleDisconnect} className="mt-2 text-[10px] text-stone-500 hover:text-stone-300">
           Disconnect Google account
