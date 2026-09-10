@@ -1,7 +1,7 @@
 // Canvas world renderer: draws the pixel-art world (tiles, decor, buildings,
 // NPCs, beasts, player, lighting, particles) into a 16px-per-tile buffer,
 // then blits it scaled to the viewport. All game logic stays in the reducer.
-import { WORLD, zoneAt, DEFAULT_ZONE, WORLD_NPCS, WORLD_RESOURCES, CAMP_CELLS, TERRACE, FORMATION, BUILDING_AT, BUILDING_LABELS } from '../data/world';
+import { WORLD, zoneAt, DEFAULT_ZONE, WORLD_NPCS, WORLD_RESOURCES, CAMP_CELLS, TERRACE, FORMATION, BUILDING_AT, BUILDING_LABELS, HAZARDS } from '../data/world';
 import { NPC_BY_ID } from '../data/npcs';
 import { ENEMY_BY_ID, DANGER_LABEL, DANGER_COLOR, visualOf } from '../data/enemies';
 import { MASTER_BY_ID } from '../data/masters';
@@ -235,6 +235,38 @@ export function drawWorld(display, state, view) {
       g.drawImage(img, sx, sy);
       if (ch === 'T') trees.push([x, y, sx, sy]);
       else if (inWorld(x, y)) drawDecor(x, y, sx, sy, ch, zoneAt(x, y)?.danger ?? 2, t, glows);
+    }
+  }
+
+  // --- environmental hazard tints: miasma haze / shifting scree cracks
+  for (const hz of HAZARDS) {
+    if (hz.kind === 'rapids') continue;
+    const list = hz.cells ? hz.cells.slice() : [];
+    if (hz.rect) for (let j = 0; j < hz.rect.h; j++) for (let i = 0; i < hz.rect.w; i++) list.push([hz.rect.x + i, hz.rect.y + j]);
+    for (const [hx, hy] of list) {
+      if (!inWorld(hx, hy) || hx < x0 - 1 || hx > x0 + cols || hy < y0 - 1 || hy > y0 + rows) continue;
+      const sx = (hx - x0) * 16, sy = (hy - y0) * 16;
+      const wob = Math.sin(t / 700 + hx * 2 + hy);
+      if (hz.kind === 'miasma') {
+        g.fillStyle = `rgba(140,60,190,${0.15 + 0.06 * wob})`;
+        g.fillRect(sx, sy, 16, 16);
+        g.fillStyle = `rgba(190,120,220,${0.3 + 0.12 * wob})`;
+        for (let k = 0; k < 4; k++) {
+          const dx = (k * 5 + 2 + Math.floor(t / 130 + hx * 4 + hy * 9)) % 14;
+          const dy = (k * 3 + 3 + Math.floor(t / 170 + hx * 7 + hy * 5)) % 13;
+          g.fillRect(sx + dx, sy + dy, 2, 1);
+        }
+      } else { // unstable ground — cracked, shifting scree
+        g.fillStyle = 'rgba(70,55,40,0.30)';
+        g.fillRect(sx, sy, 16, 16);
+        g.strokeStyle = 'rgba(30,22,15,0.55)';
+        g.lineWidth = 1;
+        const sh = Math.round(wob * 1.5);
+        g.beginPath();
+        g.moveTo(sx + 3 + sh, sy + 2); g.lineTo(sx + 8, sy + 8); g.lineTo(sx + 4, sy + 14);
+        g.moveTo(sx + 12 - sh, sy + 3); g.lineTo(sx + 9, sy + 9); g.lineTo(sx + 13, sy + 13);
+        g.stroke();
+      }
     }
   }
 

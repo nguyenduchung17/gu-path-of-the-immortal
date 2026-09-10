@@ -7,18 +7,29 @@ import { GU_BY_ID } from '../data/gu';
 import { ENEMY_BY_ID, visualOf } from '../data/enemies';
 import { BALANCE } from '../config/balance';
 import { totalGameMin } from './vitalGu';
+import { advanceTime } from './time';
 import { grantMastery } from './mastery';
 import { revealFog } from './guLife';
 import { WORLD_RESOURCES, WORLD, HIDDEN_PATHS, HAZARDS, hazardAt, LANDMARKS } from '../data/world';
 
 const cheb = (ax, ay, bx, by) => Math.max(Math.abs(ax - bx), Math.abs(ay - by));
 
+// Is a hazard of this kind within `r` paces of the player? (cells or rect)
+function hazardNear(p, kind, r) {
+  return HAZARDS.some(h => {
+    if (h.kind !== kind) return false;
+    if (h.cells) return h.cells.some(([x, y]) => cheb(x, y, p.x, p.y) <= r);
+    const rc = h.rect;
+    return p.x >= rc.x - r && p.x < rc.x + rc.w + r && p.y >= rc.y - r && p.y < rc.y + rc.h + r;
+  });
+}
+
 // Active exploration buffs on the player (vision / stealth / haste / sense).
 export function exploreActive(state) {
   const fx = state.exploreFx || {};
   const now = totalGameMin(state.time);
   const out = {};
-  for (const k of ['vision', 'stealth', 'haste', 'sense', 'waterwalk']) {
+  for (const k of ['vision', 'stealth', 'haste', 'sense', 'waterwalk', 'steady']) {
     if (fx[k] && fx[k].until > now) out[k] = fx[k];
   }
   return out;
@@ -98,19 +109,34 @@ export function moveOverride(state, nx, ny) {
   return null;
 }
 
-// After stepping: miasma burns unprotected lungs; Mist Veil filters it whole.
+// After stepping: hazards bite unprotected travelers — miasma burns lungs,
+// unstable ground drags at every stride — and BOTH cost extra game minutes
+// per step, so terrain directly shapes travel efficiency on the map. The
+// right Gu bypasses each hazard safely at full pace.
 export function hazardStep(s) {
   const hz = hazardAt(s.player.x, s.player.y);
-  if (!hz || hz.kind !== 'miasma') return s;
-  if (exploreActive(s).stealth) {
-    return { ...s, log: [...s.log, 'Mist Veil shrouds you — the miasma slides past harmlessly.'] };
+  if (!hz) return s;
+  const act = exploreActive(s);
+  const slowMin = (BALANCE.exploration.hazardSlowMinutes || {})[hz.kind] || 0;
+  if (hz.kind === 'miasma') {
+    if (act.stealth) {
+      return { ...s, log: [...s.log, 'Mist Veil shrouds you — the miasma slides past harmlessly.'] };
+    }
+    const dmg = BALANCE.exploration.hazardDmg;
+    const out = {
+      ...s,
+      player: { ...s.player, hp: Math.max(1, s.player.hp - dmg) },
+      log: [...s.log, `Poison miasma sears your lungs! (-${dmg} HP, +${slowMin} min)`],
+    };
+    return advanceTime(out, slowMin);
   }
-  const dmg = BALANCE.exploration.hazardDmg;
-  return {
-    ...s,
-    player: { ...s.player, hp: Math.max(1, s.player.hp - dmg) },
-    log: [...s.log, `Poison miasma sears your lungs! (-${dmg} HP)`],
-  };
+  if (hz.kind === 'unstable') {
+    if (act.steady) {
+      return { ...s, log: [...s.log, `${hz.name} shifts and groans — your steady grip keeps your footing sure.`] };
+    }
+    return advanceTime({ ...s, log: [...s.log, `${hz.name} — the shifting ground fights your every step. (+${slowMin} min)`] }, slowMin);
+  }
+  return s;
 }
 
 // What a battle inherits from exploration prep: lingering enemy control
@@ -247,6 +273,17 @@ export function applyExploreGu(state, inst) {
     return spend(s, { haste: { until } }, {
       icon: '💨', title: 'WIND STEP',
       lines: [`Your stride outpaces the wilds for ${ex.duration} min.`, ...(pursued ? ['You pull ahead of the pursuit!'] : [])],
+    });
+  }
+
+  // ---- steady: an earth grip that anchors your steps on shifting ground ----
+  if (ex.kind === 'steady') {
+    const near = hazardNear(p, 'unstable', 3);
+    let s = state;
+    if (near) s = grantMastery(s, gu.path, BALANCE.exploration.masteryXp, 'guUsed', 'guUse');
+    return spend(s, { steady: { until } }, {
+      icon: '⛰️', title: 'SURE-FOOTED',
+      lines: [`${gu.name} anchors your steps for ${ex.duration} min.`, ...(near ? ['The shifting ground cannot slow you.'] : [])],
     });
   }
 

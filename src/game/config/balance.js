@@ -189,6 +189,7 @@ export const BALANCE = {
     masteryXp: 10,                   // meaningful-use reward only
     resist: { elite: 0.7, boss: 0.5 }, // duration factor on elite / high-danger foes
     hazardDmg: 3,                    // HP per unprotected step through miasma
+    hazardSlowMinutes: { miasma: 2, unstable: 3 }, // extra game minutes per unprotected step
   },
   // The accelerated game clock. Baseline: 1 real second = 1 in-game minute.
   time: {

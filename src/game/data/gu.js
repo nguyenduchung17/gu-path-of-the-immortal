@@ -61,9 +61,10 @@ export const GU = [
   // ---- Earth ----
   {
     id: 'stoneShell', name: 'Stone Shell Gu', rank: 1, type: 'Defense', path: 'earth', element: 'earth', rarity: 'common',
-    description: 'Coats you in living stone, blunting incoming blows for several turns.',
+    description: 'Coats you in living stone, blunting incoming blows for several turns. In the wilds, its earth grip anchors your footing on shifting ground.',
     energyCost: 6, cooldown: 3,
     effect: { defense: { power: 6, duration: 3 } },
+    explore: { kind: 'steady', essence: 4, cooldown: 25, duration: 12 },
   },
   {
     id: 'ironSkin', name: 'Iron Skin Gu', rank: 1, type: 'Defense', path: 'earth', element: 'metal', rarity: 'common',

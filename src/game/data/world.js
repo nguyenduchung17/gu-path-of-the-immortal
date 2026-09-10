@@ -149,12 +149,16 @@ export const HIDDEN_PATHS = [
   { id: 'moonFord', name: 'Moonlit Ford', x: 26, y: 10, r: 3, cells: [[26, 10], [27, 10]] },
 ];
 
-// Environmental hazards — crossable only with the right exploration Gu.
-// The rapids need Tide Binding's water-stilling; the miasma sears
-// unprotected lungs but Mist Veil's shroud filters it entirely.
+// Environmental hazards — each demands a specific Gu to bypass safely, and
+// every unprotected step costs extra game minutes (movement efficiency).
+// Rapids need Tide Binding's water-stilling; the miasma sears unprotected
+// lungs but Mist Veil's shroud filters it; unstable terrain drags at every
+// stride unless Stone Shell's earth grip anchors your footing.
 export const HAZARDS = [
   { id: 'rapids', name: 'Raging Rapids', kind: 'rapids', bypassKind: 'waterwalk', cells: [[26, 50], [27, 50]] },
   { id: 'miasma', name: 'Poison Miasma', kind: 'miasma', bypassKind: 'stealth', rect: { x: 58, y: 49, w: 6, h: 3 } },
+  { id: 'fenWest', name: 'Quaking Fen', kind: 'unstable', bypassKind: 'steady', rect: { x: 8, y: 36, w: 5, h: 3 } },
+  { id: 'fenEast', name: 'Scree Slopes', kind: 'unstable', bypassKind: 'steady', rect: { x: 53, y: 44, w: 3, h: 2 } },
 ];
 const HAZARD_CELL = new Map();
 for (const h of HAZARDS) {
