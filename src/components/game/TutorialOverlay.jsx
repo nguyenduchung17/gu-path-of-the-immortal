@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useGame } from '@/game/state/GameContext';
 import { useT } from '@/game/i18n/LangContext';
 import { TUTORIAL_STEPS } from '@/game/data/tutorial';
@@ -22,11 +22,6 @@ export default function TutorialOverlay() {
             <div className="text-2xl mb-1">🐉</div>
             <h2 className="text-lg font-heading text-emerald-100">{t('tut.welcome.title')}</h2>
             <p className="text-xs text-stone-400 mt-1">{t('tut.welcome.subtitle')}</p>
-            {/* movement stays locked until the player chooses — say so up
-                front, so the controls are never a mystery */}
-            <p className="text-[10px] text-emerald-300/80 mt-2 border border-emerald-800/50 rounded-lg bg-emerald-900/20 px-2 py-1 inline-block">
-              ⌨️ {t('tut.welcome.controls')}
-            </p>
           </div>
           {confirmSkip ? (
             <div className="space-y-3">
