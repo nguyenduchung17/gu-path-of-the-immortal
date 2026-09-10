@@ -45,6 +45,39 @@ export const PATHS = [
     ],
   },
   {
+    id: 'lightning', name: 'Lightning Path', icon: '⚡', color: 'text-yellow-300', border: 'border-yellow-700/40',
+    description: 'Burst damage with a chance of paralysis. Lightning strikes first — and sometimes the foe never answers.',
+    levels: [
+      { text: '+3% Lightning Gu damage', fx: { damagePct: 3 } },
+      { text: '+6% Lightning Gu damage', fx: { damagePct: 3 } },
+      { text: '+9% Lightning Gu damage', fx: { damagePct: 3 } },
+      { text: '+12% Lightning Gu damage', fx: { damagePct: 3 } },
+      { text: '+15% Lightning Gu damage · Lightning Gu essence cost −10%', fx: { damagePct: 3, costPct: 10 } },
+    ],
+  },
+  {
+    id: 'ice', name: 'Ice Path', icon: '❄️', color: 'text-cyan-200', border: 'border-cyan-700/40',
+    description: 'Control through dead-still cold. A frozen foe loses its moment — and with it, the fight.',
+    levels: [
+      { text: '+3% Ice Gu damage', fx: { damagePct: 3 } },
+      { text: '+6% Ice Gu damage', fx: { damagePct: 3 } },
+      { text: '+9% Ice Gu damage', fx: { damagePct: 3 } },
+      { text: '+12% Ice Gu damage', fx: { damagePct: 3 } },
+      { text: '+15% Ice Gu damage · Ice Gu essence cost −10%', fx: { damagePct: 3, costPct: 10 } },
+    ],
+  },
+  {
+    id: 'poison', name: 'Poison Path', icon: '☠️', color: 'text-lime-300', border: 'border-lime-700/40',
+    description: 'Stacking venom that wins the long fights. Weak at the first strike; inevitable by the last.',
+    levels: [
+      { text: '+3% Poison Gu damage', fx: { damagePct: 3 } },
+      { text: '+6% Poison Gu damage', fx: { damagePct: 3 } },
+      { text: '+9% Poison Gu damage', fx: { damagePct: 3 } },
+      { text: '+12% Poison Gu damage', fx: { damagePct: 3 } },
+      { text: '+15% Poison Gu damage · Poison Gu essence cost −10%', fx: { damagePct: 3, costPct: 10 } },
+    ],
+  },
+  {
     id: 'enslavement', name: 'Enslavement Path', icon: '🐉', color: 'text-violet-300', border: 'border-violet-800/40',
     description: 'Command over creatures and summons. Why fight alone when beasts obey your will?',
     levels: [
@@ -67,8 +100,8 @@ export const PATHS = [
     ],
   },
   {
-    id: 'sword', name: 'Sword Path', icon: '⚔️', color: 'text-zinc-200', border: 'border-zinc-500/40', locked: true,
-    description: 'The way of the flying sword — precision, piercing strikes and bladework. All but lost in the Green Valley; only a true master can open it.',
+    id: 'sword', name: 'Sword Path', icon: '⚔️', color: 'text-zinc-200', border: 'border-zinc-500/40',
+    description: 'The way of the flying sword — precision, piercing strikes and bladework. A rare few are born with a sword heart; the rest find Master Jian by the waterfall.',
     levels: [
       { text: '+3% Sword Gu damage', fx: { damagePct: 3 } },
       { text: '+6% Sword Gu damage', fx: { damagePct: 3 } },

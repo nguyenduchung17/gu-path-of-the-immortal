@@ -44,7 +44,14 @@ const STATUS_META = {
   armorBreak: { icon: '🔨', label: 'Armor Break', desc: 'Defense reduced.', tone: 'bg-orange-900/50 text-orange-200 border-orange-600/50' },
   soaked: { icon: '💧', label: 'Soaked', desc: 'Lightning bites deeper; fire scalds.', tone: 'bg-sky-900/50 text-sky-200 border-sky-600/50' },
   broken: { icon: '⚡', label: 'BROKEN', desc: 'Guard shattered — takes more damage, acts late.', tone: 'bg-amber-800/60 text-amber-100 border-amber-400/60' },
+  paralysis: { icon: '⚡', label: 'Paralyzed', desc: 'Loses its next action. Nerves harden after it lands.', tone: 'bg-yellow-900/50 text-yellow-200 border-yellow-600/50' },
+  frozen: { icon: '❄️', label: 'Frozen', desc: 'Loses its next action — charged attacks are interrupted.', tone: 'bg-sky-900/50 text-sky-100 border-cyan-500/50' },
+  momentum: { icon: '💨', label: 'Wind Momentum', desc: 'Each stack: +5% Speed. Lasts the whole battle (max 5).', tone: 'bg-teal-900/50 text-teal-200 border-teal-600/50' },
+  ccResist: { icon: '🧿', label: 'Hardened', desc: 'Control resistance +30% — paralysis and freeze land less often.', tone: 'bg-indigo-900/50 text-indigo-200 border-indigo-600/50' },
 };
+
+// scouting: what an enemy's status resistances look like on the panel
+const STATUS_RESIST_ICON = { burn: '🔥', poison: '☠️', paralysis: '⚡', freeze: '❄️' };
 
 function guSound(gu, kinds) {
   if (kinds.heal || kinds.essence) return 'heal';
@@ -84,7 +91,9 @@ function StatusChips({ statuses }) {
     <div className="mt-2 flex flex-wrap gap-1">
       {groups.map((g, i) => {
         const meta = STATUS_META[g.type];
-        const value = g.type === 'barrier' ? `${g.power}·${g.duration}` : `${g.count > 1 ? `×${g.count} ` : ''}${g.duration}`;
+        const value = g.type === 'barrier' ? `${g.power}·${g.duration}`
+          : g.type === 'momentum' ? `×${g.count}`
+          : `${g.count > 1 ? `×${g.count} ` : ''}${g.duration}`;
         return (
           <span key={i} title={`${meta?.label || g.type} — ${meta?.desc || ''}`}
             className={`text-[9px] px-1.5 py-0.5 rounded border ${meta?.tone || 'bg-white/10 text-stone-300 border-stone-600/50'}`}>
@@ -133,6 +142,7 @@ export default function CombatView() {
     const gu = pendingGu.current;
     const kinds = {};
     let enemyDmg = 0, playerDmg = 0, dodge = false, block = false, crit = false, fail = false, heal = 0, essence = 0;
+    let statusText = null, playerStatusText = null;
     let m;
     for (const l of lines) {
       if ((m = l.match(/strikes .*? for (\d+) damage/)) || (m = l.match(/is cut by thorns for (\d+) damage/))) enemyDmg += +m[1];
@@ -148,6 +158,12 @@ export default function CombatView() {
       else if (l.includes('vulnerable')) crit = true;
       else if (l.includes('Not enough primeval essence') || l.includes('is on cooldown') || l.includes('fails to activate')) fail = true;
       else if (l.includes('set ablaze')) kinds.burn = true;
+      else if ((m = l.match(/\+(\d+) essence/))) essence += +m[1];
+      else if (l.includes('PARALYZED')) { kinds.paralysis = true; statusText = t('battle.paralyzed'); }
+      else if (l.includes('FROZEN solid')) { kinds.frozen = true; statusText = t('battle.frozen'); }
+      else if ((m = l.match(/POISON ×(\d+)/))) { kinds.poison = true; statusText = t('battle.poisonStack', { n: m[1] }); }
+      else if ((m = l.match(/WIND MOMENTUM \+(\d+)/))) { kinds.momentum = true; playerStatusText = t('battle.momentumGain', { n: m[1] }); }
+      else if (l.includes('Stone Guard braces')) kinds.defense = true;
       else if (l.includes('blurs your form')) kinds.evasion = true;
       else if (l.includes('hardens your defense') || l.includes('brace behind')) kinds.defense = true;
       else if (l.includes('raises a barrier')) kinds.barrier = true;
@@ -168,7 +184,7 @@ export default function CombatView() {
     }
     pendingGu.current = null;
     const castColor = gu ? PATH_COLORS[gu.path] || '#8fd8a0' : null;
-    setFx({ key: logLen, gu, kinds, killer: !!(gu && isKillerMove(gu)), castColor, enemyDmg, playerDmg, dodge, block, crit, fail, heal, essence });
+    setFx({ key: logLen, gu, kinds, killer: !!(gu && isKillerMove(gu)), castColor, enemyDmg, playerDmg, dodge, block, crit, fail, heal, essence, statusText, playerStatusText });
     if (kinds.broken) sfx('crit');
     if (fail) sfx('fail');
     else if (gu) sfx(guSound(gu, kinds));
@@ -176,6 +192,9 @@ export default function CombatView() {
     if (playerDmg > 0) sfx('hurt');
     if (dodge) sfx('dodge');
     if (block) sfx('block');
+    if (kinds.paralysis || kinds.frozen) sfx('crit');
+    if (kinds.momentum) sfx('wind');
+    if (kinds.poison) sfx('cast');
   }, [logLen]);
 
   // outcome sting
@@ -235,6 +254,12 @@ export default function CombatView() {
           {c.revealed && enemy.resists?.length > 0 && (
             <div className="text-[10px] text-sky-300/80 mt-0.5">
               {t('battle.resists')}: {enemy.resists.map(p => PATH_BY_ID[p]?.name || p).join(' · ')}
+            </div>
+          )}
+          {c.revealed && enemy.statusResist && (
+            <div className="text-[9px] text-stone-400 mt-0.5">
+              {t('battle.statusResists')}: {Object.entries(enemy.statusResist)
+                .map(([k, v]) => `${STATUS_RESIST_ICON[k] || k} ${v >= 100 ? t('battle.resImmune') : `${v}%`}`).join(' · ')}
             </div>
           )}
           {!c.over && <IntentPanel combat={c} enemy={enemy} />}

@@ -31,6 +31,19 @@ export const TUTORIAL_STEPS = [
 // One-time contextual tips — advanced systems explained the moment they
 // first touch the player, whatever the state of the main tutorial.
 export const TIP_DEFS = [
+  // One tip per Dao Path — only the player's OWN starter path ever becomes
+  // due (it is knownPaths[0]), so the tutorial explains exactly the mechanic
+  // their first Gu uses, never all the paths at once.
+  { id: 'pathFire', due: s => (s.tutorial?.moves || 0) >= 3 && (s.knownPaths || [])[0] === 'fire' },
+  { id: 'pathLightning', due: s => (s.tutorial?.moves || 0) >= 3 && (s.knownPaths || [])[0] === 'lightning' },
+  { id: 'pathWater', due: s => (s.tutorial?.moves || 0) >= 3 && (s.knownPaths || [])[0] === 'water' },
+  { id: 'pathIce', due: s => (s.tutorial?.moves || 0) >= 3 && (s.knownPaths || [])[0] === 'ice' },
+  { id: 'pathPoison', due: s => (s.tutorial?.moves || 0) >= 3 && (s.knownPaths || [])[0] === 'poison' },
+  { id: 'pathWind', due: s => (s.tutorial?.moves || 0) >= 3 && (s.knownPaths || [])[0] === 'wind' },
+  { id: 'pathEarth', due: s => (s.tutorial?.moves || 0) >= 3 && (s.knownPaths || [])[0] === 'earth' },
+  { id: 'pathSword', due: s => (s.tutorial?.moves || 0) >= 3 && (s.knownPaths || [])[0] === 'sword' },
+  { id: 'pathEnslavement', due: s => (s.tutorial?.moves || 0) >= 3 && (s.knownPaths || [])[0] === 'enslavement' },
+  { id: 'pathRefinement', due: s => (s.tutorial?.moves || 0) >= 3 && (s.knownPaths || [])[0] === 'refinement' },
   { id: 'night', due: s => { const m = (s.time || {}).min ?? 0; return m >= 18 * 60 || m < 5 * 60; } },
   { id: 'hunger', due: s => (s.ownedGu || []).some(g => s.vitalGu !== g.instanceId && (g.satiety ?? 100) < 40) },
   { id: 'wildGu', due: s => !!s.wildEncounter },

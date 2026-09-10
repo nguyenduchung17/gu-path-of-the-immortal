@@ -172,6 +172,34 @@ export default function BattleScene({ enemy, fx, casting, appearance, biome, res
       {k.control && (
         <div key={`cb${hit.key}`} className="absolute right-[12%] sm:right-[15%] bottom-[36%] w-[88px] h-[88px] sm:w-[144px] sm:h-[144px] rounded-full border-2 border-dashed border-blue-300/70 animate-battle-bind" />
       )}
+      {k.paralysis && (
+        <div key={`plz${hit.key}`} className="absolute right-[12%] sm:right-[15%] bottom-[36%] w-[88px] h-[88px] sm:w-[144px] sm:h-[144px] rounded-full border-2 border-yellow-300/80 animate-battle-bind"
+          style={{ background: 'radial-gradient(circle, rgba(255,240,120,0.20), transparent 65%)' }} />
+      )}
+      {k.frozen && (
+        <div key={`frz${hit.key}`} className="absolute right-[12%] sm:right-[16%] bottom-[34%] w-[92px] h-[92px] sm:w-[150px] sm:h-[150px] rounded-lg border-2 border-cyan-200/80 animate-battle-bind"
+          style={{ background: 'linear-gradient(160deg, rgba(190,235,255,0.35), rgba(120,190,255,0.12))', boxShadow: '0 0 22px rgba(150,220,255,0.45)' }} />
+      )}
+      {k.poison && (
+        <div key={`psn${hit.key}`} className="absolute right-[12%] sm:right-[16%] bottom-[34%] w-16 h-16 sm:w-28 sm:h-28 animate-battle-aurarise"
+          style={{ background: 'radial-gradient(ellipse at bottom, rgba(150,230,60,0.5), transparent 70%)' }} />
+      )}
+      {k.momentum && (
+        <div key={`mom${hit.key}`} className="absolute left-[10%] sm:left-[16%] bottom-[10%] w-[88px] h-[88px] sm:w-[136px] sm:h-[136px] rounded-full border-2 border-teal-200/70 animate-battle-swirl"
+          style={{ borderTopColor: 'transparent', borderBottomColor: 'transparent' }} />
+      )}
+      {hit.statusText && (
+        <span key={`stx${hit.key}`} className="absolute right-[13%] sm:right-[17%] bottom-[46%] font-heading text-xs sm:text-sm text-amber-200 animate-battle-dmg whitespace-nowrap pointer-events-none"
+          style={{ textShadow: '2px 2px 0 #000' }}>
+          {hit.statusText}
+        </span>
+      )}
+      {hit.playerStatusText && (
+        <span key={`pst${hit.key}`} className="absolute left-[13%] sm:left-[17%] bottom-[20%] font-heading text-xs sm:text-sm text-teal-200 animate-battle-dmg whitespace-nowrap pointer-events-none"
+          style={{ textShadow: '2px 2px 0 #000' }}>
+          {hit.playerStatusText}
+        </span>
+      )}
       {k.investigate && (
         <div key={`iv${hit.key}`} className="absolute right-[12%] sm:right-[15%] bottom-[38%] w-16 h-16 sm:w-28 sm:h-28 rounded-full border-2 border-amber-200/70 animate-battle-bind"
           style={{ background: 'radial-gradient(circle, rgba(255,240,180,0.14), transparent 65%)' }} />

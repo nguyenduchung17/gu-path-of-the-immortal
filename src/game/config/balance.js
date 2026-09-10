@@ -149,6 +149,7 @@ export const BALANCE = {
     pathFoods: {                     // what each Dao Path's Gu eats
       fire: 'flameGrass', water: 'spiritWater', earth: 'mineralEssence', poison: 'venomSac',
       wind: 'beastMeat', enslavement: 'beastMeat', sword: 'beastMeat', refinement: 'spiritGrass',
+      lightning: 'beastMeat', ice: 'spiritWater',
     },
   },
   // Vital Gu (Cổ Bản Mệnh) — one bound companion, protected and empowered.

@@ -31,6 +31,12 @@ export function effectSummary(gu, t) {
   if (e.advance) parts.push(`${t('fx.advance')} ${e.advance.pct}%`);
   if (e.expose) parts.push(`${t('fx.expose')} +${e.expose.power}%`);
   if (e.self?.haste) parts.push(`${t('fx.haste')} +${e.self.haste.power}%`);
+  if (e.self?.momentum) parts.push(`${t('fx.momentum')} +${e.self.momentum.power}%/hit`);
+  if (e.attack?.paralysis) parts.push(`${t('fx.paralysis')} ${e.attack.paralysis.chance}%`);
+  if (e.attack?.freeze) parts.push(`${t('fx.freeze')} ${e.attack.freeze.chance}%`);
+  if (e.attack?.guard) parts.push(`${t('fx.stoneGuard')} ${e.attack.guard.chance}%`);
+  if (e.poison) parts.push(`${t('fx.poison')} ${e.poison.power}×${e.poison.duration}`);
+  if (e.essenceRecovery) parts.push(`${t('fx.essenceRecovery')} ${e.essenceRecovery.chance}%`);
   if (e.selfDelay) parts.push(`${t('fx.selfDelay')} +${e.selfDelay.pct}%`);
   if (e.soak) parts.push(t('fx.soak'));
   return parts.join(' · ');

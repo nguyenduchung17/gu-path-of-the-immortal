@@ -13,14 +13,15 @@
 import { DICT } from './translations';
 import { DICT_LOG } from './log';
 import { CONTENT_VI } from './content';
+import { DICT_STARTER } from './starterDict';
 import { DANGER_LABEL, visualOf } from '../data/enemies';
 import { TERRAIN_LABELS } from '../data/terrain';
 
 const STORAGE_KEY = 'gu_lang';
 
 export const TABLES = {
-  en: { ...DICT.en, ...DICT_LOG.en },
-  vi: { ...DICT.vi, ...DICT_LOG.vi, ...CONTENT_VI },
+  en: { ...DICT.en, ...DICT_LOG.en, ...DICT_STARTER.en },
+  vi: { ...DICT.vi, ...DICT_LOG.vi, ...CONTENT_VI, ...DICT_STARTER.vi },
 };
 
 // Runtime registry of content keys missing a Vietnamese override.

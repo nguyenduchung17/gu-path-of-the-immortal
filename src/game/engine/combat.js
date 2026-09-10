@@ -44,7 +44,7 @@ export function maxStabilityOf(def) {
 export function speedMulOf(statuses) {
   let m = 1;
   for (const s of statuses || []) {
-    if (s.type === 'haste') m += (s.power || 0) / 100;
+    if (s.type === 'haste' || s.type === 'momentum') m += (s.power || 0) / 100;
     else if (s.type === 'slow') m -= (s.power || 0) / 100;
   }
   return Math.max(G().speedMulMin, Math.min(G().speedMulMax, m));
@@ -62,7 +62,11 @@ export function strikeRange(player) {
 }
 export function guAttackRange(gu) {
   const gv = BALANCE.combat.guDamage;
-  const power = gu?.effect?.attack?.power || 0;
+  const atk = gu?.effect?.attack || {};
+  // an explicit [min, max] pair on the Gu is the designed damage window —
+  // shown to the player everywhere and rolled inside, never fixed damage
+  if (Array.isArray(atk.range)) return { min: Math.max(1, atk.range[0]), max: Math.max(1, atk.range[1]) };
+  const power = atk.power || 0;
   return { min: Math.max(1, Math.floor(power * gv.minMul)), max: Math.max(1, Math.floor(power * gv.maxMul)) };
 }
 const rollIn = (r) => r.min + Math.floor(Math.random() * (r.max - r.min + 1));
@@ -191,8 +195,9 @@ export function activationChanceOf(gu, inst, state, combat) {
 }
 
 // Stacking caps: damage-over-time effects stack, but never without limit — at
-// the cap a fresh application refreshes the strongest stack instead.
-const STACK_CAPS = { burn: 3, poison: 3 };
+// the cap a fresh application refreshes the strongest stack instead. Poison
+// stacks to ×5 (the attrition identity); wind momentum holds at 5 stacks.
+const STACK_CAPS = { burn: 3, poison: 5, momentum: 5, ccResist: 2 };
 function addStatus(statuses, entry) {
   const cap = STACK_CAPS[entry.type];
   if (cap) {
@@ -209,6 +214,9 @@ function addStatus(statuses, entry) {
 
 const effValue = (statuses, type) => (statuses || []).filter(s => s.type === type).reduce((a, s) => a + (s.power || 0), 0);
 const hasStatus = (statuses, type) => (statuses || []).some(s => s.type === type);
+// hard control: stun (legacy), paralysis (Lightning) and freeze (Ice) all
+// deny the enemy its next action and scatter any charged attack
+const incapacitated = (st) => hasStatus(st, 'stun') || hasStatus(st, 'paralysis') || hasStatus(st, 'frozen');
 
 function elementBuffMul(playerStatuses, element) {
   let m = 1;
@@ -316,6 +324,50 @@ function applyGu(gu, player, enemy, pSt, eSt, combat, push, fx, syn, weather, mu
       if (enemy.immune?.includes('stun')) push(T('cmt.stunImmune', { enemy: locEnemyName(enemy) }));
       else { eSt.push({ type: 'stun', power: 0, duration: 1 }); push(T('cmt.stunned', { enemy: locEnemyName(enemy) })); meaningful = true; }
     }
+    // LIGHTNING — paralysis: the foe may lose its next action. After it lands,
+    // its nerves harden (+30% control resistance for 2 actions), so paralysis
+    // can never chain-lock; resistant foes (bosses, elites) shake it off in
+    // proportion to their statusResist.
+    if (e.attack.paralysis) {
+      const res = (enemy.statusResist?.paralysis || 0) + effValue(eSt, 'ccResist');
+      if (enemy.immune?.includes('stun')) push(T('cmt.stunImmune', { enemy: locEnemyName(enemy) }));
+      else if (Math.random() * 100 < e.attack.paralysis.chance * (1 - Math.min(100, res) / 100)) {
+        eSt.push({ type: 'paralysis', power: 0, duration: e.attack.paralysis.duration || 1 });
+        addStatus(eSt, { type: 'ccResist', power: 30, duration: 2 });
+        push(T('cmt.paralyzed', { enemy: locEnemyName(enemy) }));
+        meaningful = true;
+      } else push(T('cmt.paralysisShrugs', { enemy: locEnemyName(enemy) }));
+    }
+    // ICE — freeze: a frozen foe loses its next action outright. Fully
+    // freeze-resistant foes (rune-bound colossi) only slow: action delay
+    // replaces the lost action. A frozen foe chills wary afterwards
+    // (+control resistance), preventing chain-freezes.
+    if (e.attack.freeze) {
+      const res = (enemy.statusResist?.freeze || 0) + effValue(eSt, 'ccResist');
+      if (enemy.immune?.includes('stun')) push(T('cmt.stunImmune', { enemy: locEnemyName(enemy) }));
+      else if (res >= 100) {
+        combat.nextAct.enemy += actDelay(enemy.baseSpeed, eSt) * 0.4;
+        push(T('cmt.frozenSlows', { enemy: locEnemyName(enemy) }));
+      } else if (Math.random() * 100 < e.attack.freeze.chance * (1 - res / 100)) {
+        eSt.push({ type: 'frozen', power: 0, duration: e.attack.freeze.duration || 1 });
+        addStatus(eSt, { type: 'ccResist', power: 30, duration: 2 });
+        push(T('cmt.frozen', { enemy: locEnemyName(enemy) }));
+        meaningful = true;
+      } else push(T('cmt.freezeShrugs', { enemy: locEnemyName(enemy) }));
+    }
+    // EARTH — some strikes leave your stance rooted: a chance at Stone Guard.
+    if (e.attack.guard && Math.random() * 100 < e.attack.guard.chance) {
+      pSt.push({ type: 'defense', power: e.attack.guard.power, duration: e.attack.guard.duration });
+      push(T('cmt.stoneGuard', { p: e.attack.guard.power }));
+    }
+    // WATER — flowing essence: a small chance to draw essence back after the
+    // strike. Capped at 1–2 per activation — efficiency, never free casting.
+    if (e.essenceRecovery && Math.random() * 100 < e.essenceRecovery.chance) {
+      const er = e.essenceRecovery;
+      const amt = er.min + Math.floor(Math.random() * (er.max - er.min + 1));
+      player.primevalEssence = Math.min(player.maxPrimevalEssence, player.primevalEssence + amt);
+      push(T('cmt.essenceFlow', { n: amt }));
+    }
     // Killer fire feasts on burning foes — consuming the Burn for a burst
     if (killer && gu.element === 'fire' && hasStatus(eSt, 'burn')) {
       const feast = eSt.filter(s => s.type === 'burn').reduce((a, s) => a + s.power, 0) * 2;
@@ -333,9 +385,22 @@ function applyGu(gu, player, enemy, pSt, eSt, combat, push, fx, syn, weather, mu
       for (let i = eSt.length - 1; i >= 0; i--) if (eSt[i].type === 'soaked') eSt.splice(i, 1);
       push(T('cmt.burnSteam'));
     }
-    addStatus(eSt, { type: 'burn', power, duration: dur });
-    push(T('cmt.ablaze', { enemy: locEnemyName(enemy) }));
-    meaningful = true;
+    if ((enemy.statusResist?.burn || 0) >= 100) push(T('cmt.burnImmune', { enemy: locEnemyName(enemy) }));
+    else {
+      addStatus(eSt, { type: 'burn', power, duration: dur });
+      push(T('cmt.ablaze', { enemy: locEnemyName(enemy) }));
+      meaningful = true;
+    }
+  }
+  // POISON — stacking damage over time: every strike adds another layer of
+  // venom (×n, up to the cap). Weak immediately, brutal in long fights.
+  if (e.poison) {
+    if ((enemy.statusResist?.poison || 0) >= 100) push(T('cmt.poisonImmune', { enemy: locEnemyName(enemy) }));
+    else {
+      addStatus(eSt, { type: 'poison', power: e.poison.power, duration: e.poison.duration });
+      push(T('cmt.venomApplied', { enemy: locEnemyName(enemy), n: eSt.filter(s => s.type === 'poison').length, d: e.poison.power }));
+      meaningful = true;
+    }
   }
   if (e.soak) {
     eSt.push({ type: 'soaked', power: 0, duration: 3 });
@@ -351,6 +416,16 @@ function applyGu(gu, player, enemy, pSt, eSt, combat, push, fx, syn, weather, mu
   if (e.expose) { eSt.push({ type: 'weakness', power: e.expose.power, duration: e.expose.duration }); push(T('cmt.exposed', { enemy: locEnemyName(enemy) })); meaningful = true; }
   if (e.armorBreak) { eSt.push({ type: 'armorBreak', power: e.armorBreak.power, duration: e.armorBreak.duration }); push(T('cmt.armorBreak', { enemy: locEnemyName(enemy) })); meaningful = true; }
   if (e.self?.haste) { pSt.push({ type: 'haste', power: e.self.haste.power, duration: e.self.haste.duration }); push(T('cmt.selfHaste', { gu: locGuName(gu) })); }
+  // WIND — momentum: each meaningful strike adds a stack of +power% Speed (up
+  // to cap). Stacks last the whole battle — wind grows stronger as it blows.
+  if (e.self?.momentum) {
+    const mom = e.self.momentum;
+    const stacks = pSt.filter(s => s.type === 'momentum').length;
+    if (stacks < (mom.cap || 5)) {
+      addStatus(pSt, { type: 'momentum', power: mom.power, duration: 999 });
+      push(T('cmt.momentum', { n: stacks + 1, p: mom.power }));
+    } else push(T('cmt.momentumMax', { cap: mom.cap || 5 }));
+  }
   if (e.stab) applyStabilityDamage(enemy, combat, e.stab * (mul >= 1 ? 1 : 0.75), push, gu.path);
   if (e.summon) {
     const p = Math.max(1, Math.floor(e.summon.power * mul * (1 + (fx.summonPct || 0) / 100) * (syn.has('tamedTides') ? 1.15 : 1)));
@@ -401,6 +476,12 @@ function enemyAct(enemy, player, pSt, push, windEvasion, thorns) {
     if (Math.random() < 0.4 * (1 - Math.min(90, resist) / 100)) {
       addStatus(pSt, { type: 'poison', power: 3, duration: 3 }); push(T('cmt.youPoisoned'));
     }
+  }
+  // a numbing creature (stray lightning-qi in its bite) drags the player's
+  // next actions later — the enemy side of the paralysis lesson
+  if (enemy.abilities && enemy.abilities.includes('numb') && Math.random() < 0.18) {
+    addStatus(pSt, { type: 'slow', power: 30, duration: 2 });
+    push(T('cmt.youNumbed', { enemy: locEnemyName(enemy) }));
   }
 }
 
@@ -768,14 +849,18 @@ export function executeRound(state, action) {
     combat.clock = combat.nextAct.enemy;
     eSt = tick(eSt, push, enemy, 'enemy');
     enemy.statuses = eSt;
-    // a stunned or BROKEN enemy loses any charged attack
-    if (enemy.telegraph && (hasStatus(eSt, 'stun') || hasStatus(eSt, 'broken'))) {
+    // a stunned, paralyzed, FROZEN or BROKEN enemy loses any charged attack
+    if (enemy.telegraph && (incapacitated(eSt) || hasStatus(eSt, 'broken'))) {
       enemy.telegraph = null;
       enemy.planned = null;
       push(T('cmt.interrupted', { enemy: locEnemyName(enemy) }));
     }
     if (hasStatus(eSt, 'broken')) {
       push(T('cmt.reel', { enemy: locEnemyName(enemy) }));
+    } else if (hasStatus(eSt, 'frozen')) {
+      push(T('cmt.frozenCannot', { enemy: locEnemyName(enemy) }));
+    } else if (hasStatus(eSt, 'paralysis')) {
+      push(T('cmt.paralysisCannot', { enemy: locEnemyName(enemy) }));
     } else if (hasStatus(eSt, 'stun')) {
       push(T('cmt.stunCannot', { enemy: locEnemyName(enemy) }));
     } else if (enemy.telegraph) {
@@ -789,7 +874,7 @@ export function executeRound(state, action) {
     }
     combat.nextAct.enemy += actDelay(enemy.baseSpeed, eSt);
     // commit the NEXT intent one action ahead — the player can read and answer it
-    if (enemy.hp > 0 && !hasStatus(eSt, 'broken') && !hasStatus(eSt, 'stun')) enemy.planned = planIntent(enemy, eSt);
+    if (enemy.hp > 0 && !hasStatus(eSt, 'broken') && !incapacitated(eSt)) enemy.planned = planIntent(enemy, eSt);
     if (enemy.hp <= 0) break;
   }
 

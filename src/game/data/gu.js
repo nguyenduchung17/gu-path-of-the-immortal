@@ -3,10 +3,10 @@
 export const GU = [
   // ---- Wind ----
   {
-    id: 'swiftFang', name: 'Swift Fang Gu', rank: 1, type: 'Attack', path: 'wind', element: 'none', rarity: 'common',
-    description: 'A swift bite of primeval force. Cheap and reliable — the first Gu of many a young master.',
+    id: 'swiftFang', name: 'Swift Fang Gu', rank: 1, type: 'Attack', path: 'wind', element: 'wind', rarity: 'common',
+    description: 'A swift bite of wind-force. Every strike builds WIND MOMENTUM — the longer the fight, the sooner you act.',
     energyCost: 3, cooldown: 0,
-    effect: { attack: { power: 8 } },
+    effect: { attack: { power: 7, range: [6, 9] }, self: { momentum: { power: 5, cap: 5 } } },
   },
   {
     id: 'windStep', name: 'Wind Step Gu', rank: 1, type: 'Movement', path: 'wind', element: 'wind', rarity: 'common',
@@ -158,6 +158,53 @@ export const GU = [
     effect: { summon: { power: 13, duration: 3 } },
   },
   // ---- Starter Gu (chosen at character creation) ----
+  // Eight philosophies of combat — one per Dao Path. Balanced on TOTAL VALUE,
+  // not raw damage: every option can win an early fight, and each teaches a
+  // different mechanic (Burn / Paralysis / Essence regain / Freeze / Poison
+  // stacks / Momentum / GUARD-breaking / Criticals).
+  {
+    id: 'emberFang', name: 'Ember Fang Gu', rank: 1, type: 'Attack', path: 'fire', element: 'fire', rarity: 'common',
+    description: 'A fang of living flame. Strikes hard and leaves the foe BURNING — fire damage every action.',
+    energyCost: 4, cooldown: 1,
+    effect: { attack: { power: 10, range: [8, 11] }, burn: { power: 2, duration: 3 } },
+  },
+  {
+    id: 'sparkNeedle', name: 'Spark Needle Gu', rank: 1, type: 'Attack', path: 'lightning', element: 'lightning', rarity: 'common',
+    description: 'A needle of drawn lightning. May PARALYZE the foe — its next action simply never comes.',
+    energyCost: 4, cooldown: 1,
+    effect: { attack: { power: 9, range: [7, 10], paralysis: { chance: 20, duration: 1 } } },
+  },
+  {
+    id: 'flowingDrop', name: 'Flowing Drop Gu', rank: 1, type: 'Attack', path: 'water', element: 'water', rarity: 'common',
+    description: 'A drop that flows without spilling. Sometimes the strike\u2019s essence flows back to you.',
+    energyCost: 4, cooldown: 1,
+    effect: { attack: { power: 8, range: [6, 9] }, essenceRecovery: { chance: 25, min: 1, max: 2 } },
+  },
+  {
+    id: 'frostNeedle', name: 'Frost Needle Gu', rank: 1, type: 'Attack', path: 'ice', element: 'ice', rarity: 'common',
+    description: 'A needle of dead-still frost. May FREEZE the foe solid for its next action.',
+    energyCost: 4, cooldown: 1,
+    effect: { attack: { power: 8, range: [6, 9], freeze: { chance: 15, duration: 1 } } },
+  },
+  {
+    id: 'venomNeedle', name: 'Venom Needle Gu', rank: 1, type: 'Attack', path: 'poison', element: 'poison', rarity: 'common',
+    description: 'A hollow needle-bead of venom. Its POISON stacks with every strike — weak now, deadly soon.',
+    energyCost: 3, cooldown: 0,
+    effect: { attack: { power: 6, range: [4, 7] }, poison: { power: 2, duration: 3 } },
+  },
+  {
+    id: 'stoneFist', name: 'Stone Fist Gu', rank: 1, type: 'Attack', path: 'earth', element: 'earth', rarity: 'common',
+    description: 'A fist of grinding stone. Splinters the foe\u2019s GUARD — and sometimes leaves you braced behind Stone Guard.',
+    energyCost: 3, cooldown: 1,
+    effect: { attack: { power: 7, range: [5, 8], guard: { chance: 25, power: 5, duration: 2 } }, stab: 12 },
+  },
+  {
+    id: 'ironEdge', name: 'Iron Edge Gu', rank: 1, type: 'Attack', path: 'sword', element: 'metal', rarity: 'common',
+    description: 'A plain iron edge honed to one truth: the clean cut. High damage, honest criticals, no tricks.',
+    energyCost: 4, cooldown: 1,
+    effect: { attack: { power: 11, range: [9, 13], crit: 10 } },
+  },
+  // ---- Legacy starter Gu (retired from the creation roster) ----
   {
     id: 'flameSpark', name: 'Flame Spark Gu', rank: 1, type: 'Attack', path: 'fire', element: 'fire', rarity: 'common',
     description: 'A drifting spark of living flame that clings to the foe and burns on.',
