@@ -21,6 +21,14 @@ export function effectSummary(gu, t) {
   if (e.control) parts.push(`${t('fx.control')} ${e.control.power}`);
   if (e.buff) parts.push(`${t('fx.buff')} +${e.buff.power}%`);
   if (e.investigate) parts.push(t('fx.investigate'));
+  if (e.stab) parts.push(`${t('fx.stab')} ${e.stab}`);
+  if (e.slow) parts.push(`${t('fx.slow')} −${e.slow.power}%`);
+  if (e.delay) parts.push(`${t('fx.delay')} ${e.delay.pct}%`);
+  if (e.advance) parts.push(`${t('fx.advance')} ${e.advance.pct}%`);
+  if (e.expose) parts.push(`${t('fx.expose')} +${e.expose.power}%`);
+  if (e.self?.haste) parts.push(`${t('fx.haste')} +${e.self.haste.power}%`);
+  if (e.selfDelay) parts.push(`${t('fx.selfDelay')} +${e.selfDelay.pct}%`);
+  if (e.soak) parts.push(t('fx.soak'));
   return parts.join(' · ');
 }
 
@@ -54,7 +62,7 @@ function GuOption({ inst, state, combat, killer, onClick }) {
 
 // Bottom battle command interface: main commands open sub-lists; every option
 // shows name, Path, essence cost, cooldown, activation chance and effect.
-export default function BattleCommandMenu({ state, combat, busy, onGu, onItem, onDefend, onFlee }) {
+export default function BattleCommandMenu({ state, combat, busy, onGu, onItem, onStrike, onObserve, onDefend, onFlee }) {
   const { t } = useT();
   const [tab, setTab] = useState('main');
   const p = state.player;
@@ -69,8 +77,10 @@ export default function BattleCommandMenu({ state, combat, busy, onGu, onItem, o
   const MAIN = [
     { id: 'gu', label: t('battle.cmdGu'), icon: '🐉', tone: 'bg-emerald-700/80 hover:bg-emerald-600 border-emerald-500/40' },
     { id: 'killer', label: t('battle.cmdKiller'), icon: '⚡', tone: 'bg-amber-700/70 hover:bg-amber-600 border-amber-500/40' },
+    { id: 'strike', label: t('battle.cmdStrike'), icon: '⚔️', tone: 'bg-amber-800/60 hover:bg-amber-700 border-amber-600/40' },
     { id: 'item', label: t('battle.cmdItem'), icon: '🧪', tone: 'bg-sky-800/70 hover:bg-sky-700 border-sky-600/40' },
     { id: 'defend', label: t('battle.cmdDefend'), icon: '🛡️', tone: 'bg-stone-700/80 hover:bg-stone-600 border-stone-500/40' },
+    { id: 'observe', label: t('battle.cmdObserve'), icon: '👁️', tone: 'bg-slate-700/70 hover:bg-slate-600 border-slate-500/40' },
     { id: 'flee', label: t('battle.cmdFlee'), icon: '🏃', tone: 'bg-rose-900/60 hover:bg-rose-800 border-rose-700/50' },
   ];
 
@@ -111,7 +121,7 @@ export default function BattleCommandMenu({ state, combat, busy, onGu, onItem, o
 
       {/* main command row */}
       {tab === 'main' && (
-        <div className="grid grid-cols-5 gap-1.5">
+        <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5">
           {MAIN.map(cmd => {
             const dim = disabled || (cmd.id === 'item' && meds.length === 0);
             return (
@@ -119,6 +129,8 @@ export default function BattleCommandMenu({ state, combat, busy, onGu, onItem, o
                 onClick={() => {
                   if (cmd.id === 'gu' || cmd.id === 'killer' || cmd.id === 'item') { sfx('open'); setTab(cmd.id); }
                   else if (cmd.id === 'defend') { sfx('ui'); onDefend(); }
+                  else if (cmd.id === 'strike') { sfx('ui'); onStrike(); }
+                  else if (cmd.id === 'observe') { sfx('sense'); onObserve(); }
                   else { sfx('cancel'); onFlee(); }
                 }}
                 className={`rounded-lg border px-1 py-2.5 text-white text-[11px] sm:text-xs font-heading tracking-wide transition active:scale-95 ${cmd.tone} ${dim ? 'opacity-40 cursor-not-allowed' : ''}`}>

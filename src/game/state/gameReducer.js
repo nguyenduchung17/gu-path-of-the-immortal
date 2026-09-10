@@ -5,7 +5,7 @@ import { NPC_BY_ID, guOfferOf } from '../data/npcs';
 import { MASTERS, MASTER_BY_ID, reqChecks, syncMasterSteps } from '../data/masters';
 import { EVENT_BY_ID } from '../data/events';
 import { ENEMY_BY_ID } from '../data/enemies';
-import { initCombat, executeRound } from '../engine/combat';
+import { initCombat, executeRound, persistCombatEnemyState } from '../engine/combat';
 import { advanceTime, phaseOf } from '../engine/time';
 import { applyEffects } from '../engine/effects';
 import { grantMastery, learnRecipe, bonusOf, learnClue, CLUE_RANK } from '../engine/mastery';
@@ -16,7 +16,7 @@ import {
   WORLD, zoneAt, isWalkable, DEFAULT_ZONE, LANDMARKS, WORLD_RESOURCES,
   initialEnemies, TERRACE, FORMATION, CAMP_CELLS, INNS,
 } from '../data/world';
-import { tickEnemies } from '../engine/enemies';
+import { tickEnemies, regenWorldEnemies } from '../engine/enemies';
 import { MISSION_BY_ID } from '../data/missions';
 import { CONTRIBUTION_OFFERS } from '../data/contribution';
 import { ARENA_BY_ID } from '../data/arena';
@@ -336,7 +336,7 @@ export function gameReducer(state, action) {
       const e = (state.worldState.enemies || []).find(en => !en.dead && Math.abs(en.x - p.x) + Math.abs(en.y - p.y) === 1);
       if (!e) return state;
       const def = ENEMY_BY_ID[e.defId];
-      return { ...state, combat: initCombat(e.defId, p, { hp: e.hp, worldId: e.id, difficulty: state.difficulty, intro: `You strike first — the ${def.name} turns on you!` }) };
+      return { ...state, combat: initCombat(e.defId, p, { hp: e.hp, stability: e.stability, statuses: e.statuses, worldId: e.id, difficulty: state.difficulty, intro: `You strike first — the ${def.name} turns on you!` }) };
     }
 
     case 'SLEEP_INN': {
@@ -667,6 +667,8 @@ export function gameReducer(state, action) {
     // ---------- Game clock ----------
     case 'TIME_TICK': {
       let s = advanceTime(state, BALANCE.time.minutesPerTick);
+      // wounded world enemies slowly mend — never instantly (BALANCE.combat.regen)
+      s = regenWorldEnemies(s, BALANCE.time.minutesPerTick);
       s = { ...s, playtimeSec: (s.playtimeSec || 0) + BALANCE.time.tickMs / 1000 };
       return s;
     }
@@ -705,7 +707,7 @@ export function gameReducer(state, action) {
       return {
         ...state,
         recovery: null,
-        combat: initCombat(e.defId, state.player, { hp: e.hp, worldId: e.id, difficulty: state.difficulty, intro: `Your meditation shatters — the ${def.name} found you!` }),
+        combat: initCombat(e.defId, state.player, { hp: e.hp, stability: e.stability, statuses: e.statuses, worldId: e.id, difficulty: state.difficulty, intro: `Your meditation shatters — the ${def.name} found you!` }),
         log: [...state.log, `Your meditation shatters — the ${def.name} found you!`],
       };
     }
@@ -808,31 +810,10 @@ export function gameReducer(state, action) {
       const c = state.combat;
       if (!c) return state;
       let s = { ...state, combat: null };
-      // wild Gu bookkeeping: killed → the haunt empties until respawn;
-      // a surviving wild Gu keeps the damage you dealt (weakened = easier capture)
-      if (c.wildGuId && s.worldState.wildGu) {
-        if (c.result === 'victory') {
-          s = wildGuAfterEncounter(s, c.wildGuId, true);
-        } else {
-          s = { ...s, worldState: { ...s.worldState, wildGu: s.worldState.wildGu.map(w => w.id !== c.wildGuId ? w : { ...w, hp: Math.max(1, Math.round(c.enemy.hp / (c.hpScale || 1))) }) } };
-        }
-      }
-      // world enemy bookkeeping: dead → respawn timer; surviving → keep damage dealt
-      if (c.worldId && s.worldState.enemies) {
-        s = {
-          ...s,
-          worldState: {
-            ...s.worldState,
-            enemies: s.worldState.enemies.map(e => {
-              if (e.id !== c.worldId) return e;
-              if (c.result === 'victory') {
-                return { ...e, dead: true, respawnAt: Date.now() + BALANCE.world.respawnMs * (ENEMY_BY_ID[e.defId]?.respawnMul || 1), x: e.home.x, y: e.home.y, state: 'idle', hp: ENEMY_BY_ID[e.defId].hp };
-              }
-              return { ...e, hp: Math.max(1, Math.min(ENEMY_BY_ID[e.defId].hp, Math.round(c.enemy.hp / (c.hpScale || 1)))), state: 'idle' };
-            }),
-          },
-        };
-      }
+      // world bookkeeping — the exact combat state (HP, guard, lingering wounds,
+      // last-combat time) survives a flee or an interrupted battle; only a kill
+      // (respawn timer) or natural regen ever returns a foe to full strength.
+      s = persistCombatEnemyState(s, c);
       // quest events — a valid kill and its loot advance objectives (flees never count)
       if (c.result === 'victory') {
         s = withQuestEvents(s, { type: 'ENEMY_KILLED', id: c.enemyId });

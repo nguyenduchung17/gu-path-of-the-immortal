@@ -195,7 +195,6 @@ function applyGu(gu, player, enemy, pSt, eSt, combat, push, fx, syn, weather, mu
   const G_ = BALANCE.combat;
   let meaningful = false;
   const killer = isKillerMove(gu);
-  const broken = hasStatus(eSt, 'broken');
   if (e.attack) {
     const hits = e.attack.hits || 1;
     for (let h = 0; h < hits; h++) {
@@ -216,9 +215,8 @@ function applyGu(gu, player, enemy, pSt, eSt, combat, push, fx, syn, weather, mu
         dmg = Math.floor(dmg * 1.4);
         push(`The lightning races across ${enemy.name}'s soaked hide!`);
       }
-      // setup pays off: broken targets take heavy bonus damage, exposed ones more
-      if (broken) dmg = Math.floor(dmg * damageTakenMul(enemy));
-      else dmg = Math.floor(dmg * damageTakenMul(enemy));
+      // setup pays off: broken/exposed targets take amplified damage
+      dmg = Math.floor(dmg * damageTakenMul(enemy));
       const guard = eSt.find(s => s.type === 'guard');
       if (guard) { dmg = Math.floor(dmg * (1 - (guard.power || 0) / 100)); push(`${enemy.name} hunkers behind its guard.`); }
       dmg = Math.max(1, dmg - Math.floor(effDefenseOf(enemy) * 0.5));

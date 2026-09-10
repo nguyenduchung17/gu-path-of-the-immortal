@@ -3,6 +3,7 @@ import { gameReducer } from './gameReducer';
 import { migrateSave } from './migrate';
 import { recoveryRatePerSec } from '../config/balance';
 import { ENEMY_BY_ID } from '../data/enemies';
+import { persistCombatEnemyState } from '../engine/combat';
 
 const GameContext = createContext(null);
 export const SLOT_COUNT = 5;
@@ -35,6 +36,11 @@ function normalize(raw) {
   // saves from any older build (v7 boss-era, v8 living-Gu-era, …) pick up the
   // fields the current game expects. The old `>= 7` guard froze saves at v7.
   let s = migrateSave(raw);
+  // a battle cut short by a page refresh must not heal the foe — carry the
+  // combat record back onto the world before the transient state is dropped
+  if (s.combat?.enemy && (s.combat.worldId || s.combat.wildGuId)) {
+    s = persistCombatEnemyState(s, s.combat);
+  }
   s = { ...s, toasts: [], breakthrough: null, dialogue: null, pendingEvent: null, combat: null };
   if (s.sleeping && (!s.sleeping.wakeAt || Date.now() >= s.sleeping.wakeAt)) s = { ...s, sleeping: null };
   // respawn any world enemies whose timer elapsed while away

@@ -11,6 +11,7 @@ import { appearanceOf } from '@/game/data/appearance';
 import { zoneAt } from '@/game/data/world';
 import BattleScene from './battle/BattleScene';
 import BattleCommandMenu from './battle/BattleCommandMenu';
+import Timeline from './battle/Timeline';
 import { biomeOf } from './battle/biomes';
 import { weatherOf } from '@/game/engine/weather';
 import PortraitFrame from './PortraitFrame';
@@ -33,6 +34,14 @@ const STATUS_META = {
   evasion: { icon: '🌪️', tone: 'bg-teal-900/50 text-teal-200 border-teal-700/50' },
   barrier: { icon: '💠', tone: 'bg-cyan-900/50 text-cyan-200 border-cyan-700/50' },
   buff: { icon: '✨', tone: 'bg-amber-900/50 text-amber-200 border-amber-700/50' },
+  haste: { icon: '💨', tone: 'bg-teal-900/50 text-teal-200 border-teal-600/50' },
+  slow: { icon: '🕸️', tone: 'bg-slate-800/60 text-slate-200 border-slate-500/50' },
+  guard: { icon: '🛡️', tone: 'bg-stone-700/60 text-stone-100 border-stone-400/50' },
+  focus: { icon: '🎯', tone: 'bg-amber-900/50 text-amber-200 border-amber-600/50' },
+  weakness: { icon: '💔', tone: 'bg-rose-900/50 text-rose-200 border-rose-600/50' },
+  armorBreak: { icon: '🔨', tone: 'bg-orange-900/50 text-orange-200 border-orange-600/50' },
+  soaked: { icon: '💧', tone: 'bg-sky-900/50 text-sky-200 border-sky-600/50' },
+  broken: { icon: '⚡', tone: 'bg-amber-800/60 text-amber-100 border-amber-400/60' },
 };
 
 function guSound(gu, kinds) {
@@ -128,7 +137,13 @@ export default function CombatView() {
       else if (l.includes('binds')) kinds.control = true;
       else if (l.includes('empowers your')) kinds.buff = true;
       else if (l.includes('answers the pact')) kinds.summon = true;
-      else if (l.includes('reveals the enemy')) kinds.investigate = true;
+      else if (l.includes('reveals the enemy') || l.includes('intent — weaknesses')) kinds.investigate = true;
+      else if ((m = l.match(/You strike .*? for (\d+) damage/))) enemyDmg += +m[1];
+      else if ((m = l.match(/sinks its fangs in for (\d+) damage/))) playerDmg += +m[1];
+      else if (l.includes('guard SHATTERS')) kinds.broken = true;
+      else if (l.includes('feasts on the burning')) crit = true;
+      else if (l.includes('blunts')) block = true;
+      else if (l.includes('quickens your form')) kinds.haste = true;
     }
     if (gu) {
       for (const key of Object.keys(gu.effect || {})) kinds[key] = kinds[key] ?? key !== 'attack';
@@ -137,6 +152,7 @@ export default function CombatView() {
     pendingGu.current = null;
     const castColor = gu ? PATH_COLORS[gu.path] || '#8fd8a0' : null;
     setFx({ key: logLen, gu, kinds, killer: !!(gu && isKillerMove(gu)), castColor, enemyDmg, playerDmg, dodge, block, crit, fail, heal, essence });
+    if (kinds.broken) sfx('crit');
     if (fail) sfx('fail');
     else if (gu) sfx(guSound(gu, kinds));
     if (enemyDmg > 0) sfx(crit ? 'crit' : 'hit');
@@ -183,13 +199,17 @@ export default function CombatView() {
         <div className="absolute top-3 left-3 w-44 sm:w-64 rounded-xl bg-black/60 backdrop-blur border border-rose-900/60 p-2.5 sm:p-3 animate-pop">
           <div className="flex items-center justify-between gap-2 mb-2">
             <div className="text-sm font-semibold text-rose-100 truncate">{enemy.name}</div>
-            <div className="text-[10px] text-stone-400 shrink-0">ATK {enemy.attack} · DEF {enemy.defense}</div>
+            <div className="text-[10px] text-stone-400 shrink-0">ATK {enemy.attack} · DEF {enemy.defense} · {t('battle.spd')} {enemy.baseSpeed}</div>
           </div>
           <div className="text-[9px] text-stone-400 -mt-1 mb-1">
             {enemy.elite && <span className="text-rose-400 font-semibold">☠ {t('battle.elite')} · </span>}
             {visualOf(enemy.id).rank}{!c.arena && !c.trial ? ` · ${DANGER_LABEL[visualOf(enemy.id).danger] || ''}` : ''}
           </div>
           <Bar value={enemy.hp} max={enemy.maxHp} from="#9f1239" to="#fb7185" label={t('ui.hp')} />
+          <div className="mt-1.5">
+            <Bar value={enemy.stability ?? enemy.maxStability} max={enemy.maxStability} from="#64748b" to="#cbd5e1"
+              label={enemy.statuses?.some(s => s.type === 'broken') ? t('battle.broken') : t('battle.guard')} />
+          </div>
           {c.revealed && (
             <div className="text-[10px] text-amber-300/80 mt-1">
               {t('battle.weakness')}: <span className="capitalize">{enemy.weakness === 'none' ? t('ui.none') : `${PATH_BY_ID[enemy.weakness]?.name || enemy.weakness}`}</span>
@@ -215,6 +235,7 @@ export default function CombatView() {
             </div>
             <div className="text-[9px] text-emerald-300/80 shrink-0 text-right leading-tight">
               {t(`apt.tier.${tier.id}`)}
+              <div className="text-stone-400">{t('battle.spd')} {c.speeds?.player ?? '—'}</div>
             </div>
           </div>
           <Bar value={p.hp} max={p.maxHp} from="#e11d48" to="#fb7185" label={t('ui.hp')} />
@@ -230,6 +251,16 @@ export default function CombatView() {
             busy ? 'border-rose-700/50 text-rose-200' : 'border-emerald-600/50 text-emerald-200 animate-pulse'
           }`}>
             {busy ? t('battle.acting') : t('battle.turn')}
+          </div>
+        )}
+
+        {/* action timeline — who acts next, so the player can plan ahead */}
+        {!c.over && <Timeline combat={c} />}
+
+        {/* telegraphed heavy move — answer with Defend, delay, a stun or a BREAK */}
+        {!c.over && enemy.telegraph && (
+          <div className="absolute top-[76px] left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-amber-950/80 border border-amber-500/60 text-[10px] text-amber-200 font-heading tracking-wide animate-pulse whitespace-nowrap pointer-events-none">
+            ⚠ {enemy.name} prepares {enemy.telegraph.name} — brace yourself!
           </div>
         )}
 
@@ -288,6 +319,8 @@ export default function CombatView() {
             busy={busy}
             onGu={(inst) => act('gu', { guInst: inst })}
             onItem={(itemId) => act('item', { itemId })}
+            onStrike={() => act('strike')}
+            onObserve={() => act('observe')}
             onDefend={() => act('defend')}
             onFlee={() => act('flee')}
           />

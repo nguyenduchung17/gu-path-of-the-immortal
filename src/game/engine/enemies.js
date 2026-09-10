@@ -3,7 +3,7 @@
 // player attacks them first. No random encounters.
 import { ENEMY_BY_ID } from '../data/enemies';
 import { isWalkable, zoneAt, DEFAULT_ZONE, WORLD_NPCS } from '../data/world';
-import { initCombat } from './combat';
+import { initCombat, maxStabilityOf } from './combat';
 import { isNight } from './time';
 import { BALANCE } from '../config/balance';
 
@@ -91,13 +91,13 @@ export function tickEnemies(state) {
       if (dist > detect + BALANCE.world.giveUpDist || homeDist > BALANCE.world.leash) {
         ne.state = 'idle';
       } else if (manhattan(ne.x, ne.y, p.x, p.y) === 1) {
-        combat = initCombat(e.defId, p, { hp: ne.hp, worldId: e.id, difficulty: state.difficulty, intro: `${def.name} catches you!` });
+        combat = initCombat(e.defId, p, { hp: ne.hp, stability: ne.stability, statuses: ne.statuses, worldId: e.id, difficulty: state.difficulty, intro: `${def.name} catches you!` });
         return ne;
       } else {
         const st = stepToward(ne, p.x, p.y, enemies, p);
         if (st) { ne.x = st.x; ne.y = st.y; }
         if (manhattan(ne.x, ne.y, p.x, p.y) === 1) {
-          combat = initCombat(e.defId, p, { hp: ne.hp, worldId: e.id, difficulty: state.difficulty, intro: `${def.name} closes in!` });
+          combat = initCombat(e.defId, p, { hp: ne.hp, stability: ne.stability, statuses: ne.statuses, worldId: e.id, difficulty: state.difficulty, intro: `${def.name} closes in!` });
         }
       }
       return ne;
@@ -118,4 +118,33 @@ export function tickEnemies(state) {
   });
 
   return { state: { ...state, worldState: { ...ws, enemies } }, combat };
+}
+
+// Natural recovery between fights — % of max HP per in-game minute (slow by
+// design; see BALANCE.combat.regen). Never instantly heals; the enemy
+// currently in combat is skipped. Guard (stability) mends a little faster.
+export function regenWorldEnemies(state, minutes = 1) {
+  const ws = state.worldState;
+  if (!ws?.enemies?.length) return state;
+  const cfg = BALANCE.combat.regen;
+  const inCombatId = state.combat?.worldId || null;
+  let changed = false;
+  const enemies = ws.enemies.map(e => {
+    if (e.dead || e.id === inCombatId) return e;
+    const def = ENEMY_BY_ID[e.defId];
+    if (!def) return e;
+    const maxHp = def.hp;
+    const maxStab = maxStabilityOf(def);
+    const hp = e.hp ?? maxHp;
+    const stab = e.stability ?? maxStab;
+    if (hp >= maxHp && stab >= maxStab) return e;
+    const pct = def.regenPct ?? (def.elite ? cfg.elitePctPerMin : cfg.defaultPctPerMin);
+    changed = true;
+    return {
+      ...e,
+      hp: Math.min(maxHp, Math.round((hp + (maxHp * pct / 100) * minutes) * 10) / 10),
+      stability: Math.min(maxStab, Math.round((stab + (maxStab * cfg.stabilityPctPerMin / 100) * minutes) * 10) / 10),
+    };
+  });
+  return changed ? { ...state, worldState: { ...ws, enemies } } : state;
 }
