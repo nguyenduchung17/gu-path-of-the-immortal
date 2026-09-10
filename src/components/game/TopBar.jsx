@@ -1,6 +1,7 @@
 import React from 'react';
 import { useGame } from '@/game/state/GameContext';
 import { CULTIVATION_STAGES } from '@/game/data/cultivation';
+import { diffOf } from '@/game/config/balance';
 
 const TABS = [
   { id: 'world', label: 'World', icon: '🗺️' },
@@ -23,7 +24,7 @@ function Bar({ value, max, color }) {
 }
 
 export default function TopBar({ tab, setTab }) {
-  const { state, reset } = useGame();
+  const { state, reset, exitToSlots } = useGame();
   const p = state.player;
   const stage = CULTIVATION_STAGES[Math.min(19, p.rank * 4 + (p.stage || 0))];
   return (
@@ -34,7 +35,7 @@ export default function TopBar({ tab, setTab }) {
             <div className="w-9 h-9 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-800 flex items-center justify-center text-lg shadow-inner">🧑</div>
             <div>
               <div className="text-sm font-semibold leading-tight">{p.name}</div>
-              <div className="text-[10px] text-emerald-300/80 leading-tight">{stage.name} · {p.aptitude} apt</div>
+              <div className="text-[10px] text-emerald-300/80 leading-tight">{stage.name} · {p.aptitude} apt · <span className="text-amber-200/80">{diffOf(state).label}</span></div>
             </div>
           </div>
           <div className="flex-1 min-w-[140px] grid grid-cols-2 gap-2 max-w-xs">
@@ -50,7 +51,8 @@ export default function TopBar({ tab, setTab }) {
           <div className="flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-200" title="Primordial Stones">
             💎 {p.spiritStones}
           </div>
-          <button onClick={() => { if (confirm('Abandon this cultivator and start anew? Progress will be lost.')) reset(); }} className="text-[10px] text-stone-400 hover:text-rose-300 px-2 py-1 rounded border border-stone-700">Reset</button>
+          <button onClick={exitToSlots} className="text-[10px] text-stone-400 hover:text-amber-300 px-2 py-1 rounded border border-stone-700">Slots</button>
+          <button onClick={() => { if (confirm('Abandon this cultivator and delete this save? All progress in this slot will be lost.')) reset(); }} className="text-[10px] text-stone-400 hover:text-rose-300 px-2 py-1 rounded border border-stone-700">Reset</button>
         </div>
         <div className="mt-2 flex gap-1 overflow-x-auto scrollbar-thin">
           {TABS.map(t => (

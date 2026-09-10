@@ -7,6 +7,8 @@ import {
   WORLD, zoneAt, DEFAULT_ZONE, WORLD_NPCS, WORLD_RESOURCES, CAMP_CELLS,
   TERRACE, FORMATION, BUILDING_AT, BUILDING_LABELS,
 } from '@/game/data/world';
+import { darknessOf, warmthOf } from '@/game/engine/time';
+import ClockWidget from './ClockWidget';
 
 const TILE_BG = {
   '.': '#1c3226', ',': '#182a20', 'r': '#463d2c', 'f': '#33421f',
@@ -59,6 +61,11 @@ export default function WorldView() {
   const VH = isMobile ? 15 : 17;
   const camX = Math.max(0, Math.min(WORLD.w - VW, p.x - ((VW / 2) | 0)));
   const camY = Math.max(0, Math.min(WORLD.h - VH, p.y - ((VH / 2) | 0)));
+
+  // day/night: gradual darkness + warm dawn/dusk glow; settlements stay cozier
+  const rawDark = darknessOf(state.time?.min);
+  const dark = rawDark * (zone.safe ? 0.55 : 1);
+  const warm = warmthOf(state.time?.min);
 
   const enemies = state.worldState.enemies || [];
   const enemyMap = new Map(enemies.filter(e => !e.dead).map(e => [`${e.x},${e.y}`, e]));
@@ -130,6 +137,10 @@ export default function WorldView() {
               {BUILDING_AT.get(key).label}
             </div>
           )}
+          {b && dark > 0.2 && (
+            <div className="absolute left-[15%] top-[15%] w-[22%] h-[22%] rounded-[2px] bg-amber-300"
+              style={{ boxShadow: '0 0 5px 2px rgba(252, 211, 77, 0.75)', opacity: Math.min(1, dark) }} />
+          )}
           {res && !isPlayer && (
             <div className="absolute inset-0 flex items-center justify-center">
               <span className="text-amber-300 text-[8px] sm:text-[10px] drop-shadow">✦</span>
@@ -167,7 +178,10 @@ export default function WorldView() {
           <h2 className="text-lg font-semibold text-emerald-100">{zone.name}</h2>
           <span className={`text-[9px] px-2 py-0.5 rounded-full border whitespace-nowrap ${DANGER_CHIP[zone.danger] ?? DANGER_CHIP[2]}`}>{zone.dangerLabel}</span>
         </div>
-        <div className="text-[10px] text-stone-500 hidden sm:block">WASD / Arrows to move · E to interact</div>
+        <div className="flex items-center gap-2">
+          <ClockWidget />
+          <div className="text-[10px] text-stone-500 hidden sm:block">WASD / Arrows to move · E to interact</div>
+        </div>
       </div>
 
       <div className="relative rounded-xl overflow-hidden border border-emerald-900/50 shadow-2xl bg-[#101d15]">
@@ -179,6 +193,9 @@ export default function WorldView() {
         <div className="grid w-full" style={{ gridTemplateColumns: `repeat(${VW}, 1fr)` }}>
           {cells}
         </div>
+        {/* day/night overlays — transition smoothly as the clock turns */}
+        <div className="absolute inset-0 pointer-events-none" style={{ background: 'rgb(8 12 44)', opacity: dark * 0.5, transition: 'opacity 1.2s linear' }} />
+        <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(180deg, rgba(255,140,50,0.9), rgba(255,90,40,0.6))', opacity: warm, transition: 'opacity 1.2s linear' }} />
       </div>
 
       {/* D-pad for mobile */}

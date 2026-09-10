@@ -36,6 +36,13 @@ export const TERRACE = [49, 43];       // ×1.5 cultivation tile inside town
 export const FORMATION = [45, 47];    // teleportation formation (dormant)
 export const CAMP_CELLS = [[23, 45], [24, 45]];
 
+// Inns — safe lodging. cost is the per-night room price (scaled by difficulty);
+// spawn is the adjacent cell where an Easy-mode death returns the player.
+export const INNS = [
+  { id: 'townInn', name: 'Green Valley Inn', npcId: 'innkeeper', x: 35, y: 42, spawn: [35, 43], cost: 15 },
+  { id: 'hamletInn', name: 'Willow Hearth', npcId: 'villageElder', x: 62, y: 44, spawn: [62, 45], cost: 8 },
+];
+
 // Map-discovery landmarks. hidden ones only appear once the player comes close.
 export const LANDMARKS = [
   { id: 'townGate', name: 'Green Valley Town', x: 42, y: 38, r: 4 },

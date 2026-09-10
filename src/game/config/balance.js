@@ -52,8 +52,64 @@ export const BALANCE = {
     giveUpDist: 5,                   // losing the player by this margin ends the chase
     activeRadius: 16,                // enemies beyond this distance idle (performance)
   },
-  inn: { townRestCost: 20, villageRestCost: 10 },
+  inn: { mealItemId: 'simpleMeal' },
+  // The accelerated game clock. Baseline: 1 real second = 1 in-game minute.
+  time: {
+    tickMs: 1000,             // real-time heartbeat of the clock
+    minutesPerTick: 1,       // game minutes gained per tick
+    startDay: 1,
+    startMinutes: 7 * 60,    // new cultivators begin at 07:00
+    moveMinutes: 1,          // per action, in game minutes
+    gatherMinutes: 5,
+    cultivateMinutes: 20,
+    refineMinutes: 15,
+    tradeMinutes: 2,
+    talkMinutes: 1,
+    combatRoundMinutes: 1,
+    recoveryMinutesPerTick: 2,
+    campRestMinutes: 30,
+    arenaMinutes: 5,
+    sleepToMinutes: 7 * 60,  // "sleep until morning" target
+    sleepFadeMs: 1800,       // night-transition animation length
+    nightDetectBonus: 1,      // enemies notice you farther in the dark
+    nightGatherBonus: { moonPetal: 1 }, // moonlit materials yield more at night
+  },
 };
+
+// Difficulty modes — one config object, never hardcoded elsewhere.
+// Harder modes raise RISK and REWARD together (reward increases stay moderate).
+export const DIFFICULTIES = {
+  easy: {
+    key: 'easy', label: 'EASY',
+    enemyHpMul: 0.75, enemyDmgMul: 0.75, dropMul: 1.3, priceMul: 0.85, refinePct: 0,
+    progressLoss: 0, inventoryLoss: 0, stonesLoss: 0, respawn: 'nearestInn',
+  },
+  standard: {
+    key: 'standard', label: 'STANDARD',
+    enemyHpMul: 1, enemyDmgMul: 1, dropMul: 1, priceMul: 1, refinePct: 0,
+    progressLoss: 0.3, inventoryLoss: 0.25, stonesLoss: 0.15, respawn: 'random',
+  },
+  hard: {
+    key: 'hard', label: 'HARD',
+    enemyHpMul: 1.2, enemyDmgMul: 1.2, dropMul: 1.15, priceMul: 1.15, refinePct: 0,
+    progressLoss: 0.5, inventoryLoss: 0.5, stonesLoss: 0.3, respawn: 'random',
+  },
+  trueCultivation: {
+    key: 'trueCultivation', label: 'TRUE CULTIVATION',
+    enemyHpMul: 1.45, enemyDmgMul: 1.5, dropMul: 1.25, priceMul: 1.25, refinePct: -5,
+    permadeath: true, respawn: 'none',
+  },
+};
+
+export function diffOf(state) {
+  return DIFFICULTIES[state?.difficulty] || DIFFICULTIES.standard;
+}
+
+// What a merchant charges this character, after difficulty and reputation.
+export function shopPrice(base, state) {
+  const rep = state?.reputation?.merchants || 0;
+  return Math.max(1, Math.floor(base * diffOf(state).priceMul * (1 - rep * 0.02)));
+}
 
 export function recoveryRatePerSec(player, mode) {
   const cfg = BALANCE.recovery;

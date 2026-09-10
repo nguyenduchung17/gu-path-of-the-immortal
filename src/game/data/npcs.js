@@ -8,6 +8,7 @@ export const NPCS = [
         { itemId: 'herb', price: 4 }, { itemId: 'spiritGrass', price: 6 },
       ],
       buys: ['herb', 'beastCore', 'ore', 'ironOre', 'shadowSilk', 'spiritGrass', 'moonPetal', 'fireEssence', 'beastBlood', 'windCrystal', 'mistSilk'],
+      hours: { open: 6 * 60, close: 20 * 60 }, // closes at night
       recipes: [{ recipeId: 'windStep', price: 30 }],
     },
   },
@@ -20,6 +21,7 @@ export const NPCS = [
         { itemId: 'essencePill', price: 30 }, { itemId: 'herb', price: 4 },
       ],
       buys: ['herb', 'spiritGrass', 'moonPetal', 'mistSilk'],
+      hours: { open: 6 * 60, close: 20 * 60 }, // closes at night
       recipes: [{ recipeId: 'vitalSpring', price: 20 }, { recipeId: 'jadeMarrow', price: 55 }],
     },
   },
@@ -32,6 +34,7 @@ export const NPCS = [
         { itemId: 'shadowSilk', price: 12 }, { itemId: 'ore', price: 6 },
       ],
       buys: ['beastCore', 'fireEssence', 'shadowSilk', 'ore', 'ironOre', 'moonPetal', 'beastBlood', 'serpentGland', 'windCrystal', 'mistSilk'],
+      hours: { open: 6 * 60, close: 20 * 60 }, // closes at night
       recipes: [{ recipeId: 'emberGu', price: 25 }, { recipeId: 'stoneShell', price: 25 }],
     },
   },
@@ -89,6 +92,7 @@ export const NPCS = [
         { itemId: 'healingPill', price: 35 },
       ],
       buys: ['herb', 'spiritGrass', 'medicine', 'ration', 'beastCore', 'beastBlood', 'moonPetal', 'windCrystal', 'shadowSilk', 'mistSilk', 'serpentGland', 'fireEssence', 'ironOre', 'ore'],
+      hours: { open: 6 * 60, close: 20 * 60 }, // closes at night
       recipes: [{ recipeId: 'tideBinding', price: 50 }, { recipeId: 'flameSerpent', price: 95 }],
     },
   },

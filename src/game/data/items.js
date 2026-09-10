@@ -18,6 +18,7 @@ export const ITEMS = [
   { id: 'essencePill', name: 'Essence Pill', category: 'medicine', description: 'Restores 20 primeval essence.', value: 30, use: { essence: 20 } },
   // Food
   { id: 'ration', name: 'Travel Ration', category: 'food', description: 'Restores 10 HP. Plain but filling.', value: 4, use: { hp: 10 } },
+  { id: 'simpleMeal', name: 'Simple Rice Meal', category: 'food', rarity: 'common', description: 'A humble inn meal. Restores 15 HP.', value: 2, use: { hp: 15, essence: 0 } },
   // Quest
   { id: 'lostGuFragment', name: 'Lost Gu Fragment', category: 'questItems', description: 'A shard of an ancient Gu. The Gu Master wants it.', value: 0 },
   { id: 'stolenGoods', name: 'Stolen Goods', category: 'questItems', description: 'A merchant\'s stolen wares.', value: 0 },

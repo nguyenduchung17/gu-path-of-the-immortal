@@ -5,6 +5,7 @@ import { ITEM_BY_ID, ITEMS } from '@/game/data/items';
 import { RECIPE_BY_ID } from '@/game/data/recipes';
 import { GU_BY_ID } from '@/game/data/gu';
 import { PATH_BY_ID } from '@/game/data/paths';
+import { shopPrice } from '@/game/config/balance';
 
 export default function ShopPanel({ npcId, onClose }) {
   const { state, dispatch } = useGame();
@@ -33,7 +34,7 @@ export default function ShopPanel({ npcId, onClose }) {
         <div className="max-h-72 overflow-y-auto scrollbar-thin space-y-1.5">
           {tab === 'buy' && npc.shop.sells.map(o => {
             const it = ITEM_BY_ID[o.itemId];
-            const price = Math.max(1, Math.floor(o.price * (1 - rep * 0.02)));
+            const price = shopPrice(o.price, state);
             const afford = state.player.spiritStones >= price;
             return (
               <div key={o.itemId} className="flex justify-between items-center px-3 py-2 rounded-lg bg-white/5">
@@ -63,7 +64,7 @@ export default function ShopPanel({ npcId, onClose }) {
             const gu = GU_BY_ID[r.guId];
             const path = PATH_BY_ID[r.path];
             const known = state.knownRecipes.includes(r.id);
-            const price = Math.max(1, Math.floor(o.price * (1 - rep * 0.02)));
+            const price = shopPrice(o.price, state);
             const afford = state.player.spiritStones >= price;
             return (
               <div key={o.recipeId} className="flex justify-between items-center px-3 py-2 rounded-lg bg-white/5">

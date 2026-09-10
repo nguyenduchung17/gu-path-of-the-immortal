@@ -4,6 +4,7 @@
 import { ENEMY_BY_ID } from '../data/enemies';
 import { isWalkable, zoneAt, DEFAULT_ZONE, WORLD_NPCS } from '../data/world';
 import { initCombat } from './combat';
+import { isNight } from './time';
 import { BALANCE } from '../config/balance';
 
 const ORTH = [[1, 0], [-1, 0], [0, 1], [0, -1]];
@@ -61,7 +62,7 @@ export function tickEnemies(state) {
     if (dist > BALANCE.world.activeRadius) return e;
     const def = ENEMY_BY_ID[e.defId];
     if (!def) return e;
-    const detect = e.detect ?? (BALANCE.world.detect[e.behavior] ?? 4);
+    const detect = (e.detect ?? (BALANCE.world.detect[e.behavior] ?? 4)) + (isNight(state.time) ? BALANCE.time.nightDetectBonus : 0);
     const homeDist = cheb(e.x, e.y, e.home.x, e.home.y);
     let ne = { ...e };
 
@@ -90,13 +91,13 @@ export function tickEnemies(state) {
       if (dist > detect + BALANCE.world.giveUpDist || homeDist > BALANCE.world.leash) {
         ne.state = 'idle';
       } else if (manhattan(ne.x, ne.y, p.x, p.y) === 1) {
-        combat = initCombat(e.defId, p, { hp: ne.hp, worldId: e.id, intro: `${def.name} catches you!` });
+        combat = initCombat(e.defId, p, { hp: ne.hp, worldId: e.id, difficulty: state.difficulty, intro: `${def.name} catches you!` });
         return ne;
       } else {
         const st = stepToward(ne, p.x, p.y, enemies, p);
         if (st) { ne.x = st.x; ne.y = st.y; }
         if (manhattan(ne.x, ne.y, p.x, p.y) === 1) {
-          combat = initCombat(e.defId, p, { hp: ne.hp, worldId: e.id, intro: `${def.name} closes in!` });
+          combat = initCombat(e.defId, p, { hp: ne.hp, worldId: e.id, difficulty: state.difficulty, intro: `${def.name} closes in!` });
         }
       }
       return ne;

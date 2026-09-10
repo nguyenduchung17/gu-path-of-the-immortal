@@ -4,14 +4,18 @@ import { ITEM_BY_ID } from '../data/items';
 import { PATH_BY_ID, SYNERGIES } from '../data/paths';
 import { applyEffects } from './effects';
 import { grantMastery, bonusOf } from './mastery';
-import { BALANCE } from '../config/balance';
+import { BALANCE, DIFFICULTIES } from '../config/balance';
+import { applyDeath } from './death';
 
 export function initCombat(enemyId, player, opts = {}) {
   const def = opts.def || ENEMY_BY_ID[enemyId];
-  const startHp = opts.hp ?? def.hp;
+  const d = DIFFICULTIES[opts.difficulty] || DIFFICULTIES.standard;
+  const maxHp = Math.max(1, Math.round(def.hp * d.enemyHpMul));
+  const startHp = Math.min(maxHp, Math.max(1, Math.round((opts.hp ?? def.hp) * d.enemyHpMul)));
   return {
     enemyId: def.id,
-    enemy: { ...def, maxHp: startHp, hp: startHp, statuses: [] },
+    enemy: { ...def, attack: Math.max(1, Math.round(def.attack * d.enemyDmgMul)), maxHp, hp: startHp, statuses: [] },
+    hpScale: d.enemyHpMul,
     worldId: opts.worldId || null,
     arena: opts.arena || null,
     playerStatuses: [],
@@ -140,8 +144,9 @@ function applyPendingMastery(s, pending) {
 function finishVictory(state, combat, player, pending) {
   const enemy = combat.enemy;
   const items = {};
+  const dropMul = DIFFICULTIES[state.difficulty]?.dropMul ?? 1;
   for (const d of enemy.drops || []) {
-    if (Math.random() * 100 < (d.chance || 100)) items[d.itemId] = (items[d.itemId] || 0) + (d.qty || 1);
+    if (Math.random() * 100 < Math.min(100, (d.chance || 100) * dropMul)) items[d.itemId] = (items[d.itemId] || 0) + (d.qty || 1);
   }
   const spiritStones = Math.floor(enemy.maxHp / 4) + Math.floor(Math.random() * 5);
   const progress = BALANCE.combat.victoryProgress + Math.floor(enemy.maxHp / 40);
@@ -166,9 +171,7 @@ function finishDefeat(state, combat, player) {
     const alog = [...combat.log, 'The arena master halts the duel. Your stake is forfeit.'];
     return { ...state, player: ap, combat: { ...combat, log: alog, over: true, result: 'defeat' }, log: [...state.log, 'You were defeated in the arena.'] };
   }
-  const p = { ...player, hp: Math.max(1, Math.floor(player.maxHp * 0.2)), primevalEssence: 0, currentArea: 'greenValleyRegion', x: 42, y: 44, spiritStones: Math.floor(player.spiritStones * 0.8) };
-  const log = [...combat.log, 'You collapse... You wake in Green Valley Town, battered and lighter of purse.'];
-  return { ...state, player: p, combat: { ...combat, log, over: true, result: 'defeat' }, log: [...state.log, 'You were defeated in combat.'] };
+  return applyDeath(state, combat, player, 'defeated in combat');
 }
 
 export function executeRound(state, action) {

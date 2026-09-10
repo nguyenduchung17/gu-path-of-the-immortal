@@ -5,14 +5,15 @@ import { NPC_BY_ID } from '../data/npcs';
 import { EVENT_BY_ID } from '../data/events';
 import { ENEMY_BY_ID } from '../data/enemies';
 import { initCombat, executeRound } from '../engine/combat';
+import { advanceTime, phaseOf } from '../engine/time';
 import { applyEffects } from '../engine/effects';
 import { grantMastery, learnRecipe, bonusOf } from '../engine/mastery';
 import { CULTIVATION_STAGES, BREAKTHROUGH_REQS } from '../data/cultivation';
-import { BALANCE } from '../config/balance';
+import { BALANCE, DIFFICULTIES, diffOf, shopPrice } from '../config/balance';
 import { RECIPE_BY_ID } from '../data/recipes';
 import {
   WORLD, zoneAt, isWalkable, DEFAULT_ZONE, LANDMARKS, WORLD_RESOURCES,
-  initialEnemies, TERRACE, FORMATION, CAMP_CELLS,
+  initialEnemies, TERRACE, FORMATION, CAMP_CELLS, INNS,
 } from '../data/world';
 import { tickEnemies } from '../engine/enemies';
 import { MISSION_BY_ID } from '../data/missions';
@@ -22,10 +23,16 @@ import { ARENA_BY_ID } from '../data/arena';
 const APTITUDES = ['Dull', 'Ordinary', 'Good', 'Outstanding', 'Heavenly'];
 const START_STAGE = CULTIVATION_STAGES[0];
 
-export function createNewGame(name, gender, age) {
+export function createNewGame(name, gender, age, difficulty, slot) {
   const aptitude = APTITUDES[Math.floor(Math.random() * APTITUDES.length)];
   return {
-    version: 3,
+    version: 4,
+    difficulty: DIFFICULTIES[difficulty] ? difficulty : 'standard',
+    slot: slot || 1,
+    time: { day: BALANCE.time.startDay, min: BALANCE.time.startMinutes },
+    playtimeSec: 0,
+    deceased: null,
+    sleeping: null,
     player: {
       name: name || 'Nameless', gender: gender || 'other', age: Number(age) || 16,
       rank: 0, stage: 0, cultivationProgress: 0,
@@ -43,7 +50,7 @@ export function createNewGame(name, gender, age) {
     reputation: { villagers: 0, merchants: 0, sect: 0, blackMarket: 0 },
     worldState: {
       gathered: {},
-      discovered: { zones: { greenValleyTown: true }, landmarks: { townGate: true, teleportFormation: true } },
+      discovered: { zones: { greenValleyTown: true }, landmarks: { townGate: true, teleportFormation: true }, inns: { townInn: true } },
       enemies: initialEnemies(),
     },
     mastery: {}, masteryStats: {},
@@ -142,12 +149,16 @@ export function refineChecklist(state, recipeId) {
   };
 }
 
-const busy = (state) => !!(state.combat || state.recovery || state.pendingEvent || state.dialogue);
+const busy = (state) => !!(state.combat || state.recovery || state.pendingEvent || state.dialogue || state.sleeping);
 
 export function gameReducer(state, action) {
+  // a deceased (True Cultivation) character can no longer act — only leave or reset
+  if (state && state.deceased && !['LOAD', 'RESET', 'END_COMBAT'].includes(action.type)) return state;
   switch (action.type) {
+    case 'LOAD':
+      return action.state;
     case 'NEW_GAME':
-      return createNewGame(action.name, action.gender, action.age);
+      return createNewGame(action.name, action.gender, action.age, action.difficulty, action.slot);
     case 'RESET':
       return { noSave: true };
 
@@ -158,7 +169,7 @@ export function gameReducer(state, action) {
       const nx = p.x + action.dx, ny = p.y + action.dy;
       if (!isWalkable(nx, ny)) return state;
       const facing = action.dx === 1 ? 'right' : action.dx === -1 ? 'left' : action.dy === 1 ? 'down' : 'up';
-      let s = { ...state, player: { ...p, x: nx, y: ny, facing } };
+      let s = advanceTime({ ...state, player: { ...p, x: nx, y: ny, facing } }, BALANCE.time.moveMinutes);
 
       const zone = zoneAt(nx, ny) || DEFAULT_ZONE;
       const ws = s.worldState;
@@ -201,10 +212,11 @@ export function gameReducer(state, action) {
       if (!node) return state;
       const last = state.worldState.gathered[node.id] || 0;
       if (Date.now() - last < BALANCE.world.gatherRespawnMs) return state;
-      const qty = 1 + gatherBonus(state) + (Math.random() < state.player.perception * 0.01 ? 1 : 0);
+      const nightBonus = phaseOf((state.time || {}).min) === 'night' ? (BALANCE.time.nightGatherBonus[node.type] || 0) : 0;
+      const qty = 1 + nightBonus + gatherBonus(state) + (Math.random() < state.player.perception * 0.01 ? 1 : 0);
       let s = applyEffects(state, { items: { [node.type]: qty }, message: `Gathered ${qty} ${node.name}.` });
       s = { ...s, worldState: { ...s.worldState, gathered: { ...s.worldState.gathered, [node.id]: Date.now() } } };
-      return s;
+      return advanceTime(s, BALANCE.time.gatherMinutes);
     }
 
     case 'ATTACK_ENEMY': {
@@ -213,24 +225,42 @@ export function gameReducer(state, action) {
       const e = (state.worldState.enemies || []).find(en => !en.dead && Math.abs(en.x - p.x) + Math.abs(en.y - p.y) === 1);
       if (!e) return state;
       const def = ENEMY_BY_ID[e.defId];
-      return { ...state, combat: initCombat(e.defId, p, { hp: e.hp, worldId: e.id, intro: `You strike first — the ${def.name} turns on you!` }) };
+      return { ...state, combat: initCombat(e.defId, p, { hp: e.hp, worldId: e.id, difficulty: state.difficulty, intro: `You strike first — the ${def.name} turns on you!` }) };
     }
 
-    case 'REST_INN': {
-      if (state.combat || state.recovery) return state;
-      const cost = action.cost || BALANCE.inn.townRestCost;
+    case 'SLEEP_INN': {
+      if (busy(state)) return state;
+      const inn = INNS.find(i => i.id === action.innId);
+      if (!inn) return state;
       const p = state.player;
+      const cost = Math.max(1, Math.round(inn.cost * diffOf(state).priceMul));
       if (p.spiritStones < cost) return { ...state, log: [...state.log, `Not enough primordial stones — the room costs ${cost}.`] };
-      return applyEffects(state, {
-        hp: p.maxHp, essence: p.maxPrimevalEssence, spiritStones: -cost,
-        message: `You sleep soundly. HP and essence fully restored. (-${cost} primordial stones)`,
+      // sleep restores HP (not essence) and includes one free morning meal
+      let s = applyEffects(state, {
+        hp: p.maxHp, spiritStones: -cost,
+        items: { [BALANCE.inn.mealItemId]: 1 },
+        message: `You rent a room and sleep until morning. (-${cost} primordial stones)`,
       });
+      const t = s.time || { day: BALANCE.time.startDay, min: BALANCE.time.startMinutes };
+      const wake = t.min < BALANCE.time.sleepToMinutes
+        ? { day: t.day, min: BALANCE.time.sleepToMinutes }
+        : { day: t.day + 1, min: BALANCE.time.sleepToMinutes };
+      s = {
+        ...s,
+        time: wake,
+        sleeping: { wakeAt: Date.now() + BALANCE.time.sleepFadeMs },
+        worldState: { ...s.worldState, discovered: { ...s.worldState.discovered, inns: { ...(s.worldState.discovered.inns || {}), [inn.id]: true } } },
+        log: [...s.log, `Day ${wake.day}, 07:00 — you wake rested, a simple morning meal from the innkeeper in your pack.`],
+      };
+      return s;
     }
+    case 'WAKE':
+      return { ...state, sleeping: null };
 
     case 'REST_CAMP': {
       if (state.combat || state.recovery) return state;
       const p = state.player;
-      let s = applyEffects(state, { hp: Math.floor(p.maxHp * 0.35), message: 'You rest at the campsite. Beasts rarely stray here.' });
+      let s = advanceTime(applyEffects(state, { hp: Math.floor(p.maxHp * 0.35), message: 'You rest at the campsite. Beasts rarely stray here.' }), BALANCE.time.campRestMinutes);
       if (s.player.primevalEssence < s.player.maxPrimevalEssence) {
         s = { ...s, recovery: { mode: 'camp', startedAt: Date.now() }, log: [...s.log, 'You begin recovering essence by the fire — it will not be interrupted here.'] };
       }
@@ -239,12 +269,12 @@ export function gameReducer(state, action) {
 
     case 'USE_FORMATION': {
       if (state.combat || state.recovery) return state;
-      return { ...state, log: [...state.log, 'The formation hums with dormant power — no distant regions are charted yet.'] };
+      return advanceTime({ ...state, log: [...state.log, 'The formation hums with dormant power — no distant regions are charted yet.'] }, BALANCE.time.talkMinutes);
     }
 
     case 'TALK_NPC':
       if (state.combat || state.recovery) return state;
-      return { ...state, dialogue: { npcId: action.npcId } };
+      return advanceTime({ ...state, dialogue: { npcId: action.npcId } }, BALANCE.time.talkMinutes);
     case 'CLOSE_DIALOGUE':
       return { ...state, dialogue: null };
 
@@ -256,24 +286,22 @@ export function gameReducer(state, action) {
       if (!offer) return state;
       const qty = action.qty || 1;
       const price = offer.price * qty;
-      const rep = state.reputation.merchants || 0;
-      const total = Math.max(1, Math.floor(price * (1 - rep * 0.02)));
+      const total = shopPrice(offer.price * qty, state);
       if (state.player.spiritStones < total) return state;
       let s = { ...state, player: { ...state.player, spiritStones: state.player.spiritStones - total } };
       s = applyEffects(s, { items: { [action.itemId]: qty } });
-      return s;
+      return advanceTime(s, BALANCE.time.tradeMinutes);
     }
     case 'BUY_RECIPE': {
       if (state.combat || state.recovery) return state;
       const npc = NPC_BY_ID[action.npcId];
       const offer = (npc.shop.recipes || []).find(o => o.recipeId === action.recipeId);
       if (!offer || state.knownRecipes.includes(action.recipeId)) return state;
-      const rep = state.reputation.merchants || 0;
-      const total = Math.max(1, Math.floor(offer.price * (1 - rep * 0.02)));
+      const total = shopPrice(offer.price, state);
       if (state.player.spiritStones < total) return state;
       let s = { ...state, player: { ...state.player, spiritStones: state.player.spiritStones - total } };
       s = learnRecipe(s, action.recipeId);
-      return s;
+      return advanceTime(s, BALANCE.time.tradeMinutes);
     }
     case 'SELL': {
       if (state.combat || state.recovery) return state;
@@ -283,7 +311,7 @@ export function gameReducer(state, action) {
       const have = state.inventory[ITEM_BY_ID[action.itemId].category]?.[action.itemId] || 0;
       if (have < qty) return state;
       const price = Math.floor(ITEM_BY_ID[action.itemId].value * 0.5 * qty);
-      return applyEffects(state, { removeItems: { [action.itemId]: qty }, spiritStones: price, message: `Sold ${qty} ${ITEM_BY_ID[action.itemId].name} for ${price} primordial stones.` });
+      return advanceTime(applyEffects(state, { removeItems: { [action.itemId]: qty }, spiritStones: price, message: `Sold ${qty} ${ITEM_BY_ID[action.itemId].name} for ${price} primordial stones.` }), BALANCE.time.tradeMinutes);
     }
 
     // ---------- Missions & contribution ----------
@@ -291,7 +319,7 @@ export function gameReducer(state, action) {
       if (state.combat || state.recovery) return state;
       const m = MISSION_BY_ID[action.missionId];
       if (!m || state.missions.active.includes(m.id) || state.missions.completed.includes(m.id)) return state;
-      return { ...state, missions: { ...state.missions, active: [...state.missions.active, m.id] }, log: [...state.log, `Mission accepted: ${m.name}.`] };
+      return advanceTime({ ...state, missions: { ...state.missions, active: [...state.missions.active, m.id] }, log: [...state.log, `Mission accepted: ${m.name}.`] }, BALANCE.time.tradeMinutes);
     }
     case 'MISSION_TURN_IN': {
       if (state.combat || state.recovery) return state;
@@ -304,7 +332,7 @@ export function gameReducer(state, action) {
         message: `Mission complete: ${m.name}. (+${(m.rewards && m.rewards.contribution) || 0} contribution)`,
       });
       s = { ...s, missions: { ...s.missions, active: s.missions.active.filter(id => id !== m.id), completed: [...s.missions.completed, m.id] } };
-      return s;
+      return advanceTime(s, BALANCE.time.tradeMinutes);
     }
     case 'BUY_CONTRIBUTION': {
       if (state.combat || state.recovery) return state;
@@ -337,11 +365,12 @@ export function gameReducer(state, action) {
         ...s,
         combat: initCombat(null, s.player, {
           def: ch.opponent,
+          difficulty: s.difficulty,
           arena: { challengeId: ch.id, stake: ch.stake, opponentStake: ch.opponentStake },
           intro: `${ch.opponent.name} salutes — the duel begins!`,
         }),
       };
-      return s;
+      return advanceTime(s, BALANCE.time.arenaMinutes);
     }
 
     // ---------- Gu ----------
@@ -366,7 +395,7 @@ export function gameReducer(state, action) {
         spiritStones: -r.stones,
         removeItems: r.materials,
       });
-      const chance = Math.min(95, BALANCE.refinement.baseSuccess + p.intelligence * BALANCE.refinement.successPerInt + Math.floor(p.luck * BALANCE.refinement.successPerLuck) + (refFx.successPct || 0));
+      const chance = Math.min(95, BALANCE.refinement.baseSuccess + p.intelligence * BALANCE.refinement.successPerInt + Math.floor(p.luck * BALANCE.refinement.successPerLuck) + (refFx.successPct || 0) + diffOf(state).refinePct);
       if (Math.random() * 100 < chance) {
         s = applyEffects(s, { giveGu: r.guId, message: `Refinement succeeds! You create ${GU_BY_ID[r.guId].name}.` });
         s = grantMastery(s, 'refinement', BALANCE.mastery.xpRefineSuccess, 'refined');
@@ -379,7 +408,7 @@ export function gameReducer(state, action) {
         s = { ...s, log: [...s.log, 'Refinement failed. The materials are lost.'] };
         s = grantMastery(s, 'refinement', BALANCE.mastery.xpRefineFail, 'refined');
       }
-      return s;
+      return advanceTime(s, BALANCE.time.refineMinutes);
     }
 
     // ---------- Cultivation ----------
@@ -398,7 +427,7 @@ export function gameReducer(state, action) {
         cultivationProgress: progress,
         totalInsight: (p.totalInsight || 0) + gain,
       };
-      return { ...state, player: np, log: [...state.log, `You cultivate. (+${gain}% progress${atSect ? ' · terrace bonus' : ''})`] };
+      return advanceTime({ ...state, player: np, log: [...state.log, `You cultivate. (+${gain}% progress${atSect ? ' · terrace bonus' : ''})`] }, BALANCE.time.cultivateMinutes);
     }
 
     case 'BREAKTHROUGH': {
@@ -439,6 +468,13 @@ export function gameReducer(state, action) {
     case 'DISMISS_BREAKTHROUGH':
       return { ...state, breakthrough: null };
 
+    // ---------- Game clock ----------
+    case 'TIME_TICK': {
+      let s = advanceTime(state, BALANCE.time.minutesPerTick);
+      s = { ...s, playtimeSec: (s.playtimeSec || 0) + BALANCE.time.tickMs / 1000 };
+      return s;
+    }
+
     // ---------- Essence recovery ----------
     case 'START_RECOVERY': {
       if (state.combat || state.recovery) return state;
@@ -456,12 +492,12 @@ export function gameReducer(state, action) {
       const p = state.player;
       const essence = Math.min(p.maxPrimevalEssence, p.primevalEssence + (action.amount || 0));
       const done = essence >= p.maxPrimevalEssence;
-      return {
+      return advanceTime({
         ...state,
         player: { ...p, primevalEssence: essence },
         recovery: done ? null : state.recovery,
         log: done ? [...state.log, 'Your essence is fully restored.'] : state.log,
-      };
+      }, BALANCE.time.recoveryMinutesPerTick);
     }
     case 'RECOVERY_INTERRUPTED': {
       if (!state.recovery) return state;
@@ -471,7 +507,7 @@ export function gameReducer(state, action) {
       return {
         ...state,
         recovery: null,
-        combat: initCombat(e.defId, state.player, { hp: e.hp, worldId: e.id, intro: `Your meditation shatters — the ${def.name} found you!` }),
+        combat: initCombat(e.defId, state.player, { hp: e.hp, worldId: e.id, difficulty: state.difficulty, intro: `Your meditation shatters — the ${def.name} found you!` }),
         log: [...state.log, `Your meditation shatters — the ${def.name} found you!`],
       };
     }
@@ -525,6 +561,7 @@ export function gameReducer(state, action) {
     case 'PLAYER_ACTION': {
       if (state.recovery) return state;
       let s = executeRound(state, { type: action.action, guInstanceId: action.guInstanceId, itemId: action.itemId });
+      s = advanceTime(s, BALANCE.time.combatRoundMinutes);
       if (s.combat && s.combat.usedItem) {
         const it = ITEM_BY_ID[s.combat.usedItem];
         s = { ...s, inventory: { ...s.inventory, [it.category]: { ...s.inventory[it.category], [s.combat.usedItem]: (s.inventory[it.category]?.[s.combat.usedItem] || 0) - 1 } } };
@@ -548,7 +585,7 @@ export function gameReducer(state, action) {
               if (c.result === 'victory') {
                 return { ...e, dead: true, respawnAt: Date.now() + BALANCE.world.respawnMs, x: e.home.x, y: e.home.y, state: 'idle', hp: ENEMY_BY_ID[e.defId].hp };
               }
-              return { ...e, hp: Math.max(1, Math.round(c.enemy.hp)), state: 'idle' };
+              return { ...e, hp: Math.max(1, Math.min(ENEMY_BY_ID[e.defId].hp, Math.round(c.enemy.hp / (c.hpScale || 1)))), state: 'idle' };
             }),
           },
         };
@@ -582,7 +619,7 @@ export function gameReducer(state, action) {
       const pending = s._pendingCombat;
       delete s._pendingCombat;
       s = { ...s, pendingEvent: null };
-      if (pending) s = { ...s, combat: initCombat(pending, s.player) };
+      if (pending) s = { ...s, combat: initCombat(pending, s.player, { difficulty: s.difficulty }) };
       return s;
     }
     case 'CLOSE_EVENT':
