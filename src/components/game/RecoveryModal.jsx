@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { useGame } from '@/game/state/GameContext';
 import { BALANCE, recoveryRatePerSec } from '@/game/config/balance';
+import { zoneAt, CAMP_CELLS } from '@/game/data/world';
 
 function fmt(sec) {
   const m = Math.floor(sec / 60), s = Math.round(sec % 60);
@@ -15,12 +16,31 @@ export default function RecoveryModal({ open, onClose }) {
   const missing = p.maxPrimevalEssence - p.primevalEssence;
   const fullSecs = missing / rate;
 
-  // drive essence recovery one tick at a time
+  // drive essence recovery one tick at a time; in dangerous wilderness a
+  // nearby enemy can notice the meditating player and interrupt them
   useEffect(() => {
     if (!recovering) return;
-    const t = setInterval(() => dispatch({ type: 'RECOVERY_TICK', amount: recoveryRatePerSec(p, state.recovery.mode) }), BALANCE.recovery.tickMs);
+    const cfg = BALANCE.world;
+    const t = setInterval(() => {
+      const mode = state.recovery.mode;
+      const zone = zoneAt(p.x, p.y);
+      const nearCamp = mode === 'camp' || CAMP_CELLS.some(([cx, cy]) => Math.max(Math.abs(cx - p.x), Math.abs(cy - p.y)) <= cfg.campSafeRadius);
+      const safe = zone?.safe || nearCamp;
+      if (!safe) {
+        const intruder = (state.worldState.enemies || []).find(e => {
+          if (e.dead) return false;
+          const d = Math.max(Math.abs(e.x - p.x), Math.abs(e.y - p.y));
+          return d <= cfg.recoveryInterruptRadius && (e.detect ?? (cfg.detect[e.behavior] ?? 4)) > 0;
+        });
+        if (intruder && Math.random() * 100 < cfg.recoveryInterruptChance) {
+          dispatch({ type: 'RECOVERY_INTERRUPTED', enemyId: intruder.id });
+          return;
+        }
+      }
+      dispatch({ type: 'RECOVERY_TICK', amount: recoveryRatePerSec(p, mode) });
+    }, BALANCE.recovery.tickMs);
     return () => clearInterval(t);
-  }, [recovering, state.recovery?.mode]);
+  }, [recovering, state.recovery?.mode, p.x, p.y, state.worldState?.enemies]);
 
   if (!open && !recovering) return null;
   if (!open) return null;
@@ -39,11 +59,12 @@ export default function RecoveryModal({ open, onClose }) {
               <div className="h-full bg-gradient-to-r from-sky-600 to-cyan-300 transition-all duration-1000" style={{ width: `${(p.primevalEssence / p.maxPrimevalEssence) * 100}%` }} />
             </div>
             <div className="text-[11px] text-sky-300/80 mb-3">
-              {state.recovery.mode === 'accelerated' ? 'Accelerated recovery...' : 'Recovering slowly...'}
+              {state.recovery.mode === 'accelerated' ? 'Accelerated recovery...' : state.recovery.mode === 'camp' ? 'Recovering by the campfire...' : 'Recovering slowly...'}
               {' '}Est. {fmt(fullSecs)} remaining
             </div>
             <p className="text-[10px] text-stone-500 mb-3">
               While recovering you cannot move, fight, gather, trade, refine or cultivate. Cancelled recovery keeps all essence already gained.
+              Outside settlements and camps, nearby beasts may interrupt your meditation.
             </p>
             <div className="grid grid-cols-2 gap-2">
               <button onClick={() => dispatch({ type: 'CANCEL_RECOVERY' })}

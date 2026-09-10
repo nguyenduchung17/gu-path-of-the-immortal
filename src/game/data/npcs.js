@@ -57,6 +57,35 @@ export const NPCS = [
       recipes: [{ recipeId: 'galeBlade', price: 60 }, { recipeId: 'beastPact', price: 70 }],
     },
   },
+  {
+    id: 'innkeeper', name: 'Innkeeper Ma', area: 'greenValleyRegion', avatar: '🛏️',
+    greeting: 'A room, a hot meal, and not a single wolf at the window. Twenty stones a night.',
+    service: 'inn', innCost: 20,
+  },
+  {
+    id: 'questOfficer', name: 'Quest Officer Han', area: 'greenValleyRegion', avatar: '📋',
+    greeting: 'The board is full and the patrols are thin. Take a mission — the valley rewards those who serve.',
+    service: 'missions',
+  },
+  {
+    id: 'contributionOfficer', name: 'Exchange Keeper Rong', area: 'greenValleyRegion', avatar: '🏛️',
+    greeting: 'Stones buy goods. Contribution buys what coins cannot. Serve the valley, and its vaults open to you.',
+    service: 'contribution',
+  },
+  {
+    id: 'arenaManager', name: 'Arena Master Kun', area: 'greenValleyRegion', avatar: '⚔️',
+    greeting: 'Blood on the sand, stakes on the table. Pick your challenge — and pray your Gu are sharp.',
+    service: 'arena',
+  },
+  {
+    id: 'villageElder', name: 'Willow Elder Shu', area: 'greenValleyRegion', avatar: '👴',
+    greeting: 'The hamlet is small but its hearth is warm. Rest if the road has worn you, and trade a little if you must.',
+    shop: {
+      sells: [{ itemId: 'ration', price: 3 }, { itemId: 'medicine', price: 14 }, { itemId: 'herb', price: 4 }],
+      buys: ['herb', 'spiritGrass', 'moonPetal', 'beastCore'],
+    },
+    service: 'inn', innCost: 10,
+  },
 ];
 
 export const NPC_BY_ID = Object.fromEntries(NPCS.map(n => [n.id, n]));

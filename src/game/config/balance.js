@@ -41,6 +41,18 @@ export const BALANCE = {
     victoryProgress: 2,     // % cultivation progress per victory
     weaknessBonusPct: 25,   // damage bonus when Gu path matches enemy weakness
   },
+  world: {
+    respawnMs: 4 * 60 * 1000,        // world enemy respawn timer
+    gatherRespawnMs: 3 * 60 * 1000,  // gathering node respawn timer
+    campSafeRadius: 2,               // recovery near a campsite is never interrupted
+    recoveryInterruptRadius: 7,      // enemies this close can notice a meditating player
+    recoveryInterruptChance: 12,     // % per tick that a nearby enemy interrupts recovery
+    detect: { passive: 0, territorial: 3, aggressive: 4, predator: 6, guard: 5 },
+    leash: 8,                        // how far from home an enemy will chase
+    giveUpDist: 5,                   // losing the player by this margin ends the chase
+    activeRadius: 16,                // enemies beyond this distance idle (performance)
+  },
+  inn: { townRestCost: 20, villageRestCost: 10 },
 };
 
 export function recoveryRatePerSec(player, mode) {

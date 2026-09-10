@@ -54,6 +54,24 @@ export const ENEMIES = [
     drops: [{ itemId: 'spiritStone', chance: 100, qty: 3 }],
     description: 'A desperate thief. Dangerous to the weak, trivial to the prepared.',
   },
+  {
+    id: 'wildBoar', name: 'Wild Boar', hp: 26, attack: 6, defense: 2, speed: 4,
+    abilities: [], weakness: 'fire',
+    drops: [{ itemId: 'beastBlood', chance: 60, qty: 1 }, { itemId: 'herb', chance: 30, qty: 1 }],
+    description: 'A bad-tempered boar rooting through the farmland. Only fights back when provoked.',
+  },
+  {
+    id: 'banditChief', name: 'Bandit Chief', hp: 80, attack: 12, defense: 5, speed: 6,
+    abilities: [], weakness: 'wind',
+    drops: [{ itemId: 'beastCore', chance: 60, qty: 1 }, { itemId: 'moonPetal', chance: 50, qty: 1 }],
+    description: 'Scarred and shrewd, the leader of the northeast camp. Guards his plunder personally.',
+  },
+  {
+    id: 'ironfangAlpha', name: 'Ironfang Alpha', hp: 120, attack: 16, defense: 6, speed: 9,
+    abilities: [], weakness: 'fire',
+    drops: [{ itemId: 'beastBlood', chance: 100, qty: 2 }, { itemId: 'beastCore', chance: 100, qty: 2 }, { itemId: 'windCrystal', chance: 60, qty: 1 }],
+    description: 'The alpha of the Ironfang pack. Its howl carries across the whole deep forest.',
+  },
 ];
 
 export const ENEMY_BY_ID = Object.fromEntries(ENEMIES.map(e => [e.id, e]));

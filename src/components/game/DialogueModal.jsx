@@ -3,8 +3,9 @@ import { useGame } from '@/game/state/GameContext';
 import { NPC_BY_ID } from '@/game/data/npcs';
 import { QUESTS } from '@/game/data/quests';
 import { objectiveMet } from '@/game/state/gameReducer';
+import { BALANCE } from '@/game/config/balance';
 
-export default function DialogueModal({ onShop }) {
+export default function DialogueModal({ onShop, onService }) {
   const { state, dispatch } = useGame();
   const npc = NPC_BY_ID[state.dialogue.npcId];
   const [view, setView] = useState('main');
@@ -27,8 +28,17 @@ export default function DialogueModal({ onShop }) {
         {view === 'main' && (
           <div className="space-y-2">
             {npc.shop && <button onClick={() => { onShop(npc.id); close(); }} className="w-full text-left px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-sm">🛒 Trade</button>}
+            {npc.service === 'inn' && (
+              <button onClick={() => { close(); dispatch({ type: 'REST_INN', cost: npc.innCost || BALANCE.inn.townRestCost }); }}
+                className="w-full text-left px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-sm">
+                🛏️ Rest — fully restore HP &amp; essence (💎 {npc.innCost || BALANCE.inn.townRestCost})
+              </button>
+            )}
+            {npc.service === 'missions' && <button onClick={() => { onService('missions'); close(); }} className="w-full text-left px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-sm">📋 Mission Board</button>}
+            {npc.service === 'contribution' && <button onClick={() => { onService('contribution'); close(); }} className="w-full text-left px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-sm">🏛️ Contribution Exchange</button>}
+            {npc.service === 'arena' && <button onClick={() => { onService('arena'); close(); }} className="w-full text-left px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-sm">⚔️ Arena Challenges</button>}
             {npcQuests.length > 0 && <button onClick={() => setView('quests')} className="w-full text-left px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-sm">📜 Quests ({npcQuests.length})</button>}
-            {npc.id === 'sectElder' && <p className="text-[11px] text-stone-400 px-3">Cultivate at the ✦ marker within the sect for ×1.5 cultivation progress.</p>}
+            {npc.id === 'sectElder' && <p className="text-[11px] text-stone-400 px-3">Cultivate at the ✦ terrace by the training ground for ×1.5 cultivation progress.</p>}
             <button onClick={close} className="w-full text-left px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-sm text-stone-400">Leave</button>
           </div>
         )}

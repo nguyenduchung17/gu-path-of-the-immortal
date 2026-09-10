@@ -26,7 +26,7 @@ export const QUESTS = [
   {
     id: 'q_ruins', name: 'Whispers of the Ruins', giver: 'mysteriousTraveler',
     description: 'Reach the Ancient Ruins beyond the Mist Forest.',
-    objective: { type: 'reach', area: 'ancientRuins' },
+    objective: { type: 'reach', area: 'ruins' },
     rewards: { spiritStones: 30, reputation: { blackMarket: 1 }, message: 'The Traveler notes your daring.' },
   },
   {

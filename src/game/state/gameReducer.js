@@ -1,15 +1,23 @@
-import { AREA_BY_ID, isWalkable, rollEncounter } from '../data/areas';
 import { GU_BY_ID } from '../data/gu';
 import { ITEM_BY_ID } from '../data/items';
 import { QUEST_BY_ID } from '../data/quests';
 import { NPC_BY_ID } from '../data/npcs';
 import { EVENT_BY_ID } from '../data/events';
+import { ENEMY_BY_ID } from '../data/enemies';
 import { initCombat, executeRound } from '../engine/combat';
 import { applyEffects } from '../engine/effects';
 import { grantMastery, learnRecipe, bonusOf } from '../engine/mastery';
 import { CULTIVATION_STAGES, BREAKTHROUGH_REQS } from '../data/cultivation';
 import { BALANCE } from '../config/balance';
 import { RECIPE_BY_ID } from '../data/recipes';
+import {
+  WORLD, zoneAt, isWalkable, DEFAULT_ZONE, LANDMARKS, WORLD_RESOURCES,
+  initialEnemies, TERRACE, FORMATION, CAMP_CELLS,
+} from '../data/world';
+import { tickEnemies } from '../engine/enemies';
+import { MISSION_BY_ID } from '../data/missions';
+import { CONTRIBUTION_OFFERS } from '../data/contribution';
+import { ARENA_BY_ID } from '../data/arena';
 
 const APTITUDES = ['Dull', 'Ordinary', 'Good', 'Outstanding', 'Heavenly'];
 const START_STAGE = CULTIVATION_STAGES[0];
@@ -17,7 +25,7 @@ const START_STAGE = CULTIVATION_STAGES[0];
 export function createNewGame(name, gender, age) {
   const aptitude = APTITUDES[Math.floor(Math.random() * APTITUDES.length)];
   return {
-    version: 2,
+    version: 3,
     player: {
       name: name || 'Nameless', gender: gender || 'other', age: Number(age) || 16,
       rank: 0, stage: 0, cultivationProgress: 0,
@@ -26,19 +34,26 @@ export function createNewGame(name, gender, age) {
       primevalEssence: START_STAGE.maxEssence, maxPrimevalEssence: START_STAGE.maxEssence,
       willpower: 10,
       strength: 6, agility: 6, perception: 6, intelligence: 6, luck: 6,
-      x: 9, y: 6, currentArea: 'greenValley', facing: 'down',
+      x: 42, y: 44, currentArea: 'greenValleyRegion', facing: 'down',
       spiritStones: 50, equippedGu: ['g_start'], totalInsight: 0,
     },
     ownedGu: [{ instanceId: 'g_start', guId: 'swiftFang', rank: 1 }],
     inventory: { materials: { herb: 3 }, medicine: { medicine: 1 }, food: { ration: 2 }, questItems: {} },
     quests: { active: [], completed: [], kills: {}, flags: {} },
     reputation: { villagers: 0, merchants: 0, sect: 0, blackMarket: 0 },
-    worldState: { gathered: {}, unlockedAreas: ['greenValley', 'mistForest', 'blackMarket', 'cultivationSect'] },
+    worldState: {
+      gathered: {},
+      discovered: { zones: { greenValleyTown: true }, landmarks: { townGate: true, teleportFormation: true } },
+      enemies: initialEnemies(),
+    },
     mastery: {}, masteryStats: {},
     knownPaths: ['wind'], knownRecipes: [],
+    contribution: { greenValley: 0 },
+    missions: { active: [], completed: [] },
+    arena: { wins: 0, losses: 0 },
     recovery: null, breakthrough: null, toasts: [],
     combat: null, pendingEvent: null, dialogue: null,
-    log: ['You awaken as a Rank 1 · Early Stage cultivator of the Wind Path. The road to immortality begins.'],
+    log: ['You stand in Green Valley Town — a Rank 1 · Early Stage cultivator of the Wind Path. Roads lead out into the wilds.'],
     createdAt: Date.now(),
   };
 }
@@ -49,12 +64,17 @@ function aptitudeMul(apt) {
 
 export function globalStage(p) { return p.rank * 4 + (p.stage || 0); }
 
+let _toastN = 0;
+function pushToast(s, t) {
+  return { ...s, toasts: [...(s.toasts || []), { id: `t${Date.now().toString(36)}${_toastN++}`, ...t }] };
+}
+
 function objectiveMet(state, q) {
   const o = q.objective;
   if (!o) return false;
   if (o.type === 'gather') return (state.inventory.materials[o.item] || 0) >= o.qty;
   if (o.type === 'hunt' || o.type === 'defeat') return (state.quests.kills[o.enemy] || 0) >= o.qty;
-  if (o.type === 'reach') return state.player.currentArea === o.area;
+  if (o.type === 'reach') return !!(state.worldState.discovered?.zones?.[o.area]);
   if (o.type === 'choice') return false;
   return false;
 }
@@ -101,8 +121,10 @@ export function refineChecklist(state, recipeId) {
   const refFx = bonusOf(state, 'refinement');
   const essenceCost = Math.max(1, Math.ceil(r.essence * (1 - (refFx.refineEssencePct || 0) / 100)));
   const mats = Object.entries(r.materials);
+  const atSite = (zoneAt(p.x, p.y) || DEFAULT_ZONE).safe;
   return {
-    ok: state.knownRecipes.includes(recipeId)
+    ok: atSite
+      && state.knownRecipes.includes(recipeId)
       && globalStage(p) >= r.stageReq
       && (state.mastery?.[r.path]?.level || 1) >= r.masteryReq
       && p.primevalEssence >= essenceCost
@@ -110,6 +132,7 @@ export function refineChecklist(state, recipeId) {
       && mats.every(([id, q]) => (state.inventory.materials?.[id] || 0) >= q),
     essenceCost,
     checks: [
+      { key: 'site', met: atSite, text: 'At a settlement (refinement grounds)' },
       { key: 'stage', met: globalStage(p) >= r.stageReq, text: `Cultivation: ${CULTIVATION_STAGES[r.stageReq].name}` },
       { key: 'mastery', met: (state.mastery?.[r.path]?.level || 1) >= r.masteryReq, text: `${r.path[0].toUpperCase() + r.path.slice(1)} Mastery Level ${r.masteryReq}` },
       ...mats.map(([id, q]) => ({ key: `item-${id}`, met: (state.inventory.materials?.[id] || 0) >= q, text: `${ITEM_BY_ID[id]?.name || id}: ${state.inventory.materials?.[id] || 0}/${q}` })),
@@ -131,41 +154,92 @@ export function gameReducer(state, action) {
     // ---------- World ----------
     case 'MOVE': {
       if (busy(state)) return state;
-      const area = AREA_BY_ID[state.player.currentArea];
-      const nx = state.player.x + action.dx, ny = state.player.y + action.dy;
-      if (!isWalkable(area, nx, ny)) return state;
+      const p = state.player;
+      const nx = p.x + action.dx, ny = p.y + action.dy;
+      if (!isWalkable(nx, ny)) return state;
       const facing = action.dx === 1 ? 'right' : action.dx === -1 ? 'left' : action.dy === 1 ? 'down' : 'up';
-      let s = { ...state, player: { ...state.player, x: nx, y: ny, facing } };
-      const enc = rollEncounter(area);
-      if (enc) { s = { ...s, combat: initCombat(enc, s.player) }; }
-      if (!enc && area.type !== 'town' && area.type !== 'sect' && Math.random() * 100 < 4) {
-        const evs = ['strangeHerb', 'injuredCultivator', 'hiddenCave', 'spiritSpring', 'wanderingMerchant'];
-        s = { ...s, pendingEvent: evs[Math.floor(Math.random() * evs.length)] };
+      let s = { ...state, player: { ...p, x: nx, y: ny, facing } };
+
+      const zone = zoneAt(nx, ny) || DEFAULT_ZONE;
+      const ws = s.worldState;
+      const zonesFound = { ...(ws.discovered?.zones || {}) };
+      const logAdd = [];
+      if (!zonesFound[zone.id]) {
+        zonesFound[zone.id] = true;
+        logAdd.push(`Entered ${zone.name} — ${zone.dangerLabel.toLowerCase()}.`);
       }
+      const lms = ws.discovered?.landmarks || {};
+      let newLm = null;
+      for (const lm of LANDMARKS) {
+        if (!lms[lm.id] && Math.abs(lm.x - nx) <= lm.r && Math.abs(lm.y - ny) <= lm.r) { newLm = lm; break; }
+      }
+      let discovered = { zones: zonesFound, landmarks: lms };
+      if (newLm) discovered = { zones: zonesFound, landmarks: { ...lms, [newLm.id]: true } };
+      s = { ...s, worldState: { ...ws, discovered } };
+      if (newLm) {
+        s = pushToast(s, { icon: '📍', title: 'Discovered', lines: [newLm.name] });
+        logAdd.push(`Discovered: ${newLm.name}.`);
+      }
+      if (logAdd.length) s = { ...s, log: [...s.log, ...logAdd] };
+
+      // occasional world events in the wilderness (rare, never in safe zones)
+      if (zone.eventRate && Math.random() * 100 < zone.eventRate) {
+        const evs = ['strangeHerb', 'injuredCultivator', 'hiddenCave', 'spiritSpring', 'wanderingMerchant'];
+        s = { ...s, pendingEvent: evs[(Math.random() * evs.length) | 0] };
+      }
+
+      // visible enemies take their turn
+      const res = tickEnemies(s);
+      s = res.state;
+      if (res.combat) s = { ...s, combat: res.combat, log: [...s.log, res.combat.log[0]] };
       return s;
     }
 
     case 'INTERACT_RESOURCE': {
       if (state.combat || state.recovery) return state;
-      const area = AREA_BY_ID[state.player.currentArea];
-      const r = area.resources[action.index];
-      if (!r) return state;
-      const key = `${state.player.currentArea}-${action.index}`;
-      if (state.worldState.gathered[key]) return state;
+      const node = WORLD_RESOURCES.find(r => r.id === action.nodeId);
+      if (!node) return state;
+      const last = state.worldState.gathered[node.id] || 0;
+      if (Date.now() - last < BALANCE.world.gatherRespawnMs) return state;
       const qty = 1 + gatherBonus(state) + (Math.random() < state.player.perception * 0.01 ? 1 : 0);
-      let s = applyEffects(state, { items: { [r.type]: qty }, message: `Gathered ${qty} ${r.name}.` });
-      s = { ...s, worldState: { ...s.worldState, gathered: { ...s.worldState.gathered, [key]: true } } };
+      let s = applyEffects(state, { items: { [node.type]: qty }, message: `Gathered ${qty} ${node.name}.` });
+      s = { ...s, worldState: { ...s.worldState, gathered: { ...s.worldState.gathered, [node.id]: Date.now() } } };
       return s;
     }
 
-    case 'TRAVEL': {
+    case 'ATTACK_ENEMY': {
+      if (busy(state)) return state;
+      const p = state.player;
+      const e = (state.worldState.enemies || []).find(en => !en.dead && Math.abs(en.x - p.x) + Math.abs(en.y - p.y) === 1);
+      if (!e) return state;
+      const def = ENEMY_BY_ID[e.defId];
+      return { ...state, combat: initCombat(e.defId, p, { hp: e.hp, worldId: e.id, intro: `You strike first — the ${def.name} turns on you!` }) };
+    }
+
+    case 'REST_INN': {
       if (state.combat || state.recovery) return state;
-      const area = AREA_BY_ID[state.player.currentArea];
-      const exit = area.exits.find(e => e.x === state.player.x && e.y === state.player.y) || action.exit;
-      if (!exit) return state;
-      const gathered = { ...state.worldState.gathered };
-      Object.keys(gathered).forEach(k => { if (k.startsWith(state.player.currentArea + '-')) delete gathered[k]; });
-      return { ...state, player: { ...state.player, currentArea: exit.toArea, x: exit.toX, y: exit.toY }, worldState: { ...state.worldState, gathered }, log: [...state.log, `You travel to ${AREA_BY_ID[exit.toArea].name}.`] };
+      const cost = action.cost || BALANCE.inn.townRestCost;
+      const p = state.player;
+      if (p.spiritStones < cost) return { ...state, log: [...state.log, `Not enough primordial stones — the room costs ${cost}.`] };
+      return applyEffects(state, {
+        hp: p.maxHp, essence: p.maxPrimevalEssence, spiritStones: -cost,
+        message: `You sleep soundly. HP and essence fully restored. (-${cost} primordial stones)`,
+      });
+    }
+
+    case 'REST_CAMP': {
+      if (state.combat || state.recovery) return state;
+      const p = state.player;
+      let s = applyEffects(state, { hp: Math.floor(p.maxHp * 0.35), message: 'You rest at the campsite. Beasts rarely stray here.' });
+      if (s.player.primevalEssence < s.player.maxPrimevalEssence) {
+        s = { ...s, recovery: { mode: 'camp', startedAt: Date.now() }, log: [...s.log, 'You begin recovering essence by the fire — it will not be interrupted here.'] };
+      }
+      return s;
+    }
+
+    case 'USE_FORMATION': {
+      if (state.combat || state.recovery) return state;
+      return { ...state, log: [...state.log, 'The formation hums with dormant power — no distant regions are charted yet.'] };
     }
 
     case 'TALK_NPC':
@@ -210,6 +284,64 @@ export function gameReducer(state, action) {
       if (have < qty) return state;
       const price = Math.floor(ITEM_BY_ID[action.itemId].value * 0.5 * qty);
       return applyEffects(state, { removeItems: { [action.itemId]: qty }, spiritStones: price, message: `Sold ${qty} ${ITEM_BY_ID[action.itemId].name} for ${price} primordial stones.` });
+    }
+
+    // ---------- Missions & contribution ----------
+    case 'MISSION_ACCEPT': {
+      if (state.combat || state.recovery) return state;
+      const m = MISSION_BY_ID[action.missionId];
+      if (!m || state.missions.active.includes(m.id) || state.missions.completed.includes(m.id)) return state;
+      return { ...state, missions: { ...state.missions, active: [...state.missions.active, m.id] }, log: [...state.log, `Mission accepted: ${m.name}.`] };
+    }
+    case 'MISSION_TURN_IN': {
+      if (state.combat || state.recovery) return state;
+      const m = MISSION_BY_ID[action.missionId];
+      if (!m || !state.missions.active.includes(m.id) || !objectiveMet(state, m)) return state;
+      let s = consumeForObjective(state, m);
+      s = applyEffects(s, {
+        ...(m.rewards || {}),
+        contribution: (m.rewards && m.rewards.contribution) || 0,
+        message: `Mission complete: ${m.name}. (+${(m.rewards && m.rewards.contribution) || 0} contribution)`,
+      });
+      s = { ...s, missions: { ...s.missions, active: s.missions.active.filter(id => id !== m.id), completed: [...s.missions.completed, m.id] } };
+      return s;
+    }
+    case 'BUY_CONTRIBUTION': {
+      if (state.combat || state.recovery) return state;
+      const offer = CONTRIBUTION_OFFERS.find(o => o.id === action.offerId);
+      if (!offer) return state;
+      const contrib = (state.contribution && state.contribution.greenValley) || 0;
+      if (contrib < offer.cost) return { ...state, log: [...state.log, 'Not enough contribution points.'] };
+      if (offer.grant.recipe && state.knownRecipes.includes(offer.grant.recipe)) return state;
+      if (offer.req) {
+        if (offer.req.stageReq !== undefined && globalStage(state.player) < offer.req.stageReq)
+          return { ...state, log: [...state.log, 'Your cultivation is not sufficient for this reward.'] };
+        if (offer.req.mastery && (state.mastery?.[offer.req.mastery.path]?.level || 1) < offer.req.mastery.level)
+          return { ...state, log: [...state.log, 'Your path mastery is not sufficient for this reward.'] };
+      }
+      let s = { ...state, contribution: { ...state.contribution, greenValley: contrib - offer.cost } };
+      if (offer.grant.recipe) s = learnRecipe(s, offer.grant.recipe);
+      if (offer.grant.items) s = applyEffects(s, { items: offer.grant.items, message: `Exchanged contribution for ${offer.name}. (-${offer.cost} contribution)` });
+      else s = { ...s, log: [...s.log, `Exchanged contribution for ${offer.name}. (-${offer.cost} contribution)`] };
+      return s;
+    }
+
+    // ---------- Arena ----------
+    case 'ARENA_FIGHT': {
+      if (busy(state)) return state;
+      const ch = ARENA_BY_ID[action.challengeId];
+      if (!ch) return state;
+      if (state.player.spiritStones < ch.stake) return { ...state, log: [...state.log, `You need ${ch.stake} primordial stones to post this stake.`] };
+      let s = applyEffects(state, { spiritStones: -ch.stake, message: `You post your stake of ${ch.stake} primordial stones. The bout begins!` });
+      s = {
+        ...s,
+        combat: initCombat(null, s.player, {
+          def: ch.opponent,
+          arena: { challengeId: ch.id, stake: ch.stake, opponentStake: ch.opponentStake },
+          intro: `${ch.opponent.name} salutes — the duel begins!`,
+        }),
+      };
+      return s;
     }
 
     // ---------- Gu ----------
@@ -257,7 +389,7 @@ export function gameReducer(state, action) {
       const p = state.player;
       const cost = cfg.essenceCostBase + cfg.essenceCostPerRank * p.rank;
       if (p.primevalEssence < cost) return { ...state, log: [...state.log, 'Not enough essence to cultivate.'] };
-      const atSect = p.currentArea === 'cultivationSect';
+      const atSect = WORLD.tiles[p.y] && WORLD.tiles[p.y][p.x] === '*';
       const gain = Math.min(cfg.progressCap, Math.floor((cfg.progressBase + p.intelligence * cfg.progressPerInt) * aptitudeMul(p.aptitude) * (atSect ? cfg.sectBonus : 1)));
       const progress = Math.min(100, (p.cultivationProgress || 0) + gain);
       const np = {
@@ -266,7 +398,7 @@ export function gameReducer(state, action) {
         cultivationProgress: progress,
         totalInsight: (p.totalInsight || 0) + gain,
       };
-      return { ...state, player: np, log: [...state.log, `You cultivate. (+${gain}% progress${atSect ? ' · sect bonus' : ''})`] };
+      return { ...state, player: np, log: [...state.log, `You cultivate. (+${gain}% progress${atSect ? ' · terrace bonus' : ''})`] };
     }
 
     case 'BREAKTHROUGH': {
@@ -331,6 +463,18 @@ export function gameReducer(state, action) {
         log: done ? [...state.log, 'Your essence is fully restored.'] : state.log,
       };
     }
+    case 'RECOVERY_INTERRUPTED': {
+      if (!state.recovery) return state;
+      const e = (state.worldState.enemies || []).find(en => en.id === action.enemyId && !en.dead);
+      if (!e) return { ...state, recovery: null };
+      const def = ENEMY_BY_ID[e.defId];
+      return {
+        ...state,
+        recovery: null,
+        combat: initCombat(e.defId, state.player, { hp: e.hp, worldId: e.id, intro: `Your meditation shatters — the ${def.name} found you!` }),
+        log: [...state.log, `Your meditation shatters — the ${def.name} found you!`],
+      };
+    }
     case 'CANCEL_RECOVERY':
       if (!state.recovery) return state;
       return { ...state, recovery: null, log: [...state.log, 'You cease recovering. The essence gained is kept.'] };
@@ -389,8 +533,47 @@ export function gameReducer(state, action) {
       }
       return s;
     }
-    case 'END_COMBAT':
-      return { ...state, combat: null };
+    case 'END_COMBAT': {
+      const c = state.combat;
+      if (!c) return state;
+      let s = { ...state, combat: null };
+      // world enemy bookkeeping: dead → respawn timer; surviving → keep damage dealt
+      if (c.worldId && s.worldState.enemies) {
+        s = {
+          ...s,
+          worldState: {
+            ...s.worldState,
+            enemies: s.worldState.enemies.map(e => {
+              if (e.id !== c.worldId) return e;
+              if (c.result === 'victory') {
+                return { ...e, dead: true, respawnAt: Date.now() + BALANCE.world.respawnMs, x: e.home.x, y: e.home.y, state: 'idle', hp: ENEMY_BY_ID[e.defId].hp };
+              }
+              return { ...e, hp: Math.max(1, Math.round(c.enemy.hp)), state: 'idle' };
+            }),
+          },
+        };
+      }
+      // arena resolution — stake was posted up front
+      if (c.arena) {
+        const ch = ARENA_BY_ID[c.arena.challengeId];
+        if (c.result === 'victory') {
+          s = applyEffects(s, {
+            spiritStones: c.arena.stake + c.arena.opponentStake,
+            contribution: (ch && ch.rewards && ch.rewards.contribution) || 0,
+            items: (ch && ch.rewards && ch.rewards.items) || {},
+            message: `Arena victory! You claim both stakes: +${c.arena.stake + c.arena.opponentStake} primordial stones.`,
+          });
+          s = { ...s, arena: { ...s.arena, wins: (s.arena.wins || 0) + 1 } };
+        } else {
+          s = {
+            ...s,
+            arena: { ...s.arena, losses: (s.arena.losses || 0) + 1 },
+            log: [...s.log, c.result === 'defeat' ? 'Defeated in the arena — your stake is forfeit.' : 'You forfeit the duel and your stake.'],
+          };
+        }
+      }
+      return s;
+    }
 
     case 'CHOOSE_EVENT': {
       const ev = EVENT_BY_ID[state.pendingEvent];

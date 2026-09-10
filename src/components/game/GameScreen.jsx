@@ -13,6 +13,9 @@ import CombatView from './CombatView';
 import EventModal from './EventModal';
 import DialogueModal from './DialogueModal';
 import ShopPanel from './ShopPanel';
+import MissionBoard from './MissionBoard';
+import ContributionShopPanel from './ContributionShopPanel';
+import ArenaPanel from './ArenaPanel';
 import TutorialOverlay from './TutorialOverlay';
 import RecoveryModal from './RecoveryModal';
 import BreakthroughOverlay from './BreakthroughOverlay';
@@ -22,6 +25,7 @@ export default function GameScreen() {
   const { state } = useGame();
   const [tab, setTab] = useState('world');
   const [shop, setShop] = useState(null);
+  const [service, setService] = useState(null);
   const [recoveryOpen, setRecoveryOpen] = useState(false);
 
   useEffect(() => { if (state.combat) setTab('world'); }, [state.combat]);
@@ -42,8 +46,11 @@ export default function GameScreen() {
       </main>
       {state.combat && <CombatView />}
       {state.pendingEvent && <EventModal />}
-      {state.dialogue && <DialogueModal onShop={setShop} />}
+      {state.dialogue && <DialogueModal onShop={setShop} onService={setService} />}
       {shop && <ShopPanel npcId={shop} onClose={() => setShop(null)} />}
+      {service === 'missions' && <MissionBoard onClose={() => setService(null)} />}
+      {service === 'contribution' && <ContributionShopPanel onClose={() => setService(null)} />}
+      {service === 'arena' && <ArenaPanel onClose={() => setService(null)} />}
       <RecoveryModal open={recoveryOpen} onClose={() => setRecoveryOpen(false)} />
       <BreakthroughOverlay />
       <Toasts />

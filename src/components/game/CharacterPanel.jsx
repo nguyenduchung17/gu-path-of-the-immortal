@@ -3,6 +3,7 @@ import { useGame } from '@/game/state/GameContext';
 import { CULTIVATION_STAGES, BREAKTHROUGH_REQS } from '@/game/data/cultivation';
 import { BALANCE } from '@/game/config/balance';
 import { breakthroughChecklist } from '@/game/state/gameReducer';
+import { TERRACE } from '@/game/data/world';
 
 function Stat({ label, value }) {
   return (
@@ -30,7 +31,7 @@ export default function CharacterPanel({ onRecover }) {
   const req = peak ? null : BREAKTHROUGH_REQS[g];
   const cfg = BALANCE.cultivation;
   const cost = cfg.essenceCostBase + cfg.essenceCostPerRank * p.rank;
-  const atSect = p.currentArea === 'cultivationSect';
+  const atSect = p.x === TERRACE[0] && p.y === TERRACE[1];
   const checklist = peak ? null : breakthroughChecklist(state);
   const ready = checklist?.ok;
 
@@ -81,7 +82,7 @@ export default function CharacterPanel({ onRecover }) {
           </div>
         )}
         <p className="text-[10px] text-stone-500 mt-2">
-          Cultivate at the Azure Cloud Sect for ×1.5 progress. Essence never regenerates on its own — recover it deliberately.
+          Cultivate at the ✦ terrace in town for ×1.5 progress. Essence never regenerates on its own — recover it deliberately, at inns or campsites when far afield.
         </p>
       </div>
 

@@ -24,7 +24,7 @@ export default function TutorialOverlay() {
           <div className="rounded-lg bg-white/5 p-3">
             <div className="text-xs font-semibold text-emerald-200 mb-1">🗺️ Moving Around</div>
             <p className="text-[11px] text-stone-300 leading-relaxed">
-              Use <b className="text-emerald-100">WASD</b> / <b className="text-emerald-100">Arrow keys</b> to move, and <b className="text-emerald-100">E</b> to interact with people, resources and portals. On mobile, use the on-screen D-pad.
+              Use <b className="text-emerald-100">WASD</b> / <b className="text-emerald-100">Arrow keys</b> to move, and <b className="text-emerald-100">E</b> to interact with people, resources, camps and formations. On mobile, use the on-screen D-pad.
             </p>
           </div>
           <div className="rounded-lg bg-white/5 p-3">

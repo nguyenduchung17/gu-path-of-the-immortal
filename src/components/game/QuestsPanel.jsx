@@ -8,7 +8,7 @@ function progressText(state, q) {
   const o = q.objective;
   if (o.type === 'gather') return `${state.inventory.materials[o.item] || 0} / ${o.qty} ${ITEM_BY_ID[o.item]?.name}`;
   if (o.type === 'hunt' || o.type === 'defeat') return `${state.quests.kills[o.enemy] || 0} / ${o.qty}`;
-  if (o.type === 'reach') return state.player.currentArea === o.area ? 'Reached' : 'Not reached';
+  if (o.type === 'reach') return !!(state.worldState.discovered?.zones?.[o.area]) ? 'Reached' : 'Not reached';
   return '';
 }
 

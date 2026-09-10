@@ -13,6 +13,8 @@ export function applyEffects(state, effects) {
   let reputation = { ...state.reputation };
   let quests = { ...state.quests };
   let worldState = { ...state.worldState };
+  let contribution = { greenValley: 0, ...(state.contribution || {}) };
+  if (effects.contribution) contribution = { ...contribution, greenValley: (contribution.greenValley || 0) + effects.contribution };
   let log = state.log ? state.log.slice() : [];
   let pendingCombat = null;
 
@@ -52,7 +54,7 @@ export function applyEffects(state, effects) {
   if (effects.flag) quests.flags = { ...quests.flags, [effects.flag]: true };
   if (effects.message) log.push(effects.message);
 
-  let next = { ...state, player, inventory, ownedGu, reputation, quests, worldState, log };
+  let next = { ...state, player, inventory, ownedGu, reputation, quests, worldState, contribution, log };
   if (effects.mastery) for (const [pid, xp] of Object.entries(effects.mastery)) next = grantMastery(next, pid, xp);
   if (effects.recipes) for (const id of effects.recipes) next = learnRecipe(next, id);
   if (pendingCombat) next._pendingCombat = pendingCombat;
