@@ -2,6 +2,7 @@
 // Gu / refinement), inventories never cross categories, and each role has its
 // own look + daily schedule. Hidden masters are appended from masters.js.
 import { MASTERS } from './masters';
+import { ITEM_BY_ID } from './items';
 
 export const NPCS = [
   {
@@ -9,9 +10,15 @@ export const NPCS = [
     greeting: 'Fresh buns, honest tea, and rations that survive a long road — Chen sells food, nothing fancier.',
     look: { body: 'male', hair: 'short', hairColor: '#4a3018', skin: '#e8b88a', eyes: '#3a2a18', outfit: 'tunic', outfitPrimary: '#8a7a3a', outfitSecondary: '#c9a45a', accessory: 'belt' },
     shop: {
+      // food prices are read from each item's computed value — never hand-set
       sells: [
-        { itemId: 'simpleMeal', price: 3 }, { itemId: 'ration', price: 4 },
-        { itemId: 'riceBun', price: 3 }, { itemId: 'gingerTea', price: 3 },
+        { itemId: 'simpleMeal', price: ITEM_BY_ID.simpleMeal.value },
+        { itemId: 'heartyStew', price: ITEM_BY_ID.heartyStew.value },
+        { itemId: 'ration', price: ITEM_BY_ID.ration.value },
+        { itemId: 'riceBun', price: ITEM_BY_ID.riceBun.value },
+        { itemId: 'gingerTea', price: ITEM_BY_ID.gingerTea.value },
+        { itemId: 'willowBarkTea', price: ITEM_BY_ID.willowBarkTea.value },
+        { itemId: 'qiBerry', price: ITEM_BY_ID.qiBerry.value },
         { itemId: 'herb', price: 4 }, { itemId: 'spiritGrass', price: 5 }, // cooking ingredients
       ],
       buys: ['herb', 'spiritGrass', 'moonPetal'],
@@ -88,7 +95,13 @@ export const NPCS = [
     look: { body: 'female', hair: 'braids', hairColor: '#3a2a18', skin: '#e8b88a', eyes: '#3a2a18', outfit: 'tunic', outfitPrimary: '#8a5a2b', outfitSecondary: '#e8e4d8', accessory: 'belt' },
     service: 'inn', innCost: 20,
     shop: {
-      sells: [{ itemId: 'simpleMeal', price: 3 }, { itemId: 'ration', price: 4 }, { itemId: 'gingerTea', price: 3 }],
+      sells: [
+        { itemId: 'simpleMeal', price: ITEM_BY_ID.simpleMeal.value },
+        { itemId: 'heartyStew', price: ITEM_BY_ID.heartyStew.value },
+        { itemId: 'ration', price: ITEM_BY_ID.ration.value },
+        { itemId: 'gingerTea', price: ITEM_BY_ID.gingerTea.value },
+        { itemId: 'willowBarkTea', price: ITEM_BY_ID.willowBarkTea.value },
+      ],
       buys: [],
       // Tavern talk — cheap rumors overheard at the inn.
       intel: [
@@ -141,7 +154,13 @@ export const NPCS = [
     greeting: 'The hamlet is small but its hearth is warm. A general store — plain necessities, nothing rare.',
     look: { body: 'male', hair: 'long', hairColor: '#e8e4d8', skin: '#a8785a', eyes: '#3a2a18', outfit: 'robe', outfitPrimary: '#556077', outfitSecondary: '#8a6a43', accessory: 'shoulderCloth' },
     shop: {
-      sells: [{ itemId: 'ration', price: 3 }, { itemId: 'medicine', price: 14 }, { itemId: 'herb', price: 4 }, { itemId: 'simpleMeal', price: 3 }],
+      priceMul: 0.9, // hamlet economy — plain necessities a little cheaper
+      sells: [
+        { itemId: 'ration', price: ITEM_BY_ID.ration.value },
+        { itemId: 'riceBun', price: ITEM_BY_ID.riceBun.value },
+        { itemId: 'simpleMeal', price: ITEM_BY_ID.simpleMeal.value },
+        { itemId: 'medicine', price: 14 }, { itemId: 'herb', price: 4 },
+      ],
       buys: ['herb', 'spiritGrass', 'moonPetal', 'beastCore'],
     },
     service: 'inn', innCost: 10,

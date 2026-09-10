@@ -6,6 +6,19 @@ import { learnRecipe, discoverPath, learnClue } from './mastery';
 let _idc = 0;
 const newInstanceId = () => 'g' + Date.now().toString(36) + (_idc++).toString(36);
 
+// A consumed food's lasting effect ("food buff") — stored on the player with an
+// absolute in-game expiry (day·1440 + min, matching MIN_PER_DAY in time.js).
+// Temporary stat bonuses apply immediately and are returned on expiry.
+export function applyFoodBuff(player, buff, time) {
+  const abs = (time?.day ?? 1) * 1440 + (time?.min ?? 0);
+  const next = {
+    ...player,
+    foodBuffs: [...(player.foodBuffs || []), { ...buff, startedMin: abs, untilMin: abs + (buff.minutes || 0) }],
+  };
+  if (buff.type === 'statBonus') next[buff.stat] = (next[buff.stat] || 0) + buff.power;
+  return next;
+}
+
 export function applyEffects(state, effects) {
   if (!effects) return state;
   let player = { ...state.player };
@@ -28,6 +41,7 @@ export function applyEffects(state, effects) {
 
   if (effects.hp) player.hp = Math.min(player.maxHp, Math.max(0, player.hp + effects.hp));
   if (effects.essence) player.primevalEssence = Math.min(player.maxPrimevalEssence, Math.max(0, player.primevalEssence + effects.essence));
+  if (effects.foodBuff) player = applyFoodBuff(player, effects.foodBuff, state.time);
   if (effects.spiritStones) player.spiritStones = Math.max(0, player.spiritStones + effects.spiritStones);
   if (effects.progress) {
     player.cultivationProgress = Math.min(100, (player.cultivationProgress || 0) + effects.progress);

@@ -61,7 +61,8 @@ export default function BattleCommandMenu({ state, combat, busy, onGu, onItem, o
   const equipped = p.equippedGu.map(id => state.ownedGu.find(g => g.instanceId === id)).filter(Boolean);
   const normalGu = equipped.filter(inst => !isKillerMove(GU_BY_ID[inst.guId]));
   const killerGu = equipped.filter(inst => isKillerMove(GU_BY_ID[inst.guId]));
-  const meds = ITEMS.filter(it => it.category === 'medicine' || it.category === 'food')
+  // only fare meant for a fight can be consumed mid-battle
+  const meds = ITEMS.filter(it => it.combatUsable)
     .filter(it => (state.inventory[it.category]?.[it.id] || 0) > 0);
   const disabled = busy || combat.over;
 
@@ -95,6 +96,9 @@ export default function BattleCommandMenu({ state, combat, busy, onGu, onItem, o
                 <div className="text-xs font-medium">🧪 {it.name} <span className="text-stone-400">×{state.inventory[it.category]?.[it.id]}</span></div>
                 <div className="text-[10px] text-stone-400 mt-0.5">
                   {it.use?.hp ? `+${it.use.hp} ${t('ui.hp')}` : ''}{it.use?.hp && it.use?.essence ? ' · ' : ''}{it.use?.essence ? `+${it.use.essence} ${t('ui.essence')}` : ''}
+                  {it.use?.cure?.includes('poison') ? ' · cures poison' : ''}
+                  {it.use?.buff?.type === 'poisonResist' ? ` · poison resist +${it.use.buff.power}%` : ''}
+                  {it.use?.buff?.type === 'statBonus' ? ` · +${it.use.buff.power} ${it.use.buff.stat}` : ''}
                 </div>
               </button>
             ))

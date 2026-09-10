@@ -46,13 +46,31 @@ export function warmthOf(min) {
   return Math.max(bell(5.5 * 60, 100), bell(19 * 60, 100)) * 0.4;
 }
 
+// Timed food effects end when their clock runs out; a temporary stat bonus
+// is returned the moment its buff expires.
+function expireFoodBuffs(state) {
+  const buffs = state.player?.foodBuffs;
+  if (!buffs?.length) return state;
+  const abs = state.time.day * MIN_PER_DAY + state.time.min;
+  let changed = false;
+  const player = { ...state.player, foodBuffs: [] };
+  for (const b of buffs) {
+    if ((b.untilMin || 0) > abs) player.foodBuffs.push(b);
+    else {
+      changed = true;
+      if (b.type === 'statBonus') player[b.stat] = Math.max(1, (player[b.stat] || 0) - b.power);
+    }
+  }
+  return changed ? { ...state, player } : state;
+}
+
 export function advanceTime(state, mins) {
   if (!mins) return state;
   const t = state.time || { day: BALANCE.time.startDay, min: BALANCE.time.startMinutes };
   const total = t.min + Math.round(mins);
   // the clock is the single choke point for everything time-driven:
-  // Gu hunger, auto-feed, starvation, injury recovery, wild-Gu respawns
-  return tickGuLife({ ...state, time: { day: t.day + Math.floor(total / MIN_PER_DAY), min: total % MIN_PER_DAY } }, mins);
+  // food-buff expiry, Gu hunger, auto-feed, starvation, injury recovery, wild-Gu respawns
+  return tickGuLife(expireFoodBuffs({ ...state, time: { day: t.day + Math.floor(total / MIN_PER_DAY), min: total % MIN_PER_DAY } }), mins);
 }
 
 // Market-style shops keep daytime hours; inns and the black market never close.

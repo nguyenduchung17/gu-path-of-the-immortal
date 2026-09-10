@@ -2,7 +2,7 @@ import { GU_BY_ID, isKillerMove } from '../data/gu';
 import { ENEMY_BY_ID } from '../data/enemies';
 import { ITEM_BY_ID } from '../data/items';
 import { PATH_BY_ID, SYNERGIES } from '../data/paths';
-import { applyEffects } from './effects';
+import { applyEffects, applyFoodBuff } from './effects';
 import { grantMastery, bonusOf } from './mastery';
 import { BALANCE, DIFFICULTIES } from '../config/balance';
 import { applyDeath } from './death';
@@ -148,8 +148,12 @@ function enemyAct(enemy, player, pSt, push, windEvasion, thorns) {
   player.hp -= dmg;
   push(`${enemy.name} attacks for ${dmg} damage.`);
   if (thorns) { enemy.hp -= thorns; push(`${enemy.name} is cut by thorns for ${thorns} damage.`); }
-  if (enemy.abilities && enemy.abilities.includes('poison') && Math.random() < 0.4) {
-    pSt.push({ type: 'poison', power: 3, duration: 3 }); push('You are poisoned!');
+  if (enemy.abilities && enemy.abilities.includes('poison')) {
+    // medicinal food steadies the blood — ginger tea and the like
+    const resist = (player.foodBuffs || []).filter(b => b.type === 'poisonResist').reduce((a, b) => a + (b.power || 0), 0);
+    if (Math.random() < 0.4 * (1 - Math.min(90, resist) / 100)) {
+      pSt.push({ type: 'poison', power: 3, duration: 3 }); push('You are poisoned!');
+    }
   }
 }
 
@@ -274,10 +278,16 @@ export function executeRound(state, action) {
     push('You failed to escape!');
   } else if (action.type === 'item') {
     const it = ITEM_BY_ID[action.itemId];
-    if (!it || !it.use) return state;
+    // only fare meant for the chaos of battle can be consumed mid-fight
+    if (!it || !it.use || !it.combatUsable) return state;
     if ((state.inventory[it.category]?.[action.itemId] || 0) <= 0) return state;
     if (it.use.hp) player.hp = Math.min(player.maxHp, player.hp + it.use.hp);
     if (it.use.essence) player.primevalEssence = Math.min(player.maxPrimevalEssence, player.primevalEssence + it.use.essence);
+    if (it.use.cure && pSt.some(s => it.use.cure.includes(s.type))) {
+      pSt = pSt.filter(s => !it.use.cure.includes(s.type));
+      push('The toxins wash from your blood — the poison is cured.');
+    }
+    if (it.use.buff) { player = applyFoodBuff(player, it.use.buff, state.time); push(`${it.name}'s effect settles over you.`); }
     push(`You use ${it.name}.`);
     combat.usedItem = action.itemId;
   } else if (action.type === 'defend') {

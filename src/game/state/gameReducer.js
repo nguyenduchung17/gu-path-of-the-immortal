@@ -383,8 +383,7 @@ export function gameReducer(state, action) {
       const offer = npc.shop.sells.find(o => o.itemId === action.itemId);
       if (!offer) return state;
       const qty = action.qty || 1;
-      const price = offer.price * qty;
-      const total = shopPrice(offer.price * qty, state);
+      const total = shopPrice(offer.price * qty * (npc.shop.priceMul || 1), state);
       if (state.player.spiritStones < total) return state;
       let s = { ...state, player: { ...state.player, spiritStones: state.player.spiritStones - total } };
       s = applyEffects(s, { items: { [action.itemId]: qty } });
@@ -696,7 +695,15 @@ export function gameReducer(state, action) {
       const it = ITEM_BY_ID[action.itemId];
       if (!it || !it.use) return state;
       if ((state.inventory[it.category]?.[action.itemId] || 0) <= 0) return state;
-      return applyEffects(state, { hp: it.use.hp || 0, essence: it.use.essence || 0, removeItems: { [action.itemId]: 1 }, message: `You use ${it.name}.` });
+      // meals are sit-down fare — only eaten where it is safe to sit
+      if (it.role === 'meal' && !(zoneAt(state.player.x, state.player.y) || DEFAULT_ZONE).safe) {
+        return { ...state, log: [...state.log, `${it.name} is sit-down fare — eat it at an inn or a settlement dining area.`] };
+      }
+      return applyEffects(state, {
+        hp: it.use.hp || 0, essence: it.use.essence || 0,
+        foodBuff: it.use.buff || null,
+        removeItems: { [action.itemId]: 1 }, message: `You use ${it.name}.`,
+      });
     }
 
     case 'ACCEPT_QUEST': {

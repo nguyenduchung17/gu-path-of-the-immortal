@@ -64,6 +64,22 @@ export const BALANCE = {
     wildGuRespawnMs: 10 * 60 * 1000, // wild Gu returns to its haunt after capture/kill
   },
   inn: { mealItemId: 'simpleMeal' },
+  // Food & consumable economy — a food's worth is never price-per-HP alone:
+  //   value = (base + HP·perHp + portability + utility + rarity) × roleAdj
+  //   MEAL      cheapest healing per stone, but sit-down fare (inns/settlements)
+  //   TRAVEL    portable expedition food, priced above its raw healing
+  //   MEDICINAL drinks that trade raw healing for a real, lasting effect
+  //   RARE      uncommon cultivation food carrying a premium effect
+  // Shop offers read the computed value (items.foodValueOf) — never a
+  // hand-typed price — and shopPrice() multipliers apply on top of it.
+  foodValue: {
+    base: 0.5,
+    perHp: 0.1,
+    portability: 1.5,            // can be eaten out in the wilderness
+    roleAdj: { meal: 1.5, travel: 1.3, medicinal: 1.0, rare: 1.0 },
+    utility: { poisonResist: 2, curePoison: 3, statBonus: 4 },
+    rarity: { common: 0, uncommon: 2, rare: 5 },
+  },
   // Gu hunger — long-term resource management, not micromanagement.
   hunger: {
     maxSatiety: 100,

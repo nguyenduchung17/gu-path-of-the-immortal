@@ -1,3 +1,5 @@
+import { BALANCE } from '../config/balance';
+
 export const ITEMS = [
   // Materials
   { id: 'herb', name: 'Spirit Herb', category: 'materials', description: 'A common herb with mild healing essence.', value: 3 },
@@ -17,15 +19,36 @@ export const ITEMS = [
   { id: 'wardenCore', name: 'Warden Core', category: 'materials', rarity: 'rare', description: 'A rune-carved core pried from the Ruin Warden\u2019s chest.', value: 70 },
   { id: 'dreadMarrow', name: 'Dread Marrow', category: 'materials', rarity: 'rare', description: 'Marrow drawn from the Dread Matriarch, thrumming with venom and shadow.', value: 65 },
   // Medicine
-  { id: 'medicine', name: 'Healing Salve', category: 'medicine', description: 'Restores 25 HP.', value: 15, use: { hp: 25 } },
-  { id: 'healingPill', name: 'Greater Healing Pill', category: 'medicine', description: 'Restores 55 HP.', value: 35, use: { hp: 55 } },
-  { id: 'essencePill', name: 'Essence Pill', category: 'medicine', description: 'Restores 20 primeval essence.', value: 30, use: { essence: 20 } },
-  // Food
-  { id: 'ration', name: 'Travel Ration', category: 'food', description: 'Restores 10 HP. Plain but filling.', value: 4, use: { hp: 10 } },
-  { id: 'simpleMeal', name: 'Simple Rice Meal', category: 'food', rarity: 'common', description: 'A humble inn meal. Restores 15 HP.', value: 2, use: { hp: 15, essence: 0 } },
-  // More food (the food merchant's trade)
-  { id: 'riceBun', name: 'Steamed Rice Bun', category: 'food', description: 'A warm bun from the market stalls. Restores 12 HP.', value: 2, use: { hp: 12 } },
-  { id: 'gingerTea', name: 'Ginger Tea', category: 'food', description: 'A warming clay cup of tea. Restores 6 HP.', value: 2, use: { hp: 6 } },
+  { id: 'medicine', name: 'Healing Salve', category: 'medicine', description: 'Restores 25 HP.', value: 15, combatUsable: true, use: { hp: 25 } },
+  { id: 'healingPill', name: 'Greater Healing Pill', category: 'medicine', description: 'Restores 55 HP.', value: 35, combatUsable: true, use: { hp: 55 } },
+  { id: 'essencePill', name: 'Essence Pill', category: 'medicine', description: 'Restores 20 primeval essence.', value: 30, combatUsable: true, use: { essence: 20 } },
+  // Food roles — value is COMPUTED from BALANCE.foodValue (never hand-set):
+  //   MEAL      settlement dining: cheap bulk healing, but sit-down only
+  //   TRAVEL    portable expedition fare that never spoils
+  //   MEDICINAL drinks that trade raw healing for a real effect
+  //   RARE      uncommon cultivation food carrying a premium effect
+  // Food restores HP only — essence recovery stays a cultivation mechanic.
+  { id: 'simpleMeal', name: 'Simple Rice Meal', category: 'food', role: 'meal', rarity: 'common',
+    description: 'Restores 15 HP. Hot bowl, wooden bench — only eaten at inns and settlements.',
+    use: { hp: 15 } },
+  { id: 'heartyStew', name: 'Hearty Meat Stew', category: 'food', role: 'meal', rarity: 'common',
+    description: 'Restores 30 HP. Simmered all day in the innkeeper\u2019s pot — sit-down fare for the badly wounded.',
+    use: { hp: 30 } },
+  { id: 'ration', name: 'Travel Ration', category: 'food', role: 'travel', portable: true, combatUsable: true,
+    description: 'Restores 10 HP. Dried, dense, never spoils — eaten on the trail or mid-battle.',
+    use: { hp: 10 } },
+  { id: 'riceBun', name: 'Steamed Rice Bun', category: 'food', role: 'travel', portable: true,
+    description: 'Restores 6 HP. A cheap warm snack from the market stalls, easy to carry.',
+    use: { hp: 6 } },
+  { id: 'gingerTea', name: 'Ginger Tea', category: 'food', role: 'medicinal', portable: true,
+    description: 'Restores 6 HP and steadies the blood: Poison Resistance +40% for 4 game hours.',
+    use: { hp: 6, buff: { type: 'poisonResist', power: 40, minutes: 240 } } },
+  { id: 'willowBarkTea', name: 'Willow-Bark Tea', category: 'food', role: 'medicinal', portable: true, combatUsable: true,
+    description: 'Restores 4 HP and purges toxins — instantly cures Poison. Bitter, but drinkable mid-battle.',
+    use: { hp: 4, cure: ['poison'] } },
+  { id: 'qiBerry', name: 'Qi Berry', category: 'food', role: 'rare', rarity: 'rare', portable: true, combatUsable: true,
+    description: 'Restores 8 HP. The berry sharpens the senses: +2 Perception for 6 game hours.',
+    use: { hp: 8, buff: { type: 'statBonus', stat: 'perception', power: 2, minutes: 360 } } },
   // Gu food — each Dao Path's Gu eats its own fare (fed via the Gu panel)
   { id: 'flameGrass', name: 'Flame Grass', category: 'guFood', description: 'A warm-bladed grass that smolders faintly. Food for Fire-path Gu.', value: 5 },
   { id: 'spiritWater', name: 'Spirit Spring Water', category: 'guFood', description: 'Spring water that glimmers with qi. Food for Water-path Gu.', value: 5 },
@@ -41,6 +64,22 @@ export const ITEMS = [
   { id: 'brokenSwordFragment', name: 'Broken Sword Fragment', category: 'questItems', description: 'Half a blade, snapped long ago. A master might want it back.', value: 0 },
   { id: 'stolenGoods', name: 'Stolen Goods', category: 'questItems', description: 'A merchant\'s stolen wares.', value: 0 },
 ];
+
+// Central consumable pricing — see BALANCE.foodValue. A food's value rises with
+// its healing, portability, utility effect and rarity; the role multiplier
+// keeps the roles in honest competition (meals cheapest per stone but
+// settlement-bound, trail and rare food paying for what they do in the wilds).
+export function foodValueOf(it) {
+  const v = BALANCE.foodValue;
+  const raw = v.base
+    + (it.use?.hp || 0) * v.perHp
+    + (it.portable ? v.portability : 0)
+    + (it.use?.buff ? (v.utility[it.use.buff.type] || 0) : 0)
+    + (it.use?.cure ? v.utility.curePoison : 0)
+    + (v.rarity[it.rarity] || 0);
+  return Math.max(1, Math.round(raw * (v.roleAdj[it.role] || 1)));
+}
+for (const it of ITEMS) if (it.category === 'food' && !('value' in it)) it.value = foodValueOf(it);
 
 export const ITEM_BY_ID = Object.fromEntries(ITEMS.map(i => [i.id, i]));
 export const ITEM_CATEGORIES = ['materials', 'medicine', 'food', 'guFood', 'guGear', 'questItems'];
