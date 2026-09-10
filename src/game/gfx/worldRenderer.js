@@ -478,11 +478,18 @@ export function drawWorld(display, state, view) {
     }
   }
 
-  // proximity nameplates (screen-space, crisp) — only for beasts within ~4 tiles
+  // proximity nameplates (screen-space, crisp) — only for beasts within ~4 tiles.
+  // Packmates standing together share ONE plate (the ×n count carries the pack)
+  // instead of stacking unreadable duplicates.
+  const plateXs = [];
   for (const e of state.worldState.enemies || []) {
     if (e.dead) continue;
     if (Math.max(Math.abs(e.x - p.x), Math.abs(e.y - p.y)) > 4) continue;
     const vis = visualOf(e.defId);
+    const plateEx = (e.x - view.camX) * tile + tile / 2;
+    const plateEy = (e.y - view.camY) * tile;
+    if (plateXs.some(([px2, py2]) => Math.abs(px2 - plateEx) < 110 && Math.abs(py2 - plateEy) < 26)) continue;
+    plateXs.push([plateEx, plateEy]);
     const ex = (e.x - view.camX) * tile + tile / 2;
     const ey = (e.y - view.camY) * tile;
     const w = 132, h = 44, bx = Math.round(ex - w / 2), by = Math.round(ey - 52);
