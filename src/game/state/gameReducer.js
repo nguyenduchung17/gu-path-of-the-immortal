@@ -279,8 +279,8 @@ export function gameReducer(state, action) {
       for (const lm of LANDMARKS) {
         if (!lms[lm.id] && Math.abs(lm.x - nx) <= lm.r && Math.abs(lm.y - ny) <= lm.r) { newLm = lm; break; }
       }
-      let discovered = { zones: zonesFound, landmarks: lms };
-      if (newLm) discovered = { zones: zonesFound, landmarks: { ...lms, [newLm.id]: true } };
+      let discovered = { ...(ws.discovered || {}), zones: zonesFound, landmarks: lms };
+      if (newLm) discovered = { ...discovered, landmarks: { ...lms, [newLm.id]: true } };
       s = { ...s, worldState: { ...ws, discovered } };
       if (!(ws.discovered?.zones || {})[zone.id]) s = withQuestEvents(s, { type: 'LOCATION_DISCOVERED', id: zone.id });
       if (newLm) {
