@@ -131,6 +131,11 @@ export const DICT_EXTRA = {
     'battle.tabSupport': 'SUPPORT',
     'battle.tabUtility': 'UTILITY',
     'battle.strikeHint': 'Free attack — costs no essence, chips the enemy guard.',
+
+    // ---- secluded cultivation ----
+    'seclude.button': '🏯 Secluded Cultivation',
+    'seclude.hint': 'Seal yourself away: cultivation sessions with overnight essence recovery until your aperture is ready to break through. Requires a settlement; in-game days pass.',
+    'seclude.needTown': 'Secluded cultivation requires the safety of a settlement.',
   },
   vi: {
     // ---- gặp Cổ Trùng hoang dã ----
@@ -260,5 +265,10 @@ export const DICT_EXTRA = {
     'battle.tabSupport': 'HỖ TRỢ',
     'battle.tabUtility': 'TIỆN ÍCH',
     'battle.strikeHint': 'Đòn đánh miễn phí — không tốn chân nguyên, phá hộ địch.',
+
+    // ---- bế quan tu luyện ----
+    'seclude.button': '🏯 Bế Quan Tu Luyện',
+    'seclude.hint': 'Bế quan: liên tục tu luyện, hồi phục chân nguyên qua đêm cho đến khi khiếu đầy sẵn sàng đột phá. Cần nơi an toàn; ngày trong game trôi qua.',
+    'seclude.needTown': 'Bế quan cần sự an toàn của trấn/xã.',
   },
 };

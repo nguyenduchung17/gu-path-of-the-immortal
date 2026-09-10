@@ -676,6 +676,67 @@ export function gameReducer(state, action) {
       return advanceTime(s, BALANCE.time.cultivateMinutes);
     }
 
+    // ---------- Secluded cultivation (closed-door training) ----------
+    // One click compresses the cultivate → recover grind into a batch of
+    // sessions separated by nights of deep meditation. All per-session
+    // balance is honored (essence cost, progress gain, terrace bonus) and
+    // the whole span is paid in game time via advanceTime (days pass, Gu
+    // hunger ticks) — only the real-time waiting is removed.
+    case 'SECLUDE': {
+      if (busy(state)) return state;
+      const p = state.player;
+      const g = globalStage(p);
+      if (g >= 19) return state;
+      if ((p.cultivationProgress || 0) >= 100) return { ...state, log: [...state.log, 'Your aperture already brims with essence — break through first.'] };
+      if (!(zoneAt(p.x, p.y) || DEFAULT_ZONE).safe) return { ...state, log: [...state.log, 'Seclusion requires the safety of a settlement — wilds would tear your meditation apart.'] };
+      const cfg = BALANCE.cultivation;
+      const cost = cfg.essenceCostBase + cfg.essenceCostPerStage * g;
+      const atSect = WORLD.tiles[p.y] && WORLD.tiles[p.y][p.x] === '*';
+      const t = state.time || { day: BALANCE.time.startDay, min: BALANCE.time.startMinutes };
+      const startAbs = t.day * 1440 + t.min;
+      let abs = startAbs;
+      let progress = p.cultivationProgress || 0;
+      let essence = p.primevalEssence;
+      let insight = p.totalInsight || 0;
+      let sessions = 0, nights = 0;
+      while (progress < 100 && nights < 10) {
+        while (progress < 100 && essence >= cost) {
+          const gain = Math.min(cfg.progressCap, Math.floor((cfg.progressBase + p.intelligence * cfg.progressPerInt) * cultivateMulOf(p.aptitude) * (atSect ? cfg.sectBonus : 1)));
+          if (gain <= 0) break;
+          progress = Math.min(100, progress + gain);
+          essence -= cost;
+          insight += gain;
+          sessions++;
+          abs += BALANCE.time.cultivateMinutes;
+        }
+        if (progress >= 100) break;
+        // a night of deep meditation refills the aperture by morning
+        const dayStart = Math.floor(abs / 1440) * 1440;
+        let wake = dayStart + BALANCE.time.sleepToMinutes;
+        if (wake <= abs) wake += 1440;
+        abs = wake;
+        essence = p.maxPrimevalEssence;
+        nights++;
+      }
+      if (progress >= 100 && essence < p.maxPrimevalEssence) {
+        // one final night: emerge with a full aperture so the breakthrough
+        // requirements (essence held) are always met on the spot
+        const dayStart = Math.floor(abs / 1440) * 1440;
+        let wake = dayStart + BALANCE.time.sleepToMinutes;
+        if (wake <= abs) wake += 1440;
+        abs = wake;
+        essence = p.maxPrimevalEssence;
+        nights++;
+      }
+      let s = { ...state, player: { ...p, primevalEssence: essence, cultivationProgress: progress, totalInsight: insight } };
+      s = advanceTime(s, abs - startAbs);
+      s = { ...s, log: [...s.log, `You emerge from seclusion: ${sessions} cultivation sessions across ${nights} night(s)${atSect ? ' at the terrace' : ''}. Progress: ${Math.floor(progress)}%.`] };
+      if (progress >= 100 && (p.cultivationProgress || 0) < 100) {
+        s = pushToast(s, { icon: '🏯', title: 'SECLUDED CULTIVATION COMPLETE', lines: [`${sessions} sessions · ${nights} night(s) of seclusion.`, 'Your aperture brims — a breakthrough awaits.'] });
+      }
+      return s;
+    }
+
     case 'BREAKTHROUGH': {
       if (busy(state)) return state;
       const p = state.player;

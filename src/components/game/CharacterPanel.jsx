@@ -4,7 +4,7 @@ import { useT } from '@/game/i18n/LangContext';
 import { CULTIVATION_STAGES, BREAKTHROUGH_REQS } from '@/game/data/cultivation';
 import { BALANCE, recoveryBreakdown } from '@/game/config/balance';
 import { breakthroughChecklist } from '@/game/state/gameReducer';
-import { TERRACE } from '@/game/data/world';
+import { TERRACE, zoneAt } from '@/game/data/world';
 import { tierOf, scoreOf, constitutionName } from '@/game/config/aptitude';
 import EssenceSphere from './EssenceSphere';
 import { totalGameMin, fmtRemaining } from '@/game/engine/vitalGu';
@@ -42,6 +42,8 @@ export default function CharacterPanel({ onRecover }) {
   const cfg = BALANCE.cultivation;
   const cost = cfg.essenceCostBase + cfg.essenceCostPerStage * g;
   const atSect = p.x === TERRACE[0] && p.y === TERRACE[1];
+  const inSafeZone = !!zoneAt(p.x, p.y)?.safe;
+  const secludeOk = !state.recovery && !state.combat && !peak && p.cultivationProgress < 100 && inSafeZone;
   const checklist = peak ? null : breakthroughChecklist(state);
   const ready = checklist?.ok;
   const breakthroughReady = !peak && p.cultivationProgress >= 100;
@@ -136,6 +138,14 @@ export default function CharacterPanel({ onRecover }) {
               💧 Recovering essence — cultivation is paused until you stop recovering.
             </div>
           )}
+
+          <button onClick={() => dispatch({ type: 'SECLUDE' })} disabled={!secludeOk}
+            className={`w-full py-2.5 rounded-lg text-sm font-medium transition mb-1 ${secludeOk ? 'border border-emerald-700/50 bg-emerald-900/40 text-emerald-100 hover:bg-emerald-800/50' : 'bg-stone-800 text-stone-500 cursor-not-allowed'}`}>
+            {t('seclude.button')}
+          </button>
+          <div className="text-[10px] text-stone-500">
+            {inSafeZone ? t('seclude.hint') : t('seclude.needTown')}
+          </div>
 
           {breakthroughReady && (
             <div className="rounded-lg border border-amber-800/40 bg-amber-900/10 p-3">
