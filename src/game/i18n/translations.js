@@ -188,6 +188,9 @@ export const DICT = {
     'starter.beastCall.style': 'Summon / Control',
     'starter.beastCall.strengths': 'A tamed beast strikes for you each turn',
     'starter.beastCall.weaknesses': 'Slow to build pressure',
+    'starter.spiritMoth.style': 'Exploration / Investigation',
+    'starter.spiritMoth.strengths': 'Senses rare harvests and secret paths; +1 gathering',
+    'starter.spiritMoth.weaknesses': 'Almost no strength in battle',
 
     // ---- battle ----
     'battle.turn': 'YOUR MOVE',
@@ -512,6 +515,9 @@ export const DICT = {
     'starter.beastCall.style': 'Triệu hồi / Khống chế',
     'starter.beastCall.strengths': 'Dã thú chiến đấu thay bạn mỗi lượt',
     'starter.beastCall.weaknesses': 'Tạo áp lực chậm',
+    'starter.spiritMoth.style': 'Thám Hiểm / Do Thám',
+    'starter.spiritMoth.strengths': 'Cảm nhận tài nguyên hiếm và đường bí mật; +1 thu thập',
+    'starter.spiritMoth.weaknesses': 'Hầu như không có sức mạnh trong chiến đấu',
 
     // ---- battle ----
     'battle.turn': 'ĐẾN LƯỢT BẠN',

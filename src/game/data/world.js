@@ -138,6 +138,10 @@ export const RESOURCES = [
   // Rare harvests — the essence hides from mundane senses; Spirit Moth's sense reveals them
   { id: 'rn1', x: 8, y: 41, type: 'moonSilver', name: 'Moon Silver Bloom', rare: true },
   { id: 'rn2', x: 73, y: 51, type: 'voidLotus', name: 'Void Lotus Pool', rare: true },
+  // an early rare bloom on the forest edge north of the farmland — a new
+  // cultivator's first taste of what a sensing Gu can find, and a short walk
+  // from the Serpent's Stepping Stones ford it can reveal
+  { id: 'rn3', x: 32, y: 27, type: 'moonSilver', name: 'Moon Silver Bloom', rare: true },
 ];
 export const WORLD_RESOURCES = RESOURCES;
 

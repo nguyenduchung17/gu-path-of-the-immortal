@@ -9,6 +9,7 @@ export const STARTER_GU = [
   { guId: 'stoneSkin', icon: '🪨', key: 'stoneSkin' },
   { guId: 'healingDew', icon: '💧', key: 'healingDew' },
   { guId: 'beastCall', icon: '🐉', key: 'beastCall' },
+  { guId: 'spiritMoth', icon: '🦋', key: 'spiritMoth' },
 ];
 
 export const DEFAULT_STARTER_GU = 'swiftFang';
