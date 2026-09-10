@@ -1,11 +1,13 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { useGame } from '@/game/state/GameContext';
 import { useT } from '@/game/i18n/LangContext';
 import { GU_BY_ID } from '@/game/data/gu';
 import { PATH_BY_ID } from '@/game/data/paths';
 import { ROLES, rolesOf } from '@/game/data/roles';
-import { KM_BLUEPRINTS, blueprintMatches, BLUEPRINT_BY_ID } from '@/game/data/killerMoves';
+import { KM_BLUEPRINTS, blueprintMatches } from '@/game/data/killerMoves';
 import { canLead, kmPreview, kmResearchAvailable, maxSupportsOf, bindingOf } from '@/game/engine/killerMoves';
+import { BALANCE } from '@/game/config/balance';
+import ResonanceGame from './ResonanceGame';
 import { sfx } from '@/game/audio/sfx';
 
 // A compact selectable Gu chip (shared by core & support pickers).
@@ -35,6 +37,7 @@ export default function ResearchTab() {
   const { t } = useT();
   const [coreId, setCoreId] = useState(null);
   const [supportIds, setSupportIds] = useState([]);
+  const [resonance, setResonance] = useState(null); // experimentation minigame open
 
   const owned = state.ownedGu || [];
   if (!kmResearchAvailable(state)) {
@@ -62,17 +65,22 @@ export default function ResearchTab() {
   const supportInsts = supportIds.map(id => owned.find(g => g.instanceId === id)).filter(Boolean);
   const coreGu = coreInst ? GU_BY_ID[coreInst.guId] : null;
   // auto-pick the first owned blueprint that matches the current selection
-  const bp = useMemo(() => {
-    if (!coreGu || !supportInsts.length) return null;
-    return KM_BLUEPRINTS.find(b => state.killerMoves?.blueprints?.includes(b.id)
-      && blueprintMatches(b, coreGu, supportInsts.map(i => GU_BY_ID[i.guId]))) || null;
-  }, [coreId, supportIds.join(','), state.killerMoves?.blueprints?.length]);
+  const supportGus = supportInsts.map(i => GU_BY_ID[i.guId]);
+  const bp = coreGu && supportGus.length
+    ? KM_BLUEPRINTS.find(b => state.killerMoves?.blueprints?.includes(b.id) && blueprintMatches(b, coreGu, supportGus)) || null
+    : null;
 
   const pv = coreInst ? kmPreview(state, coreInst, supportInsts, bp) : null;
   const COMPAT_TONE = { excellent: 'text-emerald-300', good: 'text-lime-300', unstable: 'text-amber-300', poor: 'text-rose-300' };
 
   const canExperiment = pv?.ok && state.player.primevalEssence >= pv.researchCost.essence && state.player.spiritStones >= pv.researchCost.stones;
-  const experiment = () => { sfx('open'); dispatch({ type: 'KM_RESEARCH', coreId, supportIds, blueprintId: bp?.id || null }); };
+  // EXPERIMENT (#9): the resonance minigame first — its pulses raise the odds,
+  // never guarantee. Cancelling the minigame aborts the research cost-free.
+  const startExperiment = () => { sfx('open'); setResonance(true); };
+  const research = (bonus) => {
+    setResonance(null);
+    dispatch({ type: 'KM_RESEARCH', coreId, supportIds, blueprintId: bp?.id || null, minigameBonus: bonus || 0 });
+  };
 
   return (
     <div className="space-y-3">
@@ -119,6 +127,7 @@ export default function ResearchTab() {
           <div className="pt-1 border-t border-amber-900/40 text-[10px] text-stone-400 space-y-0.5">
             <div className="text-stone-300 font-semibold">{t('km.chance')}</div>
             <div>{t('km.chanceBase')}: {pv.chanceParts.base}% · {t('km.chanceMastery')}: +{pv.chanceParts.mastery}% · {t('km.chanceCompat')}: {pv.chanceParts.compat >= 0 ? '+' : ''}{pv.chanceParts.compat}%{pv.chanceParts.blueprint ? ` · ${t('km.chanceBlueprint')}: +${pv.chanceParts.blueprint}%` : ''}</div>
+            <div className="text-stone-400">{t('km.chanceMinigame', { n: BALANCE.killerMoves.minigameHits * BALANCE.killerMoves.minigameBonusPerHit })}</div>
             <div className="text-emerald-300">{t('km.chanceTotal')}: <b>{pv.chance}%</b></div>
           </div>
           {bp
@@ -127,7 +136,7 @@ export default function ResearchTab() {
           <div className="text-[10px] text-stone-400 pt-1">
             {t('km.researchCost')}: ⚡{pv.researchCost.essence} · ◉{pv.researchCost.stones}
           </div>
-          <button onClick={experiment} disabled={!canExperiment}
+          <button onClick={startExperiment} disabled={!canExperiment}
             className={`w-full py-2 mt-1 rounded-lg text-sm font-heading tracking-wide transition ${canExperiment ? 'bg-amber-600 hover:bg-amber-500 text-white' : 'bg-stone-800 text-stone-500 cursor-not-allowed'}`}>
             ⚡ {t('km.experiment')}
           </button>
@@ -138,6 +147,15 @@ export default function ResearchTab() {
       {pv && !pv.ok && (
         <div className="rounded-lg border border-rose-800/50 bg-rose-950/20 p-3 text-[11px] text-rose-200">
           {t(pv.reasonKey, pv.reasonParams)}
+        </div>
+      )}
+
+      {/* experimentation minigame (#9) — raises the odds, never guarantees */}
+      {resonance && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-3" onClick={() => setResonance(null)}>
+          <div className="w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+            <ResonanceGame onDone={research} onCancel={() => setResonance(null)} />
+          </div>
         </div>
       )}
     </div>

@@ -8,7 +8,7 @@ import { BALANCE } from '@/game/config/balance';
 // it never guarantees success.
 export default function ResonanceGame({ onDone, onCancel }) {
   const { t } = useT();
-  const ROUNDS = BALANCE.km.minigameHits;
+  const ROUNDS = BALANCE.killerMoves.minigameHits;
   const [round, setRound] = useState(0);
   const [hits, setHits] = useState(0);
   const [flash, setFlash] = useState(null); // 'hit' | 'miss'
@@ -23,7 +23,7 @@ export default function ResonanceGame({ onDone, onCancel }) {
     const loop = (now) => {
       const dt = now - prev;
       prev = now;
-      posRef.current = (posRef.current + dt * BALANCE.km.minigameSpeed) % 100;
+      posRef.current = (posRef.current + dt * BALANCE.killerMoves.minigameSpeed) % 100;
       setPos(posRef.current);
       raf = requestAnimationFrame(loop);
     };
@@ -49,7 +49,7 @@ export default function ResonanceGame({ onDone, onCancel }) {
     setTimeout(() => {
       setFlash(null);
       if (round + 1 >= ROUNDS) {
-        onDone(nextHits * BALANCE.km.minigameBonusPerHit);
+        onDone(nextHits * BALANCE.killerMoves.minigameBonusPerHit);
       } else {
         setRound(r => r + 1);
       }

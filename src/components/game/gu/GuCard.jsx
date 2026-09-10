@@ -10,6 +10,7 @@ import { effectiveCost } from '@/game/engine/combat';
 import { kmBoundOf, kmName } from '@/game/engine/killerMoves';
 import { proficiencyOf } from '@/game/engine/proficiency';
 import { HUNGER_META, foodOf, foodCount, feedingEstimate, guCondition } from '@/game/engine/guLife';
+import { bindingOf, kmNameOf } from '@/game/engine/killerMoves';
 import { effectSummary } from '../battle/BattleCommandMenu';
 import { sfx } from '@/game/audio/sfx';
 
@@ -21,6 +22,7 @@ export default function GuCard({ inst, equipped, onEquip, onUnequip, onRefine })
   const gu = GU_BY_ID[inst.guId];
   const path = PATH_BY_ID[gu.path];
   const cond = guCondition(state, inst);
+  const binding = bindingOf(state, inst.instanceId);
   const meta = HUNGER_META[cond.band];
   const food = foodOf(gu);
   const foodName = food ? (ITEM_BY_ID[food]?.name || food) : null;
@@ -77,6 +79,11 @@ export default function GuCard({ inst, equipped, onEquip, onUnequip, onRefine })
           : <button onClick={() => onEquip(inst.instanceId)} className="text-[10px] px-2 py-1 rounded bg-white/10 hover:bg-white/20 shrink-0">Equip</button>}
       </div>
 
+      {binding && (
+        <div className="text-[10px] mt-1.5 px-1.5 py-0.5 inline-block rounded border border-amber-700/50 bg-amber-900/20 text-amber-200">
+          ⚡ {t('km.bound')}: {kmNameOf(state, binding.move)}{binding.active ? '' : ` (${t('km.standby')})`}
+        </div>
+      )}
       <p className="text-[11px] text-stone-400 mt-1.5">{gu.description}</p>
       <div className="text-[10px] text-stone-500 mt-1.5 flex gap-3">
         <span>⚡ {effectiveCost(gu, state, inst)}{cond.costPct > 0 && <span className="text-amber-400"> (+hunger)</span>}</span>

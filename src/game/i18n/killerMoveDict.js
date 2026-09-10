@@ -3,6 +3,7 @@
 export const DICT_KM = {
   en: {
     'ui.killerMoves': 'Killer Moves',
+    'ui.km': 'Killer Moves',
     'km.subtitle': 'Bind a Core Gu with Support Gu into one devastating technique.',
     'km.tab.known': 'Known', 'km.tab.research': 'Research', 'km.tab.blueprints': 'Blueprints', 'km.tab.loadout': 'Loadout',
 
@@ -76,6 +77,12 @@ export const DICT_KM = {
     'km.errConflict': 'A component is already bound to another equipped Killer Move.',
     'km.equipIncomplete': 'Every component must be owned, equipped and not severely injured first.',
     'km.openHint': 'Open Killer Moves (K) from the menu to research one.',
+    'km.game.title': 'RESONANCE FUSION',
+    'km.game.round': 'Pulse {n}/{total}',
+    'km.game.hint': 'Strike ATTUNE while the pulse crosses the golden band — each hit steadies the fusion and raises your odds.',
+    'km.game.hit': 'Resonance locked in!',
+    'km.game.miss': 'The fusion shudders…',
+    'km.chanceMinigame': 'Minigame: pending — up to +{n}%',
     'tip.killerMoves.title': 'Killer Move Research',
     'tip.killerMoves.body': 'You now own enough Gu to begin experimenting with Killer Moves — advanced techniques combining a Core Gu with Support Gu. Open Killer Moves (K) from the menu bar.',
     'km.fallbackName': 'Forgotten Technique',
@@ -97,6 +104,7 @@ export const DICT_KM = {
 
   vi: {
     'ui.killerMoves': 'Sát Chiêu',
+    'ui.km': 'Sát Chiêu',
     'km.subtitle': 'Kết hợp Cổ Hạch Tâm với Cổ Phụ Trợ thành một tuyệt kỹ hủy diệt.',
     'km.tab.known': 'Đã Biết', 'km.tab.research': 'Nghiên Cứu', 'km.tab.blueprints': 'Thiết Kế', 'km.tab.loadout': 'Đội Hình',
 
@@ -166,6 +174,12 @@ export const DICT_KM = {
     'km.errConflict': 'Một thành phần đã kết với Sát Chiêu đang trang bị khác.',
     'km.equipIncomplete': 'Mọi thành phần phải còn đó, đang trang bị và không bị thương nặng.',
     'km.openHint': 'Mở Sát Chiêu (K) từ menu để nghiên cứu một chiêu.',
+    'km.game.title': 'CỘNG HƯỞNG HỢP NHẤT',
+    'km.game.round': 'Xung {n}/{total}',
+    'km.game.hint': 'Nhấn THÍCH ỨNG khi xung chạy qua dải vàng — mỗi lần trúng giúp quá trình hợp nhất ổn định và tăng cơ hội.',
+    'km.game.hit': 'Cộng hưởng đã khóa!',
+    'km.game.miss': 'Quá trình hợp nhất rung lắc…',
+    'km.chanceMinigame': 'Trò chơi: chờ — tối đa +{n}%',
     'tip.killerMoves.title': 'Nghiên Cứu Sát Chiêu',
     'tip.killerMoves.body': 'Bạn đã đủ Cổ Trùng để bắt đầu thí nghiệm Sát Chiêu — tuyệt kỹ kết hợp Cổ Hạch Tâm với Cổ Phụ Trợ. Mở Sát Chiêu (K) trên thanh menu.',
     'km.fallbackName': 'Tuyệt Kỹ Lãng Quên',

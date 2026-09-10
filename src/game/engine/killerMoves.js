@@ -19,6 +19,7 @@ import { masteryOf, grantMastery } from './mastery';
 import { guCondition } from './guLife';
 import { applyEffects } from './effects';
 import { totalGameMin } from './vitalGu';
+import { advanceTime } from './time';
 import { T, locGuName, locPathName } from '../i18n/tr';
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -44,6 +45,9 @@ export function kmResearchAvailable(state) {
   const owned = state.ownedGu || [];
   return owned.length >= 2 && owned.some(g => canLead(GU_BY_ID[g.guId]));
 }
+
+// UI alias — the GameScreen notification dot asks "can this player research?"
+export const kmCanResearch = kmResearchAvailable;
 
 export function kmSlotsOf(state) {
   const cfg = BALANCE.killerMoves;
@@ -296,7 +300,7 @@ export function kmActivationOf(combat, entry) {
 // One experiment per attempt: essence + stones spent, a visible chance, and a
 // guaranteed defined outcome. Failure never destroys Gu — only strain and a
 // short cooldown. Success creates the move and grants mastery.
-export function researchKillerMove(state, coreId, supportIds, blueprintId) {
+export function researchKillerMove(state, coreId, supportIds, blueprintId, minigameBonus = 0) {
   const cfg = BALANCE.killerMoves;
   let s = { ...state, killerMoves: state.killerMoves || kmSeed() };
   const km = s.killerMoves;
@@ -315,6 +319,8 @@ export function researchKillerMove(state, coreId, supportIds, blueprintId) {
   if (bp && !blueprintMatches(bp, coreGu, supportGus)) return { state, reason: T('km.errBpMismatch') };
   const pv = kmPreview(s, core, supports, bp);
   if (!pv.ok) return { state, reason: T(pv.reasonKey, pv.reasonParams) };
+  // the resonance minigame's attuned pulses raise the odds — never guarantee (#9)
+  if (minigameBonus > 0) pv.chance = clamp(pv.chance + minigameBonus, 10, 95);
   const p = s.player;
   if (p.primevalEssence < pv.researchCost.essence) return { state, reason: T('km.errEssence', { n: pv.researchCost.essence }) };
   if (p.spiritStones < pv.researchCost.stones) return { state, reason: T('km.errStones', { n: pv.researchCost.stones }) };
@@ -366,4 +372,83 @@ export function researchKillerMove(state, coreId, supportIds, blueprintId) {
   });
   s = { ...s, log: [...s.log, T('km.log.failed', { essence: pv.researchCost.essence, n: cfg.strainDays, chance: pv.chance })] };
   return { state: s, ok: false, pv };
+}
+
+// ---- Reducer delegation ----
+// gameReducer hands the KM_* actions here; every branch performs the action
+// or explains the refusal — never a silent no-op (#51).
+const kmBlocked = (s) => !!(s.combat || s.recovery || s.pendingEvent || s.dialogue || s.sleeping || s.wildEncounter);
+
+export function kmAction(state, action) {
+  switch (action.type) {
+    case 'KM_SEEN':
+      return { ...state, killerMoves: { ...(state.killerMoves || kmSeed()), seen: true } };
+    case 'KM_RESEARCH': {
+      if (kmBlocked(state)) return state;
+      const res = researchKillerMove(state, action.coreId, action.supportIds, action.blueprintId, action.minigameBonus || 0);
+      if (res.state === state) {
+        // blocked: costs, cooldown, strain or an invalid combination — say why
+        return pushToast({ ...state, log: [...state.log, T('km.log.blocked', { reason: res.reason })] },
+          { icon: '⚗️', title: T('km.toast.blocked'), lines: [res.reason] });
+      }
+      return advanceTime(res.state, BALANCE.time.refineMinutes);
+    }
+    case 'KM_EQUIP': {
+      if (state.combat || state.recovery) return state;
+      const km = state.killerMoves || kmSeed();
+      const move = (km.known || []).find(m => m.id === action.moveId);
+      if (!move) return state;
+      if (!moveStatus(state, move).complete) {
+        return pushToast({ ...state, log: [...state.log, T('km.equipIncomplete')] },
+          { icon: '⚡', title: T('km.toast.equipBlocked'), lines: [T('km.equipIncomplete')] });
+      }
+      const slots = kmSlotsOf(state);
+      const loadout = [...(km.loadout || [null, null, null])];
+      while (loadout.length < 3) loadout.push(null);
+      // a component can serve only one equipped technique at a time (#32)
+      const comp = new Set([move.coreId, ...(move.supportIds || [])]);
+      for (let i = 0; i < loadout.length; i++) {
+        const other = loadout[i] && (km.known || []).find(m => m.id === loadout[i]);
+        if (other && [other.coreId, ...(other.supportIds || [])].some(id => comp.has(id))) {
+          return pushToast({ ...state, log: [...state.log, T('km.errConflict')] },
+            { icon: '⚡', title: T('km.toast.equipBlocked'), lines: [T('km.errConflict')] });
+        }
+      }
+      const idx = loadout.slice(0, slots).indexOf(null);
+      if (idx < 0) {
+        return pushToast({ ...state, log: [...state.log, T('km.errNoSlots')] },
+          { icon: '⚡', title: T('km.toast.equipBlocked'), lines: [T('km.errNoSlots')] });
+      }
+      loadout[idx] = move.id;
+      return { ...state, killerMoves: { ...km, loadout }, log: [...state.log, T('km.log.equipped', { name: kmNameOf(state, move) })] };
+    }
+    case 'KM_UNEQUIP': {
+      const km = state.killerMoves || kmSeed();
+      const loadout = [...(km.loadout || [null, null, null])];
+      const id = loadout[action.slot];
+      if (id == null) return state;
+      loadout[action.slot] = null;
+      const move = (km.known || []).find(m => m.id === id);
+      return { ...state, killerMoves: { ...km, loadout }, log: [...state.log, T('km.log.unequipped', { name: move ? kmNameOf(state, move) : '?' })] };
+    }
+    case 'KM_DISMANTLE': {
+      if (state.combat || state.recovery) return state;
+      const km = state.killerMoves || kmSeed();
+      const move = (km.known || []).find(m => m.id === action.moveId);
+      if (!move) return state;
+      // unbinding frees every component Gu for normal use — nothing is destroyed (#15)
+      const name = kmNameOf(state, move);
+      return {
+        ...state,
+        killerMoves: {
+          ...km,
+          known: km.known.filter(m => m.id !== move.id),
+          loadout: (km.loadout || []).map(id => id === move.id ? null : id),
+        },
+        log: [...state.log, T('km.log.dismantled', { name })],
+      };
+    }
+    default:
+      return undefined;
+  }
 }

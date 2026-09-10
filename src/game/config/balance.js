@@ -309,6 +309,10 @@ export const BALANCE = {
     slotsAtRank: 1,         // p.rank >= 1 unlocks the 3rd slot
     // complexity is mastery-gated (#21): max SUPPORT Gu by core-path level
     maxSupportsByMastery: { 1: 1, 2: 1, 3: 2, 4: 3, 5: 4 },
+    // resonance minigame (#9): each band hit adds research chance — never a guarantee
+    minigameHits: 3,
+    minigameSpeed: 0.045,       // bar %/ms (one sweep ≈ 2.2s)
+    minigameBonusPerHit: 8,     // % research success per attuned pulse
   },
 };
 

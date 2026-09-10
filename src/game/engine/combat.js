@@ -45,6 +45,7 @@ import { planIntent } from './intent';
 import { terrainModsOf, TERRAIN_LABELS } from '../data/terrain';
 import { LEADER_DOWN } from '../data/packs';
 import { resolveTargets, targetKindOf } from './targeting';
+import { kmCombatEntry, kmActivationOf, kmCdKey } from './killerMoves';
 import { strengthFxOf, strengthLevelOf, forceOf } from './strength';
 import { T, TL, locGuName, locEnemyName, locPathName, locItemName, locTerrainLabel } from '../i18n/tr';
 
@@ -766,6 +767,7 @@ function finishVictory(state, combat, player, pending) {
   let spiritStones = 0, progress = 0, insight = 0;
   const killed = [];
   const droppedRecipes = [];
+  const droppedBlueprints = [];
   const icfg = BALANCE.insight;
   const b = { ...(state.bestiary || {}) };
   for (const en of combat.enemies) {
@@ -778,6 +780,9 @@ function finishVictory(state, combat, player, pending) {
     for (const d of def.recipeDrops || []) {
       if (Math.random() * 100 < (d.chance || 100)) droppedRecipes.push(d.recipeId);
     }
+    for (const d of def.kmDrops || []) {
+      if (Math.random() * 100 < (d.chance || 100) && !droppedBlueprints.includes(d.blueprintId)) droppedBlueprints.push(d.blueprintId);
+    }
     spiritStones += Math.floor(en.maxHp / 4) + Math.floor(Math.random() * 5);
     progress += BALANCE.combat.victoryProgress + Math.floor(en.maxHp / 40);
     const kills = state.bestiary?.[def.id]?.kills || 0;
@@ -786,7 +791,7 @@ function finishVictory(state, combat, player, pending) {
     const rec = b[def.id] || { seen: 0, kills: 0 };
     b[def.id] = { ...rec, kills: rec.kills + 1 };
   }
-  let s = { ...state, player, combat: { ...combat, over: true, result: 'victory', killed, rewards: { items, spiritStones, progress, insight, mastery: [] } } };
+  let s = { ...state, player, combat: { ...combat, over: true, result: 'victory', killed, rewards: { items, spiritStones, progress, insight, mastery: [], blueprints: droppedBlueprints } } };
   s = applyEffects(s, { items, spiritStones, progress, insight, recipes: droppedRecipes, message: T('cmt.victory', { stones: spiritStones, progress }) });
   s = { ...s, bestiary: b };
   const masteryGains = [];
@@ -1134,6 +1139,49 @@ function executeRoundInner(state, action, hpBefore) {
         if (xp > 0) {
           push(T('cmt.masteryGain', { icon: PATH_BY_ID[pseudo.path].icon, path: locPathName(PATH_BY_ID[pseudo.path]), xp }));
           pending.push({ pathId: pseudo.path, xp });
+        }
+      }
+    }
+  }
+
+  // KILLER MOVE (Sát Chiêu) — a researched technique from the battle loadout.
+  // Only equipped, complete moves resolve; the activation roll uses mastery,
+  // component condition, Focus and the broken-enemy opening. A failed
+  // activation still spends essence and the cooldown — power has a price.
+  if (action.type === 'km') {
+    const move = (state.killerMoves?.known || []).find(m => m.id === action.moveId);
+    const entry = move ? kmCombatEntry(state, move) : null;
+    if (!entry) { push(T('cmt.kmIncomplete')); return { ...state, combat: { ...combat, log } }; }
+    const cdKey = kmCdKey(move);
+    if ((cooldowns[cdKey] || 0) > 0) { push(T('cmt.cd', { gu: entry.gu.name })); return { ...state, combat: { ...combat, log } }; }
+    if (player.primevalEssence < entry.gu.energyCost) { push(T('cmt.noEssence')); return { ...state, combat: { ...combat, log } }; }
+    player.primevalEssence -= entry.gu.energyCost;
+    cooldowns[cdKey] = entry.gu.cooldown;
+    if (Math.random() * 100 > kmActivationOf(combat, entry)) {
+      push(T('cmt.killerFail', { gu: entry.gu.name }));
+    } else {
+      const fx = bonusOf(state, entry.corePath);
+      const tlist = resolveTargets(combat, entry.gu, target.uid);
+      let meaningful = false;
+      tlist.forEach((tt, i) => {
+        const foe = enemies.find(e => e.uid === tt.e.uid);
+        if (!foe || foe.hp <= 0) return;
+        const kind = targetKindOf(entry.gu);
+        if (kind === 'chain' && i > 0) push(T('cmt.chainLeap', { enemy: dispOf(foe) }));
+        if (kind === 'cleave' && i > 0) push(T('cmt.cleaveHit', { enemy: dispOf(foe) }));
+        const m = applyGu(entry.gu, player, foe, pSt, foe.statuses, combat, push, fx, syn, weather,
+          entry.effMul * tt.mul, { selfFx: i === 0, procMul: tt.sec ? 0.6 : 1 });
+        if (m) meaningful = true;
+      });
+      if (meaningful) {
+        combat.contributed[entry.corePath] = true;
+        const uses = (combat.masteryUses[cdKey] || 0) + 1;
+        combat.masteryUses[cdKey] = uses;
+        const decay = BALANCE.mastery.repeatDecay[Math.min(uses - 1, BALANCE.mastery.repeatDecay.length - 1)];
+        const xp = Math.round(BALANCE.mastery.xpCombatUse * decay);
+        if (xp > 0) {
+          push(T('cmt.masteryGain', { icon: PATH_BY_ID[entry.corePath].icon, path: locPathName(PATH_BY_ID[entry.corePath]), xp }));
+          pending.push({ pathId: entry.corePath, xp });
         }
       }
     }

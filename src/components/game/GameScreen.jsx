@@ -139,7 +139,7 @@ export default function GameScreen() {
       <ScoutReport />
       <HazardBadge />
       <MiniMap />
-      <Hotbar active={panel} notify={kmCanResearch(state) && !state.tutorial?.active ? ['km'] : []} onSelect={(id) => (id === 'dashboard' ? setDashOpen(true) : openPanel(id))} onPause={() => setPaused(true)} />
+      <Hotbar active={panel} notify={kmCanResearch(state) && !state.tutorial?.active && !state.killerMoves?.seen ? ['km'] : []} onSelect={(id) => (id === 'dashboard' ? setDashOpen(true) : openPanel(id))} onPause={() => setPaused(true)} />
 
       {/* in-game panel overlays (world stays visible underneath) */}
       {panel && (
