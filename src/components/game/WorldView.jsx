@@ -110,6 +110,9 @@ export default function WorldView({ paused, inputLocked }) {
 
   // keyboard: held keys give smooth continuous movement (diagonals supported);
   // E interacts once per press.
+  const isLocked = (s) => propsRef.current.inputLocked || propsRef.current.paused
+    || s.combat || s.pendingEvent || s.dialogue || s.recovery || s.sleeping || s.deceased || s.wildEncounter;
+
   useEffect(() => {
     const DIR_KEYS = ['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'];
     const onDown = (e) => {
@@ -118,9 +121,18 @@ export default function WorldView({ paused, inputLocked }) {
       if (DIR_KEYS.includes(k)) {
         e.preventDefault();
         keysRef.current.add(k);
-        // a fresh press moves on the very next frame — a quick tap shorter
-        // than the hold-gate must not be swallowed silently
-        if (!e.repeat) stepRef.current.acc = Infinity;
+        // a fresh press takes its first step IMMEDIATELY — movement must never
+        // depend on the render loop ticking (throttled/headless environments
+        // can stall requestAnimationFrame while keys still arrive)
+        if (!e.repeat && !isLocked(stateRef.current)) {
+          const keys = keysRef.current;
+          const dx = (keys.has('d') || keys.has('arrowright') ? 1 : 0) - (keys.has('a') || keys.has('arrowleft') ? 1 : 0);
+          const dy = (keys.has('s') || keys.has('arrowdown') ? 1 : 0) - (keys.has('w') || keys.has('arrowup') ? 1 : 0);
+          if (dx || dy) {
+            dispatchRef.current({ type: 'MOVE', dx, dy });
+            stepRef.current.acc = 0;
+          }
+        }
       }
       else if ((k === 'e' || k === ' ' || k === 'enter') && !e.repeat) { e.preventDefault(); interactRef.current(); }
     };
