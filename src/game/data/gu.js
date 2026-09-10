@@ -76,6 +76,7 @@ export const GU = [
     description: 'Roots you to the earth and raises a barrier that absorbs damage.',
     energyCost: 7, cooldown: 3,
     effect: { barrier: { power: 14, duration: 2 } },
+    explore: { kind: 'sense', essence: 4, cooldown: 25, duration: 12, radius: 7 },
   },
   {
     id: 'mountainGuard', name: 'Mountain Guard Gu', rank: 2, type: 'Defense', path: 'earth', element: 'earth', rarity: 'rare',
@@ -179,6 +180,7 @@ export const GU = [
     description: 'A low call that binds a tamed beast to your will for a short pact.',
     energyCost: 5, cooldown: 3,
     effect: { summon: { power: 4, duration: 3 } },
+    explore: { kind: 'vision', essence: 4, cooldown: 25, duration: 12, radius: 7 },
   },
   // ---- Sword (unlocked only by Master Jian) ----
   {

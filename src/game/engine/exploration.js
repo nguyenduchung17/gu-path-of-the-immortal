@@ -9,7 +9,7 @@ import { BALANCE } from '../config/balance';
 import { totalGameMin } from './vitalGu';
 import { grantMastery } from './mastery';
 import { revealFog } from './guLife';
-import { WORLD_RESOURCES, WORLD, HIDDEN_PATHS, HAZARDS, hazardAt } from '../data/world';
+import { WORLD_RESOURCES, WORLD, HIDDEN_PATHS, HAZARDS, hazardAt, LANDMARKS } from '../data/world';
 
 const cheb = (ax, ay, bx, by) => Math.max(Math.abs(ax - bx), Math.abs(ay - by));
 
@@ -189,10 +189,21 @@ export function applyExploreGu(state, inst) {
     const r = ex.radius || 9;
     let s = revealFog(state, p.x, p.y, r);
     const foes = (s.worldState.enemies || []).filter(e => !e.dead && cheb(e.x, e.y, p.x, p.y) <= r);
-    if (foes.length) s = grantMastery(s, gu.path, BALANCE.exploration.masteryXp, 'guUsed', 'guUse');
+    // hidden places — caves, springs, lairs — are charted on the map for good
+    const knownLm = s.worldState.discovered?.landmarks || {};
+    const foundLm = LANDMARKS.filter(lm => lm.hidden && !knownLm[lm.id]
+      && Math.max(Math.abs(lm.x - p.x), Math.abs(lm.y - p.y)) <= r);
+    if (foundLm.length) {
+      s = { ...s, worldState: { ...s.worldState, discovered: { ...s.worldState.discovered, landmarks: { ...knownLm, ...Object.fromEntries(foundLm.map(l => [l.id, true])) } } } };
+    }
+    if (foes.length || foundLm.length) s = grantMastery(s, gu.path, BALANCE.exploration.masteryXp, 'guUsed', 'guUse');
     const out = spend(s, { vision: { until, radius: r } }, {
       icon: '👁️', title: 'SCOUTING',
-      lines: [`The wilds within ${r} paces are laid bare.`, foes.length ? `${foes.length} threat(s) revealed — details on the left.` : 'No threats within sight.'],
+      lines: [
+        `The wilds within ${r} paces are laid bare.`,
+        foes.length ? `${foes.length} threat(s) revealed — details on the left.` : 'No threats within sight.',
+        ...(foundLm.length ? [`🗺️ ${foundLm.length} hidden place(s) charted on your map.`] : []),
+      ],
     });
     out.state = checkHiddenPaths(out.state);
     return out;
@@ -208,7 +219,9 @@ export function applyExploreGu(state, inst) {
     if (near.length) s = grantMastery(s, gu.path, BALANCE.exploration.masteryXp, 'guUsed', 'guUse');
     const out = spend(s, { sense: { until } }, {
       icon: '🦋', title: 'RESOURCE SENSE',
-      lines: near.length ? Object.entries(byName).map(([name, n]) => `${n}× ${name} within ${r} paces`) : [`Nothing of use within ${r} paces.`],
+      lines: near.length
+        ? [...Object.entries(byName).map(([name, n]) => `${n}× ${name} within ${r} paces`), ...(near.some(n => n.rare) ? ['✨ A rare harvest hides among them.'] : [])]
+        : [`Nothing of use within ${r} paces.`],
     });
     out.state = checkHiddenPaths(out.state);
     return out;
