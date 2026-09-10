@@ -18,6 +18,9 @@ export const ITEMS = [
   { id: 'mistHeart', name: 'Mist Heart', category: 'materials', rarity: 'rare', description: 'The still heart of the Mist Devourer, heavy with centuries of essence.', value: 60 },
   { id: 'wardenCore', name: 'Warden Core', category: 'materials', rarity: 'rare', description: 'A rune-carved core pried from the Ruin Warden\u2019s chest.', value: 70 },
   { id: 'dreadMarrow', name: 'Dread Marrow', category: 'materials', rarity: 'rare', description: 'Marrow drawn from the Dread Matriarch, thrumming with venom and shadow.', value: 65 },
+  // Rare wild harvests — invisible to mundane gathering; only a sensing Gu reveals them
+  { id: 'moonSilver', name: 'Moon Silver', category: 'materials', rarity: 'rare', description: 'Metal that blooms like a flower under moonlight — found only where a sensing Gu can feel it.', value: 55 },
+  { id: 'voidLotus', name: 'Void Lotus', category: 'materials', rarity: 'rare', description: 'A lotus that grows in poison and drinks the miasma dry. Hidden from mundane eyes.', value: 65 },
   // Medicine
   { id: 'medicine', name: 'Healing Salve', category: 'medicine', description: 'Restores 25 HP.', value: 15, combatUsable: true, use: { hp: 25 } },
   { id: 'healingPill', name: 'Greater Healing Pill', category: 'medicine', description: 'Restores 55 HP.', value: 35, combatUsable: true, use: { hp: 55 } },

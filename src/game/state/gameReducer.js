@@ -25,7 +25,7 @@ import { essenceCapFor, cultivateMulOf, normalizeAptitude, rollAptitudeScore, ro
 import { starterGuOf } from '../data/starterGu';
 import { SPECIES_BY_ID, wildCombatDef, captureChanceOf, initialWildGu } from '../data/wildGu';
 import { revealFog, seedFog, foodOf } from '../engine/guLife';
-import { applyExploreGu, carryIntoCombat, visionRadiusOf } from '../engine/exploration';
+import { applyExploreGu, carryIntoCombat, visionRadiusOf, checkHiddenPaths, hazardStep, moveOverride, exploreActive } from '../engine/exploration';
 import { startInstability } from '../engine/vitalGu';
 import { QS, acceptQuest, turnInQuest, toggleTrack, abandonQuest, applyQuestEvent, emptyQuests, markDiscovered } from '../engine/questEngine';
 
@@ -67,7 +67,7 @@ export function createNewGame(name, gender, age, difficulty, slot, appearance, a
     reputation: { villagers: 0, merchants: 0, sect: 0, blackMarket: 0 },
     worldState: {
       gathered: {},
-      discovered: { zones: { greenValleyTown: true }, landmarks: { townGate: true, teleportFormation: true }, inns: { townInn: true } },
+      discovered: { zones: { greenValleyTown: true }, landmarks: { townGate: true, teleportFormation: true }, inns: { townInn: true }, paths: {} },
       enemies: initialEnemies(),
       wildGu: initialWildGu(),
       fog: seedFog(42, 44, 6),
@@ -264,7 +264,14 @@ export function gameReducer(state, action) {
       if (busy(state)) return state;
       const p = state.player;
       const nx = p.x + action.dx, ny = p.y + action.dy;
-      if (!isWalkable(nx, ny)) return state;
+      let passNote = null;
+      if (!isWalkable(nx, ny)) {
+        // secret passages & hazard crossings — exploration Gu open the way
+        const ov = moveOverride(state, nx, ny);
+        if (!ov) return state;
+        if (ov.blocked) return { ...state, log: [...state.log, ov.blocked] };
+        passNote = ov.reason;
+      }
       const facing = action.dx === 1 ? 'right' : action.dx === -1 ? 'left' : action.dy === 1 ? 'down' : 'up';
       let s = revealFog(advanceTime({ ...state, player: { ...p, x: nx, y: ny, facing } }, BALANCE.time.moveMinutes), nx, ny, visionRadiusOf(state));
 
@@ -289,7 +296,10 @@ export function gameReducer(state, action) {
         s = pushToast(s, { icon: '📍', title: 'Discovered', lines: [newLm.name] });
         logAdd.push(`Discovered: ${newLm.name}.`);
       }
+      if (passNote) logAdd.push(passNote);
       if (logAdd.length) s = { ...s, log: [...s.log, ...logAdd] };
+      s = checkHiddenPaths(s);
+      s = hazardStep(s);
 
       // hidden masters reveal themselves when you come near — no map markers
       let masterFound = null;
@@ -324,6 +334,10 @@ export function gameReducer(state, action) {
       if (!node) return state;
       const last = state.worldState.gathered[node.id] || 0;
       if (Date.now() - last < BALANCE.world.gatherRespawnMs) return state;
+      // rare harvests hide their essence — only a sensing Gu can gather them
+      if (node.rare && !exploreActive(state).sense) {
+        return { ...state, log: [...state.log, `${node.name} eludes your grasp — its essence hides from mundane senses. A sensing Gu could reveal it.`] };
+      }
       const nightBonus = phaseOf((state.time || {}).min) === 'night' ? (BALANCE.time.nightGatherBonus[node.type] || 0) : 0;
       const qty = 1 + nightBonus + gatherBonus(state) + (Math.random() < state.player.perception * 0.01 ? 1 : 0);
       let s = applyEffects(state, { items: { [node.type]: qty }, message: `Gathered ${qty} ${node.name}.` });

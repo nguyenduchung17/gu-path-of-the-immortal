@@ -9,7 +9,7 @@ import { BALANCE } from '../config/balance';
 import { totalGameMin } from './vitalGu';
 import { grantMastery } from './mastery';
 import { revealFog } from './guLife';
-import { WORLD_RESOURCES } from '../data/world';
+import { WORLD_RESOURCES, WORLD, HIDDEN_PATHS, HAZARDS, hazardAt } from '../data/world';
 
 const cheb = (ax, ay, bx, by) => Math.max(Math.abs(ax - bx), Math.abs(ay - by));
 
@@ -18,7 +18,7 @@ export function exploreActive(state) {
   const fx = state.exploreFx || {};
   const now = totalGameMin(state.time);
   const out = {};
-  for (const k of ['vision', 'stealth', 'haste', 'sense']) {
+  for (const k of ['vision', 'stealth', 'haste', 'sense', 'waterwalk']) {
     if (fx[k] && fx[k].until > now) out[k] = fx[k];
   }
   return out;
@@ -54,6 +54,63 @@ function nearestEnemy(state, range) {
     if (d <= range && d < bestD) { best = e; bestD = d; }
   }
   return best;
+}
+
+// Secret passages: while a perception Gu (vision/sense) is active, any
+// undiscovered hidden path near the player reveals itself — permanently.
+export function checkHiddenPaths(s) {
+  const act = exploreActive(s);
+  if (!act.vision && !act.sense) return s;
+  const p = s.player;
+  const known = s.worldState.discovered?.paths || {};
+  let found = null;
+  for (const hp of HIDDEN_PATHS) {
+    if (known[hp.id]) continue;
+    if (Math.max(Math.abs(hp.x - p.x), Math.abs(hp.y - p.y)) <= hp.r) { found = hp; break; }
+  }
+  if (!found) return s;
+  return {
+    ...s,
+    worldState: { ...s.worldState, discovered: { ...s.worldState.discovered, paths: { ...known, [found.id]: true } } },
+    log: [...s.log, `${found.name} revealed — the way is permanently open to you.`],
+    toasts: [...(s.toasts || []), { id: `hp${Date.now().toString(36)}`, icon: '🌀', title: 'HIDDEN PATH REVEALED', lines: [found.name, 'A secret way opens before you.'] }],
+  };
+}
+
+// Passability override for blocked cells: revealed secret passages ('P')
+// and the rapids under a waterwalk binding. Returns { reason } to pass,
+// { blocked } with a hint message, or null for a normal wall.
+export function moveOverride(state, nx, ny) {
+  const row = WORLD.tiles[ny];
+  const tile = row ? row[nx] : null;
+  if (tile === 'P') {
+    const hp = HIDDEN_PATHS.find(p => p.cells.some(([cx, cy]) => cx === nx && cy === ny));
+    const known = state.worldState.discovered?.paths || {};
+    if (hp && known[hp.id]) return { reason: `You follow ${hp.name}.` };
+    if (hp) return { blocked: 'Something is hidden here — a scouting Gu might reveal the way.' };
+    return null;
+  }
+  const hz = hazardAt(nx, ny);
+  if (hz?.kind === 'rapids') {
+    if (exploreActive(state).waterwalk) return { reason: 'Tide Binding stills the raging water — you cross.' };
+    return { blocked: 'The Raging Rapids churn — nothing crosses. Perhaps a binding could still the waters…' };
+  }
+  return null;
+}
+
+// After stepping: miasma burns unprotected lungs; Mist Veil filters it whole.
+export function hazardStep(s) {
+  const hz = hazardAt(s.player.x, s.player.y);
+  if (!hz || hz.kind !== 'miasma') return s;
+  if (exploreActive(s).stealth) {
+    return { ...s, log: [...s.log, 'Mist Veil shrouds you — the miasma slides past harmlessly.'] };
+  }
+  const dmg = BALANCE.exploration.hazardDmg;
+  return {
+    ...s,
+    player: { ...s.player, hp: Math.max(1, s.player.hp - dmg) },
+    log: [...s.log, `Poison miasma sears your lungs! (-${dmg} HP)`],
+  };
 }
 
 // What a battle inherits from exploration prep: lingering enemy control
@@ -98,7 +155,18 @@ export function applyExploreGu(state, inst) {
   // ---- control: root / slow the nearest enemy in range (partial resist on elites/bosses) ----
   if (ex.kind === 'root' || ex.kind === 'slow') {
     const e = nearestEnemy(state, ex.range || BALANCE.exploration.range);
-    if (!e) return { state, ok: false, reason: `No enemy within ${ex.range || BALANCE.exploration.range} paces.` };
+    if (!e) {
+      // no foe to bind — a water Gu can instead still the Raging Rapids
+      const nearRapids = ex.kind === 'root'
+        && HAZARDS.some(h => h.kind === 'rapids'
+          && h.cells.some(([cx, cy]) => cheb(cx, cy, p.x, p.y) <= 2));
+      if (!nearRapids) return { state, ok: false, reason: `No enemy within ${ex.range || BALANCE.exploration.range} paces.` };
+      let s = grantMastery(state, gu.path, BALANCE.exploration.masteryXp, 'guUsed', 'guUse');
+      return spend(s, { waterwalk: { until } }, {
+        icon: '⛓️', title: 'WATERS BOUND',
+        lines: [`${gu.name} grips the torrent — the rapids calm for ${ex.duration} min.`, 'Cross while the binding holds!'],
+      });
+    }
     const def = ENEMY_BY_ID[e.defId];
     const dur = Math.max(1, Math.round(ex.duration * resistFactor(def)));
     const enemies = (state.worldState.enemies || []).map(x => x.id !== e.id ? x : {
@@ -122,10 +190,12 @@ export function applyExploreGu(state, inst) {
     let s = revealFog(state, p.x, p.y, r);
     const foes = (s.worldState.enemies || []).filter(e => !e.dead && cheb(e.x, e.y, p.x, p.y) <= r);
     if (foes.length) s = grantMastery(s, gu.path, BALANCE.exploration.masteryXp, 'guUsed', 'guUse');
-    return spend(s, { vision: { until, radius: r } }, {
+    const out = spend(s, { vision: { until, radius: r } }, {
       icon: '👁️', title: 'SCOUTING',
       lines: [`The wilds within ${r} paces are laid bare.`, foes.length ? `${foes.length} threat(s) revealed — details on the left.` : 'No threats within sight.'],
     });
+    out.state = checkHiddenPaths(out.state);
+    return out;
   }
 
   // ---- resource sense: feel gathering nodes through the earth ----
@@ -136,10 +206,12 @@ export function applyExploreGu(state, inst) {
     for (const n of near) byName[n.name] = (byName[n.name] || 0) + 1;
     let s = revealFog(state, p.x, p.y, r);
     if (near.length) s = grantMastery(s, gu.path, BALANCE.exploration.masteryXp, 'guUsed', 'guUse');
-    return spend(s, { sense: { until } }, {
+    const out = spend(s, { sense: { until } }, {
       icon: '🦋', title: 'RESOURCE SENSE',
       lines: near.length ? Object.entries(byName).map(([name, n]) => `${n}× ${name} within ${r} paces`) : [`Nothing of use within ${r} paces.`],
     });
+    out.state = checkHiddenPaths(out.state);
+    return out;
   }
 
   // ---- stealth: enemies notice you far less (sneak past, break chases) ----

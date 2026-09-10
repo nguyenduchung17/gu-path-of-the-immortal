@@ -135,8 +135,33 @@ export const RESOURCES = [
   { id: 'm3', x: 76, y: 53, type: 'serpentGland', name: 'Serpent Gland' },
   { id: 'cave1', x: 8, y: 47, type: 'ironOre', name: 'Cave Cache' },
   { id: 'spring1', x: 12, y: 23, type: 'moonPetal', name: 'Spring-Touched Moon Petal' },
+  // Rare harvests — the essence hides from mundane senses; Spirit Moth's sense reveals them
+  { id: 'rn1', x: 8, y: 41, type: 'moonSilver', name: 'Moon Silver Bloom', rare: true },
+  { id: 'rn2', x: 73, y: 51, type: 'voidLotus', name: 'Void Lotus Pool', rare: true },
 ];
 export const WORLD_RESOURCES = RESOURCES;
+
+// Secret passages — river crossings walled off until a scouting Gu's
+// perception reveals them. 'P' tiles stay impassable to enemies forever;
+// for the player they open permanently once discovered.paths[id] is set.
+export const HIDDEN_PATHS = [
+  { id: 'stones', name: "Serpent's Stepping Stones", x: 26, y: 30, r: 3, cells: [[26, 30], [27, 30]] },
+  { id: 'moonFord', name: 'Moonlit Ford', x: 26, y: 10, r: 3, cells: [[26, 10], [27, 10]] },
+];
+
+// Environmental hazards — crossable only with the right exploration Gu.
+// The rapids need Tide Binding's water-stilling; the miasma sears
+// unprotected lungs but Mist Veil's shroud filters it entirely.
+export const HAZARDS = [
+  { id: 'rapids', name: 'Raging Rapids', kind: 'rapids', bypassKind: 'waterwalk', cells: [[26, 50], [27, 50]] },
+  { id: 'miasma', name: 'Poison Miasma', kind: 'miasma', bypassKind: 'stealth', rect: { x: 58, y: 49, w: 6, h: 3 } },
+];
+const HAZARD_CELL = new Map();
+for (const h of HAZARDS) {
+  if (h.cells) for (const [x, y] of h.cells) HAZARD_CELL.set(`${x},${y}`, h);
+  else for (let j = 0; j < h.rect.h; j++) for (let i = 0; i < h.rect.w; i++) HAZARD_CELL.set(`${h.rect.x + i},${h.rect.y + j}`, h);
+}
+export function hazardAt(x, y) { return HAZARD_CELL.get(`${x},${y}`) || null; }
 
 // Visible world enemies — behaviour drives detection radius and aggression.
 // detect: optional per-spawn override of the behaviour default.
@@ -267,6 +292,12 @@ function buildTiles() {
   RESOURCES.forEach(r => protect(r.x, r.y));
   INITIAL_ENEMIES.forEach(e => protect(e.x, e.y));
   WILD_GU_SPAWNS.forEach(w => protect(w.x, w.y));
+  // secret-passage mouths and hazard approaches stay clear of scatter
+  HIDDEN_PATHS.forEach(hp => hp.cells.forEach(([x, y]) => protect(x, y)));
+  HAZARDS.forEach(hz => {
+    if (hz.cells) hz.cells.forEach(([x, y]) => protect(x, y));
+    else for (let j = 0; j < hz.rect.h; j++) for (let i = 0; i < hz.rect.w; i++) protect(hz.rect.x + i, hz.rect.y + j);
+  });
   // never scatter trees over hidden masters' spots
   Object.values(NPC_POSITIONS).forEach(([x, y]) => protect(x, y));
   const rng = mulberry32(20260910);
@@ -283,6 +314,8 @@ function buildTiles() {
       else if (r < rocks + (TREE_DENSITY[z.id] || 0)) set(x, y, 'T');
     }
   }
+  // secret passages — blocked ('P') until a scouting Gu reveals them
+  HIDDEN_PATHS.forEach(hp => hp.cells.forEach(([x, y]) => set(x, y, 'P')));
   // world border
   rect(0, 0, W, 2, 'T'); rect(0, H - 2, W, 2, 'T');
   rect(0, 0, 2, H, 'T'); rect(W - 2, 0, 2, H, 'T');
@@ -296,7 +329,7 @@ export const WORLD = {
   tiles: buildTiles(),
 };
 
-const BLOCKED = new Set(['T', '~', '#', 'W', 'R', 's']);
+const BLOCKED = new Set(['T', '~', '#', 'W', 'R', 's', 'P']);
 export function isWalkable(x, y) {
   if (x < 0 || y < 0 || x >= W || y >= H) return false;
   return !BLOCKED.has(WORLD.tiles[y][x]);
