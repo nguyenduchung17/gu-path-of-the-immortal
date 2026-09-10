@@ -62,5 +62,5 @@ export const TIP_DEFS = [
 
 export const CODEX_TOPICS = [
   'essence', 'cultivation', 'aptitude', 'gu', 'vitalGu', 'paths',
-  'killerMove', 'refinement', 'hunger', 'death', 'fog', 'scouting', 'wildGu', 'contribution',
+  'killerMove', 'kmCreate', 'refinement', 'hunger', 'death', 'fog', 'scouting', 'wildGu', 'contribution',
 ];

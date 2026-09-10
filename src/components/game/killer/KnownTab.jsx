@@ -1,6 +1,7 @@
 import React from 'react';
 import { useGame } from '@/game/state/GameContext';
 import { useT } from '@/game/i18n/LangContext';
+// Canonical card for discovered Killer Moves.
 import KmMoveCard from './KmMoveCard';
 
 // KNOWN tab — every discovered technique with live stats and actions

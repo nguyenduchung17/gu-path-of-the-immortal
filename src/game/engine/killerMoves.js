@@ -452,3 +452,75 @@ export function kmAction(state, action) {
       return undefined;
   }
 }
+
+// Compatibility aliases for earlier UI names retained by hot-reloaded builds.
+// They delegate to the canonical live-derived implementation above.
+export const kmState = (state) => state?.killerMoves || kmSeed();
+export const kmUnlocked = kmResearchAvailable;
+export const kmMaxTotal = (state, path) => {
+  const core = (state?.ownedGu || []).map(i => GU_BY_ID[i.guId]).find(g => g?.path === path && canLead(g));
+  return core ? 1 + maxSupportsOf(state, core) : 2;
+};
+export const kmBoundOf = (state, instanceId) => {
+  const binding = bindingOf(state, instanceId);
+  return binding?.active ? binding.move : null;
+};
+export const kmMissing = (state, move) => moveStatus(state, move).missing.map(m => {
+  const inst = (state.ownedGu || []).find(g => g.instanceId === m.id);
+  return inst ? locGuName(GU_BY_ID[inst.guId]) : '?';
+});
+export const kmName = (move) => move?.name?.en || move?.name?.vi || T('km.fallbackName');
+export const kmBlueprintName = (bp) => bp ? T(`km.bpName.${bp.id}`) : '';
+export const kmMatchesBlueprint = (coreGu, supportGus, bp) => blueprintMatches(bp, coreGu, supportGus);
+
+// Adapters for the first Research-tab API. They expose the same estimates
+// while keeping the canonical compiler and balance values as the source.
+export function kmEstimate(state, coreGu, supportGus, bp = null) {
+  const cfg = BALANCE.killerMoves;
+  const grade = compatibilityOf(coreGu, supportGus);
+  const compiled = compileEffect(coreGu, supportGus);
+  const level = clamp(masteryOf(state, coreGu.path).level, 1, 5);
+  const essence = Math.max(1, coreGu.energyCost + supportGus.reduce((sum, gu) => sum + Math.ceil(gu.energyCost * cfg.supportCostPct / 100), 0));
+  const activation = clamp(
+    cfg.baseActivation + (level - 1) * cfg.actPerMastery + grade.pct
+      + compiled.activationBonus + (bp?.stabilityPct || 0) + cfg.actPerSupport * supportGus.length,
+    cfg.activationMin, cfg.activationMax,
+  );
+  const pseudo = {
+    id: 'km_preview', name: T('km.fallbackName'), rank: 3,
+    path: coreGu.path, element: coreGu.element, energyCost: essence,
+    cooldown: Math.max(2, coreGu.cooldown || 2), effect: compiled.fx,
+  };
+  return {
+    tier: grade.key, score: Math.round(grade.score), synth: compiled.fx,
+    damage: [compiled.fx.attack.range[0], compiled.fx.attack.range[1]],
+    essence, cooldown: pseudo.cooldown, activation,
+    roles: rolesOf(pseudo), paths: [...new Set([coreGu.path, ...supportGus.map(gu => gu.path)])],
+  };
+}
+
+export function kmResearchChance(state, estimate, bp = null, minigameBonus = 0) {
+  const cfg = BALANCE.killerMoves;
+  const level = clamp(masteryOf(state, estimate.paths[0]).level, 1, 5);
+  const compat = cfg.compatBonus[estimate.tier] || 0;
+  const parts = {
+    base: cfg.baseChance,
+    mastery: (level - 1) * cfg.perMastery,
+    compat,
+    mentor: 0,
+    blueprint: bp?.successPct || 0,
+    minigame: minigameBonus || 0,
+  };
+  return { parts, total: clamp(Object.values(parts).reduce((sum, n) => sum + n, 0), 10, 95) };
+}
+
+export const kmPseudoGu = (move) => ({
+  id: move.id,
+  name: kmName(move),
+  rank: 3,
+  path: move.primaryPath || 'fire',
+  element: move.element || 'none',
+  energyCost: move.essence || 0,
+  cooldown: move.cooldown || 2,
+  effect: move.synth || { attack: { power: 1, range: move.damage || [1, 1] } },
+});

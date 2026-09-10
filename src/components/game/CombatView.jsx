@@ -9,6 +9,7 @@ import { CULTIVATION_STAGES } from '@/game/data/cultivation';
 import { tierOf } from '@/game/config/aptitude';
 import { appearanceOf } from '@/game/data/appearance';
 import { zoneAt } from '@/game/data/world';
+import { kmPseudoGu } from '@/game/engine/killerMoves';
 import BattleScene from './battle/BattleScene';
 import BattleCommandMenu from './battle/BattleCommandMenu';
 import Timeline from './battle/Timeline';
@@ -239,7 +240,7 @@ export default function CombatView() {
     timers.current.push(setTimeout(() => {
       if (gu) pendingGu.current = gu;
       setCasting(null);
-      dispatch({ type: 'PLAYER_ACTION', action, guInstanceId: opts.guInst?.instanceId, itemId: opts.itemId, moveId: opts.km?.move?.id, targetUid: selUid });
+      dispatch({ type: 'PLAYER_ACTION', action, guInstanceId: opts.guInst?.instanceId, itemId: opts.itemId, killerMoveId: opts.km?.id, targetUid: selUid });
       timers.current.push(setTimeout(() => setBusy(false), 1300));
     }, ms));
   };
@@ -405,7 +406,7 @@ export default function CombatView() {
             combat={c}
             busy={busy}
             onGu={(inst) => act('gu', { guInst: inst })}
-            onKm={(entry) => act('km', { km: entry, pseudoGu: entry.stats.gu, ms: 850 })}
+            onKm={(kmRec) => act('km', { km: kmRec, pseudoGu: kmPseudoGu(kmRec), guInst: state.ownedGu.find(g => g.instanceId === kmRec.coreInstanceId), ms: 650 })}
             onItem={(itemId) => act('item', { itemId })}
             onStrike={() => act('strike')}
             onObserve={() => act('observe')}

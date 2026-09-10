@@ -37,9 +37,9 @@ import {
 } from '../i18n/tr';
 import { TUTORIAL_STEPS, TUTORIAL_SUPPLIES, TUTORIAL_STONES } from '../data/tutorial';
 import { tutorialObserve } from '../engine/tutorial';
+// Killer Move actions are centralized in the engine.
 import { kmAction } from '../engine/killerMoves';
 import { createNewGame, globalStage } from './createGame';
-export { globalStage } from './createGame';
 
 // createNewGame and globalStage live in ./createGame — imported below.
 
@@ -1277,4 +1277,4 @@ export function gameReducer(state, action) {
   return tutorialObserve(next, action);
 }
 
-export { objectiveMet };
+export { objectiveMet, globalStage };

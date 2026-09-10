@@ -26,12 +26,4 @@ export const CONTRIBUTION_OFFERS = [
     id: 'co_gale', name: 'Gale Blade Gu Recipe', desc: "Wind Path blade knowledge. The vault's greatest prize.",
     cost: 650, grant: { recipe: 'galeBlade' }, req: { stageReq: 9, mastery: { path: 'wind', level: 4 } }, faction: 'greenValley',
   },
-  {
-    id: 'co_bp_flameGale', name: 'Blueprint: Flame Gale', desc: 'A Killer Move design — fuse a Fire core with a swift companion.',
-    cost: 80, grant: { blueprint: 'flameGale' }, req: { stageReq: 2 }, faction: 'greenValley',
-  },
-  {
-    id: 'co_bp_thunderBind', name: 'Blueprint: Thunder Bind', desc: 'A Killer Move design — a paralyzing storm that binds the foe.',
-    cost: 150, grant: { blueprint: 'thunderBind' }, req: { stageReq: 4 }, faction: 'greenValley',
-  },
 ];

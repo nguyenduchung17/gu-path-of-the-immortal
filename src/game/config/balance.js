@@ -230,6 +230,34 @@ export const BALANCE = {
     keenDetectMul: 0.9,                  // keen senses are almost never fooled
     revealDist: 2,                       // a lurking beast rouses within this range
   },
+  // KILLER MOVES (Sát Chiêu) — techniques forged from the player's own Gu.
+  // Research must be affordable early (#11): essence/stones scale with the
+  // number of components, and failure never destroys Gu (#12) — it only
+  // strains them for a day and cools the resonance for a short while.
+  km: {
+    supportDamagePct: 45,                // slice of a Support Gu's damage lent to the move
+    supportEffectPct: 60,                // slice of its statuses/protection
+    maxHits: 3,
+    essencePerSupportPct: 50,            // supports cost half their own essence
+    minCooldown: 2, maxCooldown: 6,
+    activationBase: 72,
+    activationPerMastery: 3,             // per level of the Core Path's mastery
+    activationPerSupport: -3,            // complexity makes activation harder
+    researchBase: 35,
+    researchPerMastery: 4,
+    tierBonus: { excellent: 20, good: 12, unstable: 4, poor: -10 },
+    refinementPerLevel: 2,               // "Mentor Knowledge" — refinement mastery
+    essenceFlat: 8, essencePerComponent: 4,
+    stonesPerComponent: 5,
+    researchMinutes: 120,
+    failCooldownDays: 2,
+    strainChance: 50,                    // per component, on a failed experiment
+    strainDays: 1,
+    masteryXp: 60,                        // to the Core Path on discovery
+    minigameHits: 3,
+    minigameBonusPerHit: 8,              // each calibration hit, max +24%
+    minigameSpeed: 0.05,                 // pulse speed (% per ms)
+  },
   // CAVES — separate underground maps with their own fog. Vision underground
   // is a fraction of surface sight; a scouting Gu claws most of it back.
   cave: {
@@ -283,36 +311,6 @@ export const BALANCE = {
     sleepFadeMs: 1800,       // night-transition animation length
     nightDetectBonus: 1,      // enemies notice you farther in the dark
     nightGatherBonus: { moonPetal: 1 }, // moonlit materials yield more at night
-  },
-
-  // ---- Killer Moves (Sát Chiêu) ----
-  // Research is deliberately affordable early (#11): essence + stones only.
-  // Failure never destroys Gu — strain + a short cooldown (#12).
-  killerMoves: {
-    baseChance: 35,         // research base success %
-    perMastery: 6,          // per core-path mastery level
-    compatBonus: { excellent: 15, good: 10, unstable: 0, poor: -15 },
-    blueprintChance: 20,    // (on the blueprint itself)
-    baseActivation: 70,     // combat activation chance base %
-    actPerMastery: 3,
-    actPerSupport: -5,      // each support destabilizes slightly
-    activationMin: 40, activationMax: 95,
-    supportDamagePct: 12,   // each support adds core damage
-    supportCostPct: 50,     // support essence contribution
-    essenceBase: 8, essencePerSupport: 3,   // research cost
-    stonesBase: 5, stonesPerSupport: 2,     // research cost
-    retryCdMin: 240,        // failed-experiment cooldown (game minutes)
-    strainDays: 2,          // Gu strain duration after failure
-    strainEffPct: -10,      // strained efficiency
-    strainCostPct: 10,      // strained essence cost
-    slotsBase: 2,           // battle loadout slots
-    slotsAtRank: 1,         // p.rank >= 1 unlocks the 3rd slot
-    // complexity is mastery-gated (#21): max SUPPORT Gu by core-path level
-    maxSupportsByMastery: { 1: 1, 2: 1, 3: 2, 4: 3, 5: 4 },
-    // resonance minigame (#9): each band hit adds research chance — never a guarantee
-    minigameHits: 3,
-    minigameSpeed: 0.045,       // bar %/ms (one sweep ≈ 2.2s)
-    minigameBonusPerHit: 8,     // % research success per attuned pulse
   },
 };
 

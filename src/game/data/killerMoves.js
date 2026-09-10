@@ -54,7 +54,10 @@ export const KM_BLUEPRINTS = [
   },
 ];
 
+// Fast lookup used by research and combat rewards.
 export const BLUEPRINT_BY_ID = Object.fromEntries(KM_BLUEPRINTS.map(b => [b.id, b]));
+// Compatibility name used by the earlier Research tab.
+export const KM_BLUEPRINT_BY_ID = BLUEPRINT_BY_ID;
 
 // Does one Gu satisfy a blueprint slot spec (roles derived from its effect)?
 function specMatch(spec, gu) {

@@ -1,54 +1,40 @@
 import React from 'react';
-import { useGame } from '@/game/state/GameContext';
 import { useT } from '@/game/i18n/LangContext';
+import { useGame } from '@/game/state/GameContext';
+import { PATH_BY_ID } from '@/game/data/paths';
+import { kmState, kmBlueprintName } from '@/game/engine/killerMoves';
 import { KM_BLUEPRINTS } from '@/game/data/killerMoves';
 
-// Requirement text for a blueprint slot spec — roles/Paths, never exact names.
-function SpecText({ spec, t }) {
-  if (!spec || spec.any) return t('km.bp.any');
-  const parts = [];
-  if (spec.role) parts.push(t('km.bp.role', { role: t(`role.${spec.role}`) }));
-  if (spec.roles) parts.push(spec.roles.map(r => t('km.bp.role', { role: t(`role.${r}`) })).join(' + '));
-  if (spec.path) parts.push(t('km.bp.path', { path: t(`path.${spec.path}.name`) }));
-  if (spec.paths) parts.push(spec.paths.map(p => t('km.bp.path', { path: t(`path.${p}.name`) })).join(' / '));
-  if (spec.element) parts.push(t('km.bp.element', { element: spec.element }));
-  return parts.join(' · ');
-}
-
-// BLUEPRINTS tab — owned blueprints with requirements and bonuses; unknown
-// ones stay hidden behind a count (discovery is part of the game, #19).
+// BLUEPRINTS (#8): owned designs with role/Path requirements and bonuses.
+// Unknown designs stay hidden — discovery belongs to experimentation (#19).
 export default function BlueprintsTab() {
   const { state } = useGame();
   const { t } = useT();
-  const ownedIds = state.killerMoves?.blueprints || [];
-  const owned = KM_BLUEPRINTS.filter(b => ownedIds.includes(b.id));
-  const unknownN = KM_BLUEPRINTS.length - owned.length;
+  const km = kmState(state);
+  const owned = KM_BLUEPRINTS.filter(b => km.blueprints?.[b.id]);
 
   return (
     <div className="space-y-2">
-      <p className="text-[11px] text-stone-500 px-1">{t('km.blueprints.title')}</p>
-      {owned.map(bp => (
-        <div key={bp.id} className="rounded-lg border border-sky-800/50 bg-sky-950/20 p-3">
+      {!owned.length && (
+        <div className="rounded-lg border border-stone-700/60 bg-black/30 p-4 text-center">
+          <div className="text-2xl mb-1">📜</div>
+          <p className="text-[11px] text-stone-400">{t('km.bp.none')}</p>
+          <p className="text-[10px] text-stone-600 mt-1.5">{t('km.bp.unknown')}</p>
+        </div>
+      )}
+      {owned.map(b => (
+        <div key={b.id} className="rounded-lg border border-amber-800/50 bg-amber-950/20 p-3">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-sm font-semibold text-sky-100">📐 {t(`km.bpName.${bp.id}`)}</span>
-            <span className="text-[10px] px-1.5 rounded bg-sky-900/50 border border-sky-700/50 text-sky-200">{t('km.bp.owned')}</span>
+            <span className="text-sm font-semibold text-amber-100">{b.icon} {kmBlueprintName(b)}</span>
+            <span className="text-[10px] text-emerald-300">{t('km.bp.bonus', { r: b.bonus.researchPct, s: b.bonus.stabilityPct })}</span>
           </div>
-          <p className="text-[10px] text-stone-400 mt-1 italic">{t(`km.bpHint.${bp.id}`)}</p>
+          <p className="text-[10px] text-stone-400 mt-1">{b.desc?.[localStorage.getItem('gu_lang') === 'vi' ? 'vi' : 'en'] || ''}</p>
           <div className="text-[10px] text-stone-300 mt-1.5 space-y-0.5">
-            <div>{t('km.bp.requirements')} — {t('km.bp.core')}: <SpecText spec={bp.core} t={t} /></div>
-            {bp.supports.map((spec, i) => (
-              <div key={i}>{t('km.bp.support')} {i + 1}: <SpecText spec={spec} t={t} /></div>
-            ))}
+            <div>{t('km.bp.reqCore', { paths: b.corePaths.map(p => PATH_BY_ID[p]?.icon + ' ' + (PATH_BY_ID[p]?.name || p)).join(' / ') })}</div>
+            <div>{t('km.bp.reqSupport', { roles: b.supportRoles.join(' / ') })}</div>
           </div>
-          <div className="text-[10px] text-emerald-300/90 mt-1.5">✦ {t('km.bp.bonus', { s: bp.successPct, st: bp.stabilityPct })}</div>
         </div>
       ))}
-      {!owned.length && (
-        <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-[11px] text-stone-400">{t('km.noBlueprint')}</div>
-      )}
-      {unknownN > 0 && (
-        <p className="text-[10px] text-stone-500 px-1">🌀 {t('km.bp.unknown', { n: unknownN })}</p>
-      )}
     </div>
   );
 }

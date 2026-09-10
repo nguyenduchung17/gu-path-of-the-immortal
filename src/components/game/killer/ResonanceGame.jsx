@@ -1,14 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useT } from '@/game/i18n/LangContext';
 import { sfx } from '@/game/audio/sfx';
-import { BALANCE } from '@/game/config/balance';
 
 // Experimentation minigame (#9): 3 resonance pulses sweep a bar; striking
-// inside the golden band steadies the fusion. Each hit adds research chance —
-// it never guarantees success.
+// inside the golden band steadies the fusion. Each hit adds research chance
+// — it raises the odds, never guarantees success.
+const ROUNDS = 3;
+const BONUS_PER_HIT = 8;   // % research chance per hit
+const SPEED = 0.05;        // % of the bar per ms
+
 export default function ResonanceGame({ onDone, onCancel }) {
   const { t } = useT();
-  const ROUNDS = BALANCE.killerMoves.minigameHits;
   const [round, setRound] = useState(0);
   const [hits, setHits] = useState(0);
   const [flash, setFlash] = useState(null); // 'hit' | 'miss'
@@ -23,7 +25,7 @@ export default function ResonanceGame({ onDone, onCancel }) {
     const loop = (now) => {
       const dt = now - prev;
       prev = now;
-      posRef.current = (posRef.current + dt * BALANCE.killerMoves.minigameSpeed) % 100;
+      posRef.current = (posRef.current + dt * SPEED) % 100;
       setPos(posRef.current);
       raf = requestAnimationFrame(loop);
     };
@@ -49,7 +51,7 @@ export default function ResonanceGame({ onDone, onCancel }) {
     setTimeout(() => {
       setFlash(null);
       if (round + 1 >= ROUNDS) {
-        onDone(nextHits * BALANCE.killerMoves.minigameBonusPerHit);
+        onDone(nextHits * BONUS_PER_HIT);
       } else {
         setRound(r => r + 1);
       }
@@ -73,7 +75,7 @@ export default function ResonanceGame({ onDone, onCancel }) {
 
       <div className="flex items-center justify-between mt-2.5 gap-2">
         <span className={`text-[11px] ${flash === 'hit' ? 'text-emerald-300' : flash === 'miss' ? 'text-rose-300' : 'text-stone-500'}`}>
-          {flash === 'hit' ? `✔ ${t('km.game.hit')}` : flash === 'miss' ? `✖ ${t('km.game.miss')}` : `• ${hits}/${ROUNDS}`}
+          {flash === 'hit' ? `✔ ${t('km.game.hit')} +${BONUS_PER_HIT}%` : flash === 'miss' ? `✖ ${t('km.game.miss')}` : `• ${hits}/${ROUNDS}`}
         </span>
         <div className="flex gap-1.5">
           <button onClick={onCancel} className="px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-stone-300 text-[11px] hover:bg-white/10">
