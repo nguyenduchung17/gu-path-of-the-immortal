@@ -2,7 +2,7 @@ import React from 'react';
 import { useGame } from '@/game/state/GameContext';
 import { useT } from '@/game/i18n/LangContext';
 import { CULTIVATION_STAGES, BREAKTHROUGH_REQS } from '@/game/data/cultivation';
-import { BALANCE, recoveryBreakdown } from '@/game/config/balance';
+import { recoveryBreakdown, cultivationGain } from '@/game/config/balance';
 import { breakthroughChecklist } from '@/game/state/gameReducer';
 import { TERRACE, zoneAt } from '@/game/data/world';
 import { tierOf, scoreOf, constitutionName } from '@/game/config/aptitude';
@@ -39,9 +39,8 @@ export default function CharacterPanel({ onRecover }) {
   const stage = CULTIVATION_STAGES[g];
   const peak = g >= 19;
   const req = peak ? null : BREAKTHROUGH_REQS[g];
-  const cfg = BALANCE.cultivation;
-  const cost = cfg.essenceCostBase + cfg.essenceCostPerStage * g;
   const atSect = p.x === TERRACE[0] && p.y === TERRACE[1];
+  const { cost, gain, eff } = cultivationGain(state, atSect);
   const inSafeZone = !!zoneAt(p.x, p.y)?.safe;
   const secludeOk = !state.recovery && !state.combat && !peak && p.cultivationProgress < 100 && inSafeZone;
   const checklist = peak ? null : breakthroughChecklist(state);
@@ -121,11 +120,21 @@ export default function CharacterPanel({ onRecover }) {
           <div className="h-3 rounded-full bg-black/40 overflow-hidden mb-2">
             <div className="h-full bg-gradient-to-r from-emerald-500 to-emerald-300 transition-all duration-500" style={{ width: `${p.cultivationProgress}%` }} />
           </div>
+
+          {/* Realm Insight (Cảm Ngộ) — earned in the world, spent on breakthroughs */}
+          <div className="flex justify-between text-xs text-stone-400 mb-1">
+            <span>✧ {t('cult.insight')}</span>
+            <span>{peak ? Math.floor(p.realmInsight || 0) : `${Math.floor(p.realmInsight || 0)} / ${req.insight}`}</span>
+          </div>
+          <div className="h-2 rounded-full bg-black/40 overflow-hidden mb-3">
+            <div className="h-full bg-gradient-to-r from-violet-500 to-fuchsia-300 transition-all duration-500"
+              style={{ width: `${peak ? 100 : Math.min(100, ((p.realmInsight || 0) / req.insight) * 100)}%` }} />
+          </div>
           <div className="grid grid-cols-2 gap-2 mb-3">
             <button onClick={() => dispatch({ type: 'CULTIVATE' })} disabled={state.recovery || state.combat}
               aria-disabled={state.recovery || state.combat}
               className={`py-2.5 rounded-lg text-white text-sm font-medium transition ${(state.recovery || state.combat || p.primevalEssence < cost) ? 'bg-stone-800 text-stone-500 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-500'}`}>
-              {state.recovery ? '🧘 Cultivate — paused while recovering' : <>🧘 {t('ui.cultivate')} ({cost} {t('ui.essence')}{atSect ? ' · sect ×1.5' : ''})</>}
+              {state.recovery ? '🧘 Cultivate — paused while recovering' : <>🧘 {t('ui.cultivate')} (⚡{cost} → +{gain}%{atSect ? ' · sect ×1.5' : ''})</>}
             </button>
             <button onClick={onRecover} disabled={state.combat}
               className={`py-2.5 rounded-lg text-sm font-medium transition border border-sky-700/50 bg-sky-900/20 text-sky-200 hover:bg-sky-800/30 ${state.combat ? 'opacity-40 cursor-not-allowed' : ''}`}>
@@ -139,6 +148,12 @@ export default function CharacterPanel({ onRecover }) {
             </div>
           )}
 
+          {eff < 1 && (
+            <div className="text-[10px] text-amber-300/80 mb-3 animate-fade-in">
+              ✧ {t('cult.diminished', { p: Math.round(eff * 100) })}
+            </div>
+          )}
+
           <button onClick={() => dispatch({ type: 'SECLUDE' })} disabled={!secludeOk}
             className={`w-full py-2.5 rounded-lg text-sm font-medium transition mb-1 ${secludeOk ? 'border border-emerald-700/50 bg-emerald-900/40 text-emerald-100 hover:bg-emerald-800/50' : 'bg-stone-800 text-stone-500 cursor-not-allowed'}`}>
             {t('seclude.button')}
@@ -147,10 +162,10 @@ export default function CharacterPanel({ onRecover }) {
             {inSafeZone ? t('seclude.hint') : t('seclude.needTown')}
           </div>
 
-          {breakthroughReady && (
+          {!peak && (
             <div className="rounded-lg border border-amber-800/40 bg-amber-900/10 p-3">
               <div className="text-xs font-semibold text-amber-200 mb-1.5">
-                {req.major ? '⚡ Major Breakthrough available' : 'Breakthrough available'} — to {req.target.name}
+                {ready ? (req.major ? '⚡ Major Breakthrough available' : 'Breakthrough available') : t('cult.btReq')} — {req.target.name}
               </div>
               <div className="space-y-0.5 mb-2">
                 {checklist.checks.map(c => <ReqLine key={c.key} met={c.met} text={c.text} />)}
@@ -171,6 +186,7 @@ export default function CharacterPanel({ onRecover }) {
         <Stat label={t('ui.health')} value={`${Math.floor(p.hp)}/${p.maxHp}`} />
         <Stat label={t('ui.essence')} value={`${Math.floor(p.primevalEssence)}/${p.maxPrimevalEssence}`} />
         <Stat label={t('ui.stones')} value={`💎 ${p.spiritStones}`} />
+        <Stat label={t('cult.insight')} value={`✧ ${Math.floor(p.realmInsight || 0)}`} />
         <Stat label={t('ui.totalInsight')} value={`✦ ${(p.totalInsight || 0).toLocaleString()}`} />
         <Stat label={t('ui.willpower')} value={p.willpower} />
         <Stat label={t('ui.strength')} value={p.strength} />

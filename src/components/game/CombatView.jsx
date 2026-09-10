@@ -323,6 +323,7 @@ export default function CombatView() {
                     <div>{t('battle.loot')}: {Object.entries(c.rewards.items).map(([k, v]) => `${v} ${ITEM_BY_ID[k]?.name || k}`).join(', ')}</div>
                   )}
                   <div>{t('battle.stonesGain', { n: c.rewards.spiritStones, p: c.rewards.progress })}</div>
+                  {c.rewards.insight > 0 && <div className="text-violet-300/90">✧ {t('cult.insight')} +{c.rewards.insight}</div>}
                   {(c.rewards.mastery || []).map((m, i) => (
                     <div key={i} className="text-emerald-300/90">{PATH_BY_ID[m.pathId].icon} {PATH_BY_ID[m.pathId].name} +{m.xp}</div>
                   ))}

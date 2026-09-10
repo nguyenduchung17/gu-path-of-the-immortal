@@ -56,19 +56,19 @@ const actDelay = (base, statuses) => G().act / effSpeed(base, statuses);
 // Every damaging action rolls inside a visible min–max range (BALANCE), so
 // damage is variable, never fixed. The battle UI shows these same ranges.
 export function strikeRange(player) {
-  const sc = G().strike;
+  const sc = BALANCE.combat.strike;
   const b = (player.rank || 0) * sc.perRank + Math.floor((player.strength || 0) * sc.perStr);
   return { min: sc.min + b, max: sc.max + b, accuracy: sc.accuracy };
 }
 export function guAttackRange(gu) {
-  const gv = G().guDamage;
+  const gv = BALANCE.combat.guDamage;
   const power = gu?.effect?.attack?.power || 0;
   return { min: Math.max(1, Math.floor(power * gv.minMul)), max: Math.max(1, Math.floor(power * gv.maxMul)) };
 }
 const rollIn = (r) => r.min + Math.floor(Math.random() * (r.max - r.min + 1));
 // small crit system — some Gu carry their own odds (effect.attack.crit)
 function critMulOf(gu) {
-  const cc = G().crit;
+  const cc = BALANCE.combat.crit;
   const chance = gu?.effect?.attack?.crit ?? cc.baseChance;
   return Math.random() * 100 < chance ? cc.dmgMul : 1;
 }

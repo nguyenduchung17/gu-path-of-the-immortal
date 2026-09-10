@@ -80,6 +80,7 @@ export default function HUDTop() {
             {muted ? '🔇' : '🔊'}
           </button>
           <div className="text-[11px] px-2.5 py-1.5 rounded-full bg-black/45 backdrop-blur border border-amber-500/30 text-amber-200" title="Primordial Stones">💎 {p.spiritStones}</div>
+          <div className="text-[11px] px-2.5 py-1.5 rounded-full bg-black/45 backdrop-blur border border-violet-500/30 text-violet-200" title={tr('cult.insight')}>✧ {Math.floor(p.realmInsight || 0)}</div>
           <div className="text-[11px] px-2.5 py-1.5 rounded-full bg-black/45 backdrop-blur border border-stone-700 text-stone-300" title={`${tr('ui.day')} ${t.day}`}>
             {tr('ui.day')} {t.day} · {PHASE_ICON[phaseOf(t.min)]} {timeLabel(t.min)}
           </div>

@@ -10,7 +10,7 @@ import { advanceTime, phaseOf } from '../engine/time';
 import { applyEffects } from '../engine/effects';
 import { grantMastery, learnRecipe, bonusOf, learnClue, CLUE_RANK } from '../engine/mastery';
 import { CULTIVATION_STAGES, BREAKTHROUGH_REQS } from '../data/cultivation';
-import { BALANCE, DIFFICULTIES, diffOf, shopPrice, recoveryCosts } from '../config/balance';
+import { BALANCE, DIFFICULTIES, diffOf, shopPrice, recoveryCosts, cultivationCost, cultStreakEff, cultivationGain } from '../config/balance';
 import { RECIPE_BY_ID } from '../data/recipes';
 import {
   WORLD, zoneAt, isWalkable, DEFAULT_ZONE, LANDMARKS, WORLD_RESOURCES,
@@ -62,6 +62,7 @@ export function createNewGame(name, gender, age, difficulty, slot, appearance, a
       strength: 6, agility: 6, perception: 6, intelligence: 6, luck: 6,
       x: 42, y: 44, currentArea: 'greenValleyRegion', facing: 'down',
       spiritStones: 50, equippedGu: ['g_start'], totalInsight: 0, vitalInstability: null,
+      realmInsight: 0, cultStreak: 0,
       appearance: appearance || DEFAULT_APPEARANCE,
     },
     ownedGu: [{ instanceId: 'g_start', guId: starter.id, rank: starter.rank }],
@@ -119,7 +120,7 @@ function withQuestEvents(s, event) {
   }
   for (const qid of res.autoCompleted) {
     const q = QUEST_BY_ID[qid];
-    out = applyEffects(out, { ...q.rewards, message: locQuestRewardMsg(q) || undefined });
+    out = applyEffects(out, { ...q.rewards, insight: BALANCE.insight.quest, message: locQuestRewardMsg(q) || undefined });
     out = pushToast(out, { icon: '🎉', title: T('toast.questComplete'), lines: [locQuestName(q)] });
   }
   return out;
@@ -165,6 +166,7 @@ export function breakthroughChecklist(state) {
   return metReq([
     { key: 'progress', met: p.cultivationProgress >= 100, text: T('chk.progress') },
     { key: 'essence', met: p.primevalEssence >= req.essence, text: T('chk.essence', { cur: Math.floor(p.primevalEssence), req: req.essence }) },
+    ...(req.insight ? [{ key: 'insight', met: (p.realmInsight || 0) >= req.insight, text: T('chk.insight', { cur: Math.floor(p.realmInsight || 0), req: req.insight }) }] : []),
     ...(req.stones ? [{ key: 'stones', met: p.spiritStones >= req.stones, text: T('chk.stones', { cur: p.spiritStones, req: req.stones }) }] : []),
     ...matEntries.map(([id, qty]) => ({ key: `item-${id}`, met: (state.inventory.materials?.[id] || 0) >= qty, text: T('chk.item', { name: ITEM_BY_ID[id] ? locItemName(ITEM_BY_ID[id]) : id, cur: state.inventory.materials?.[id] || 0, req: qty }) })),
     ...(req.masteryLevel ? [{ key: 'mastery', met: maxMastery >= req.masteryLevel, text: T('chk.mastery', { n: req.masteryLevel }) }] : []),
@@ -302,8 +304,12 @@ export function gameReducer(state, action) {
       let discovered = { ...(ws.discovered || {}), zones: zonesFound, landmarks: lms };
       if (newLm) discovered = { ...discovered, landmarks: { ...lms, [newLm.id]: true } };
       s = { ...s, worldState: { ...ws, discovered } };
-      if (!(ws.discovered?.zones || {})[zone.id]) s = withQuestEvents(s, { type: 'LOCATION_DISCOVERED', id: zone.id });
+      if (!(ws.discovered?.zones || {})[zone.id]) {
+        s = withQuestEvents(s, { type: 'LOCATION_DISCOVERED', id: zone.id });
+        s = applyEffects(s, { insight: BALANCE.insight.zone });
+      }
       if (newLm) {
+        s = applyEffects(s, { insight: BALANCE.insight.landmark });
         s = pushToast(s, { icon: '📍', title: T('toast.discovered'), lines: [locLandmarkName(newLm)] });
         logAdd.push(T('wld.discovered', { name: locLandmarkName(newLm) }));
       }
@@ -513,6 +519,7 @@ export function gameReducer(state, action) {
       s = applyEffects(s, {
         ...(m.rewards || {}),
         contribution: (m.rewards && m.rewards.contribution) || 0,
+        insight: BALANCE.insight.mission,
         message: T('qs.missionDone', { name: locMissionName(m), c: (m.rewards && m.rewards.contribution) || 0 }),
       });
       s = { ...s, missions: { ...s.missions, active: s.missions.active.filter(id => id !== m.id), completed: [...s.missions.completed, m.id] } };
@@ -662,7 +669,7 @@ export function gameReducer(state, action) {
       });
       const chance = Math.min(95, BALANCE.refinement.baseSuccess + p.intelligence * BALANCE.refinement.successPerInt + Math.floor(p.luck * BALANCE.refinement.successPerLuck) + (refFx.successPct || 0) + diffOf(state).refinePct);
       if (Math.random() * 100 < chance) {
-        s = applyEffects(s, { giveGu: r.guId, message: T('refine.recipeOk', { gu: locGuName(GU_BY_ID[r.guId]) }) });
+        s = applyEffects(s, { giveGu: r.guId, insight: BALANCE.insight.refineRecipe, message: T('refine.recipeOk', { gu: locGuName(GU_BY_ID[r.guId]) }) });
         s = withQuestEvents(s, { type: 'GU_REFINED', id: r.guId });
         s = grantMastery(s, 'refinement', BALANCE.mastery.xpRefineSuccess, 'refined', 'refine');
         s = grantMastery(s, r.path, Math.round(BALANCE.mastery.xpRefineSuccess * 0.6), 'refined', 'refine');
@@ -682,20 +689,21 @@ export function gameReducer(state, action) {
       if (state.combat) return state;
       // recovery is a deliberate activity that blocks cultivation — never a silent ignore
       if (state.recovery) return { ...state, log: [...state.log, T('cult.blockedRecovery')] };
-      const cfg = BALANCE.cultivation;
       const p = state.player;
-      const cost = cfg.essenceCostBase + cfg.essenceCostPerStage * (p.rank * 4 + (p.stage || 0));
-      if (p.primevalEssence < cost) return { ...state, log: [...state.log, T('cult.noEssence')] };
       const atSect = WORLD.tiles[p.y] && WORLD.tiles[p.y][p.x] === '*';
-      const gain = Math.min(cfg.progressCap, Math.floor((cfg.progressBase + p.intelligence * cfg.progressPerInt) * cultivateMulOf(p.aptitude) * (atSect ? cfg.sectBonus : 1)));
+      const { cost, gain, eff } = cultivationGain(state, atSect);
+      if (p.primevalEssence < cost) return { ...state, log: [...state.log, T('cult.noEssence')] };
       const progress = Math.min(100, (p.cultivationProgress || 0) + gain);
       const np = {
         ...p,
         primevalEssence: p.primevalEssence - cost,
         cultivationProgress: progress,
         totalInsight: (p.totalInsight || 0) + gain,
+        cultStreak: (p.cultStreak || 0) + 1,
       };
-      let s = { ...state, player: np, log: [...state.log, atSect ? T('cult.cultivatedTerrace', { gain }) : T('cult.cultivated', { gain })] };
+      let s = { ...state, player: np, log: [...state.log,
+        atSect ? T('cult.cultivatedTerrace', { gain }) : T('cult.cultivated', { gain }),
+        ...(eff < 1 ? [T('cult.diminished', { p: Math.round(eff * 100) })] : [])] };
       // the moment the aperture fills, a milestone alert fires
       if (progress >= 100 && (p.cultivationProgress || 0) < 100) {
         s = pushToast(s, { icon: '✦', title: T('toast.breakthroughReady'), lines: [T('cult.breakthroughReady1'), T('cult.breakthroughReady2')] });
@@ -717,7 +725,7 @@ export function gameReducer(state, action) {
       if ((p.cultivationProgress || 0) >= 100) return { ...state, log: [...state.log, T('cult.secludeFull')] };
       if (!(zoneAt(p.x, p.y) || DEFAULT_ZONE).safe) return { ...state, log: [...state.log, T('cult.secludeNeedTown')] };
       const cfg = BALANCE.cultivation;
-      const cost = cfg.essenceCostBase + cfg.essenceCostPerStage * g;
+      const cost = cultivationCost(p);
       const atSect = WORLD.tiles[p.y] && WORLD.tiles[p.y][p.x] === '*';
       const t = state.time || { day: BALANCE.time.startDay, min: BALANCE.time.startMinutes };
       const startAbs = t.day * 1440 + t.min;
@@ -725,25 +733,32 @@ export function gameReducer(state, action) {
       let progress = p.cultivationProgress || 0;
       let essence = p.primevalEssence;
       let insight = p.totalInsight || 0;
+      let streak = p.cultStreak || 0;
       let sessions = 0, nights = 0;
-      while (progress < 100 && nights < 10) {
-        while (progress < 100 && essence >= cost) {
-          const gain = Math.min(cfg.progressCap, Math.floor((cfg.progressBase + p.intelligence * cfg.progressPerInt) * cultivateMulOf(p.aptitude) * (atSect ? cfg.sectBonus : 1)));
-          if (gain <= 0) break;
-          progress = Math.min(100, progress + gain);
-          essence -= cost;
-          insight += gain;
-          sessions++;
-          abs += BALANCE.time.cultivateMinutes;
+      let guard = 0;
+      while (progress < 100 && nights < 10 && guard++ < 500) {
+        if (essence < cost) {
+          // a night of deep meditation refills the aperture by morning
+          const dayStart = Math.floor(abs / 1440) * 1440;
+          let wake = dayStart + BALANCE.time.sleepToMinutes;
+          if (wake <= abs) wake += 1440;
+          abs = wake;
+          essence = p.maxPrimevalEssence;
+          nights++;
+          continue;
         }
-        if (progress >= 100) break;
-        // a night of deep meditation refills the aperture by morning
-        const dayStart = Math.floor(abs / 1440) * 1440;
-        let wake = dayStart + BALANCE.time.sleepToMinutes;
-        if (wake <= abs) wake += 1440;
-        abs = wake;
-        essence = p.maxPrimevalEssence;
-        nights++;
+        // every balance rule of a single session applies here too — including
+        // the diminishing-returns streak for back-to-back cultivation
+        const factor = (cfg.stageFactor[p.stage || 0] ?? 0.45) * cfg.rankFactor ** p.rank;
+        const gain = Math.max(1, Math.min(cfg.progressCap, Math.floor(
+          (cfg.progressBase + p.intelligence * cfg.progressPerInt) * factor * cultivateMulOf(p.aptitude)
+          * (atSect ? cfg.sectBonus : 1) * cultStreakEff(streak) * diffOf(state).cultProgressMul)));
+        progress = Math.min(100, progress + gain);
+        essence -= cost;
+        insight += gain;
+        sessions++;
+        streak++;
+        abs += BALANCE.time.cultivateMinutes;
       }
       if (progress >= 100 && essence < p.maxPrimevalEssence) {
         // one final night: emerge with a full aperture so the breakthrough
@@ -755,7 +770,7 @@ export function gameReducer(state, action) {
         essence = p.maxPrimevalEssence;
         nights++;
       }
-      let s = { ...state, player: { ...p, primevalEssence: essence, cultivationProgress: progress, totalInsight: insight } };
+      let s = { ...state, player: { ...p, primevalEssence: essence, cultivationProgress: progress, totalInsight: insight, cultStreak: streak } };
       s = advanceTime(s, abs - startAbs);
       s = { ...s, log: [...s.log, atSect ? T('cult.secluded', { sessions, nights, progress: Math.floor(progress) }) : T('cult.secludedPlain', { sessions, nights, progress: Math.floor(progress) })] };
       if (progress >= 100 && (p.cultivationProgress || 0) < 100) {
@@ -776,6 +791,7 @@ export function gameReducer(state, action) {
         essence: -req.essence,
         spiritStones: -(req.stones || 0),
         removeItems: req.items || {},
+        insight: -(req.insight || 0),
       });
       const major = p.stage === 3;
       const np = {
@@ -788,7 +804,11 @@ export function gameReducer(state, action) {
       np.maxHp = st.maxHp;
       np.hp = Math.min(st.maxHp, np.hp + (st.maxHp - p.maxHp));
       np.maxPrimevalEssence = essenceCapFor(st.maxEssence, np.aptitude);
-      np.primevalEssence = np.maxPrimevalEssence; // fully restored
+      // only a major rank breakthrough fully restores the aperture — minors
+      // refill just a fraction, so chained breakthroughs are never free
+      np.primevalEssence = major
+        ? np.maxPrimevalEssence
+        : Math.max(np.primevalEssence, Math.round(np.maxPrimevalEssence * BALANCE.cultivation.minorEssenceRestorePct / 100));
       const statGain = major ? 2 : 1;
       np.strength += statGain; np.agility += statGain; np.perception += statGain; np.intelligence += statGain;
       s = {
@@ -906,7 +926,7 @@ export function gameReducer(state, action) {
       const q = QUEST_BY_ID[action.questId];
       const res = turnInQuest(state, action.questId);
       if (res.state === state) return state;
-      let s = applyEffects(res.state, { ...(q.rewards || {}), message: locQuestRewardMsg(q) || undefined, ...(Object.keys(res.removeItems).length ? { removeItems: res.removeItems } : {}) });
+      let s = applyEffects(res.state, { ...(q.rewards || {}), insight: BALANCE.insight.quest, message: locQuestRewardMsg(q) || undefined, ...(Object.keys(res.removeItems).length ? { removeItems: res.removeItems } : {}) });
       s = pushToast(s, { icon: '🎉', title: T('toast.questComplete'), lines: [locQuestName(q), locQuestRewardMsg(q) || T('qs.rewards')] });
       return syncMasterSteps(s);
     }
@@ -974,6 +994,7 @@ export function gameReducer(state, action) {
           s = applyEffects(s, {
             spiritStones: c.arena.stake + c.arena.opponentStake,
             contribution: (ch && ch.rewards && ch.rewards.contribution) || 0,
+            insight: BALANCE.insight.arenaWin,
             items: (ch && ch.rewards && ch.rewards.items) || {},
             message: `Arena victory! You claim both stakes: +${c.arena.stake + c.arena.opponentStake} primordial stones.`,
           });
@@ -992,7 +1013,7 @@ export function gameReducer(state, action) {
         const ms = (s.masters || {})[c.trial.masterId];
         if (m && ms && (c.result === 'trial' || c.result === 'victory')) {
           const step = m.steps[c.trial.stepIndex];
-          s = applyEffects(s, step.grants || {});
+          s = applyEffects(s, { ...(step.grants || {}), insight: BALANCE.insight.trial });
           s = syncMasterSteps({
             ...s,
             masters: {
@@ -1047,7 +1068,7 @@ export function gameReducer(state, action) {
       const chance = captureChanceOf(state, wg, e, action.itemId);
       let s = action.itemId ? applyEffects(state, { removeItems: { [action.itemId]: 1 } }) : state;
       if (Math.random() * 100 < chance) {
-        s = applyEffects(s, { giveGu: sp.guId, message: T('cap.ok', { name: locSpeciesName(sp) }) });
+        s = applyEffects(s, { giveGu: sp.guId, insight: BALANCE.insight.capture, message: T('cap.ok', { name: locSpeciesName(sp) }) });
         s = withQuestEvents(s, { type: 'GU_CAPTURED', id: sp.guId });
         s = wildGuAfterEncounter(s, wg.id, true);
         s = pushToast(s, { icon: '🐉', title: T('toast.wildCaptured'), lines: [T('cap.joins', { name: locSpeciesName(sp) }), T('cap.feedsOn', { food: ITEM_BY_ID[sp.foodType] ? locItemName(ITEM_BY_ID[sp.foodType]) : sp.foodType })] });
@@ -1136,6 +1157,7 @@ export function gameReducer(state, action) {
       let s = applyEffects(state, { essence: -list.essenceCost, spiritStones: -list.stonesCost, removeItems: list.materials });
       if (Math.random() * 100 < list.chance) {
         s = { ...s, ownedGu: s.ownedGu.map(g => g.instanceId === inst.instanceId ? { ...g, rank: list.target } : g) };
+        s = applyEffects(s, { insight: BALANCE.insight.refineGu });
         s = withQuestEvents(s, { type: 'GU_REFINED', id: gu.id });
         s = grantMastery(s, 'refinement', BALANCE.mastery.xpRefineSuccess, 'refined', 'refine');
         s = pushToast(s, { icon: '✦', title: T('toast.guRefined'), lines: [T('refinegu.ok', { gu: locGuName(gu), n: list.target }), T('refinegu.power', { p: cfg.rankPowerStep })] });

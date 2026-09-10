@@ -5,13 +5,16 @@ import { GU_BY_ID, isKillerMove } from '@/game/data/gu';
 import { ITEM_BY_ID, ITEMS } from '@/game/data/items';
 import { PATH_BY_ID } from '@/game/data/paths';
 import { ROLES, rolesOf } from '@/game/data/roles';
-import { effectiveCost, activationChanceOf } from '@/game/engine/combat';
+import { effectiveCost, activationChanceOf, strikeRange, guAttackRange } from '@/game/engine/combat';
 
 // Short localized summary of what a Gu does in battle.
 export function effectSummary(gu, t) {
   const e = gu.effect || {};
   const parts = [];
-  if (e.attack) parts.push(`${t('fx.attack')} ${e.attack.power}${e.attack.hits ? `×${e.attack.hits}` : ''}${e.attack.stun ? ` · ${t('fx.stun')} ${e.attack.stun}%` : ''}`);
+  if (e.attack) {
+    const r = guAttackRange(gu);
+    parts.push(`${t('fx.attack')} ${r.min}–${r.max}${e.attack.hits ? `×${e.attack.hits}` : ''}${e.attack.stun ? ` · ${t('fx.stun')} ${e.attack.stun}%` : ''}`);
+  }
   if (e.burn) parts.push(`${t('fx.burn')} ${e.burn.power}×${e.burn.duration}`);
   if (e.defense) parts.push(`${t('fx.defense')} ${e.defense.power}`);
   if (e.barrier) parts.push(`${t('fx.barrier')} ${e.barrier.power}`);
@@ -69,7 +72,10 @@ function GuOption({ inst, state, combat, killer, onClick }) {
       <div className="text-[10px] text-stone-400 truncate mt-0.5">
         {path.icon} {path.name} · <RoleIcons gu={gu} />
       </div>
-      <div className="text-[10px] text-stone-500 truncate mt-0.5">{t('battle.activation')} {chance}% · {effectSummary(gu, t)}</div>
+      <div className="text-[10px] text-stone-500 truncate mt-0.5">
+        {gu.effect?.attack && <span className="text-amber-200/80">🎯 {t('battle.crit')} {gu.effect.attack.crit ?? 5}% · </span>}
+        {t('battle.activation')} {chance}% · {effectSummary(gu, t)}
+      </div>
     </button>
   );
 }
@@ -92,6 +98,8 @@ export default function BattleCommandMenu({ state, combat, busy, onGu, onItem, o
   const meds = ITEMS.filter(it => it.combatUsable)
     .filter(it => (state.inventory[it.category]?.[it.id] || 0) > 0);
   const disabled = busy || combat.over;
+  // Strike's real numbers, always visible — never guess basic damage
+  const sr = strikeRange(p);
 
   const FILTERS = [
     { id: 'all', label: t('battle.tabAll'), roles: null },
@@ -184,6 +192,9 @@ export default function BattleCommandMenu({ state, combat, busy, onGu, onItem, o
                 className={`rounded-lg border px-1 py-2.5 text-white text-[11px] sm:text-xs font-heading tracking-wide transition active:scale-95 ${cmd.tone} ${dim ? 'opacity-40 cursor-not-allowed' : ''}`}>
                 <div className="text-base leading-none">{cmd.icon}</div>
                 <div className="mt-1 truncate">{cmd.label}</div>
+                {cmd.id === 'strike' && (
+                  <div className="text-[8px] leading-tight text-amber-200/70">⚔️ {sr.min}–{sr.max} · ⚡0 · 🎯{sr.accuracy}%</div>
+                )}
               </button>
             );
           })}
