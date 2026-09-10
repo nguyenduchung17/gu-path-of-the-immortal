@@ -573,6 +573,26 @@ export function gameReducer(state, action) {
     case 'UNEQUIP_GU':
       return { ...state, player: { ...state.player, equippedGu: state.player.equippedGu.filter(id => id !== action.instanceId) } };
 
+    // ---------- Saved loadout presets ----------
+    case 'SAVE_LOADOUT': {
+      const loadouts = [...(state.loadouts || [])];
+      if (loadouts.length >= 3) return { ...state, log: [...state.log, 'Loadout slots full — delete one first.'] };
+      if (!state.player.equippedGu.length) return state;
+      const name = (action.name || '').trim().slice(0, 18) || `Loadout ${loadouts.length + 1}`;
+      loadouts.push({ id: `lo_${Date.now().toString(36)}`, name, guIds: [...state.player.equippedGu] });
+      return { ...state, loadouts, log: [...state.log, `Loadout saved: ${name} (${state.player.equippedGu.length} Gu equipped).`] };
+    }
+    case 'APPLY_LOADOUT': {
+      const lo = (state.loadouts || []).find(l => l.id === action.loadoutId);
+      if (!lo) return state;
+      // presets only re-equip Gu that still exist in the collection
+      const owned = new Set(state.ownedGu.map(g => g.instanceId));
+      const guIds = lo.guIds.filter(id => owned.has(id));
+      return { ...state, player: { ...state.player, equippedGu: guIds }, log: [...state.log, `Loadout applied: ${lo.name} (${guIds.length} Gu equipped).`] };
+    }
+    case 'DELETE_LOADOUT':
+      return { ...state, loadouts: (state.loadouts || []).filter(l => l.id !== action.loadoutId) };
+
     case 'REFINE_RECIPE': {
       if (state.combat || state.recovery) return state;
       const r = RECIPE_BY_ID[action.recipeId];
