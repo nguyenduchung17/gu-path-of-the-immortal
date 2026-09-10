@@ -7,6 +7,7 @@ import { ITEM_BY_ID } from '../data/items';
 import { NPC_BY_ID } from '../data/npcs';
 import { ENEMY_BY_ID } from '../data/enemies';
 import { ZONES } from '../data/world';
+import { T, TL, locEnemyName, locItemName, locZoneName, locNpcGreeting } from '../i18n/tr';
 
 export const TRACK_LIMIT = 3;
 export const QS = {
@@ -28,15 +29,15 @@ export function objectivesOf(q) {
   return [];
 }
 
-export function objectiveLabel(o) {
-  if (o.label) return o.label;
-  if (o.type === 'hunt' || o.type === 'defeat') return `Kill ${ENEMY_BY_ID[o.enemy]?.name || o.enemy}`;
-  if (o.type === 'gather') return `Collect ${ITEM_BY_ID[o.item]?.name || o.item}`;
-  if (o.type === 'reach') return `Reach ${zoneName(o.area)}`;
-  if (o.type === 'talk') return `Talk to ${NPC_BY_ID[o.npc]?.name || o.npc}`;
-  if (o.type === 'capture') return `Capture a wild ${o.guId}`;
-  if (o.type === 'refine') return `Refine ${o.guId}`;
-  return 'Objective';
+export function objectiveLabel(o, questId) {
+  if (o.label) return questId ? TL(`quest.${questId}.${o.id}`, o.label) : o.label;
+  if (o.type === 'hunt' || o.type === 'defeat') return T('qobj.kill', { enemy: ENEMY_BY_ID[o.enemy] ? locEnemyName(ENEMY_BY_ID[o.enemy]) : o.enemy });
+  if (o.type === 'gather') return T('qobj.gather', { item: ITEM_BY_ID[o.item] ? locItemName(ITEM_BY_ID[o.item]) : o.item });
+  if (o.type === 'reach') return T('qobj.reach', { zone: zoneName(o.area) });
+  if (o.type === 'talk') return T('qobj.talk', { npc: NPC_BY_ID[o.npc]?.name || o.npc });
+  if (o.type === 'capture') return T('qobj.capture', { gu: o.guId });
+  if (o.type === 'refine') return T('qobj.refine', { gu: o.guId });
+  return T('qobj.default');
 }
 
 // Objective progress semantics (never mixed):
@@ -59,7 +60,7 @@ export function questView(state, q) {
     const cur = objectiveProgress(state, q, o, rec);
     const req = o.qty || 1;
     const hidden = !!o.hidden && !rec?.revealed?.[o.id] && cur <= 0;
-    return { id: o.id, type: o.type, label: hidden ? '???' : objectiveLabel(o), cur, req, done: cur >= req };
+    return { id: o.id, type: o.type, label: hidden ? '???' : objectiveLabel(o, q.id), cur, req, done: cur >= req };
   });
 }
 
@@ -133,7 +134,7 @@ export function applyQuestEvent(state, event) {
       if (after !== before) {
         progress[o.id] = after;
         if (o.hidden) revealed[o.id] = true;
-        updates.push({ questId: qid, label: objectiveLabel(o), delta: after - before });
+        updates.push({ questId: qid, label: objectiveLabel(o, qid), delta: after - before });
         touched = true;
       }
     }

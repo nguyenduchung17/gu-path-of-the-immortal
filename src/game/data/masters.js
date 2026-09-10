@@ -1,4 +1,6 @@
 import { questDone } from '../engine/questEngine';
+import { T, TL, locPathName } from '../i18n/tr';
+import { PATH_BY_ID } from './paths';
 
 // Advanced mentor / master NPCs. They are rare, found through exploration
 // (no quest markers — a proximity reveal only), and will NOT teach you at

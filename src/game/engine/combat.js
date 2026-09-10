@@ -411,7 +411,7 @@ function enemyAI(enemy, player, pSt, eSt, push, windEvasion, thorns) {
     if (enemy.ai === 'brute' && enemy.hp < enemy.maxHp * 0.5 && !hasStatus(eSt, 'guard') && Math.random() < 0.4) plan = { kind: 'guard' };
     else if (enemy.ai === 'skirmisher' && enemy.hp < enemy.maxHp * 0.7 && !c.hasted) plan = { kind: 'buff' };
     else if (enemy.ai === 'poisoner' && Math.random() < 0.6) plan = { kind: 'poison' };
-    else if (c.acts % every === 0) plan = { kind: 'heavy', name: enemy.charge?.name || 'a savage surge', power: enemy.charge?.power || 1.8 };
+    else if (c.acts % every === 0) plan = { kind: 'heavy', name: enemy.charge ? TL(`charge.${enemy.id}`, enemy.charge.name) : T('cmt.savage'), power: enemy.charge?.power || 1.8 };
     else plan = { kind: 'attack' };
   }
   if (plan.kind === 'guard') {

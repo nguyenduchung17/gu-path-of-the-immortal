@@ -5,6 +5,7 @@
 // and leave. Capture is never guaranteed; weaken it first for better odds.
 import { GU_BY_ID } from './gu';
 import { BALANCE } from '../config/balance';
+import { T, locSpeciesName } from '../i18n/tr';
 
 export const WILD_GU_SPECIES = [
   {
@@ -96,7 +97,7 @@ export function wildGuActive(w, time) {
 // Combat definition used when the player attacks a wild Gu (initCombat opts.def).
 export function wildCombatDef(sp) {
   return {
-    id: sp.id, name: `Wild ${sp.name}`, hp: sp.hp, attack: sp.attack, defense: sp.defense, speed: 5,
+    id: sp.id, name: T('cap.wildName', { name: locSpeciesName(sp) }), hp: sp.hp, attack: sp.attack, defense: sp.defense, speed: 5,
     abilities: [], weakness: sp.weakness, drops: sp.drops, description: sp.sense,
   };
 }

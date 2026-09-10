@@ -8,12 +8,14 @@ const has = (st, type) => (st || []).some(s => s.type === type);
 
 // Decide and COMMIT the enemy's next action now, mirroring the archetype AI
 // in engine/combat.js — the executed action is always the planned one.
+import { T, TL } from '../i18n/tr';
+
 export function planIntent(enemy, eSt) {
   if (enemy.telegraph) return { kind: 'heavy', name: enemy.telegraph.name, power: enemy.telegraph.power };
   const c = enemy.aiCounters || {};
   const acts = (c.acts || 0) + 1;
   const every = enemy.charge?.every || (enemy.ai === 'brute' ? 3 : 4);
-  if (acts % every === 0) return { kind: 'heavy', name: enemy.charge?.name || 'a savage surge', power: enemy.charge?.power || 1.8 };
+  if (acts % every === 0) return { kind: 'heavy', name: enemy.charge ? TL(`charge.${enemy.id}`, enemy.charge.name) : T('cmt.savage'), power: enemy.charge?.power || 1.8 };
   if (enemy.ai === 'brute' && enemy.hp < enemy.maxHp * 0.5 && !has(eSt, 'guard') && Math.random() < 0.4) return { kind: 'guard' };
   if (enemy.ai === 'skirmisher' && enemy.hp < enemy.maxHp * 0.7 && !c.hasted) return { kind: 'buff' };
   if (enemy.ai === 'poisoner' && Math.random() < 0.6) return { kind: 'poison' };
