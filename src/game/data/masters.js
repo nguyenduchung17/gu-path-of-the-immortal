@@ -35,6 +35,9 @@ export const MASTERS = [
     steps: [
       { kind: 'req', text: '"You lack discipline." Master Jian will not teach an undisciplined cultivator. Reach Mastery Level 2 on any Dao Path first.',
         req: { anyMastery: 2 },
+        // a real teaching is never given away at first asking: meeting the
+        // requirement earns the right to ASK, then a recognition trial proves it
+        recognition: { eventId: 'ev_jian_recognition', questId: 'q_jian_trial' },
         grants: { unlockPath: 'sword', message: 'Master Jian opens one eye. "Hm. You have begun. The Sword Path — I will show you its threshold."' } },
       { kind: 'quest', questId: 'q_jian_fragment', text: '"A blade of mine broke long ago. The Bandit Chief of the northeast camp wears its fragment as a trophy. Bring it to me."' },
       { kind: 'quest', questId: 'q_jian_beasts', text: '"Stone beasts crushed my old training ground in the wild forest. Cull two of them, and we will speak of flying steel."' },
@@ -88,6 +91,7 @@ export const MASTERS = [
     steps: [
       { kind: 'req', text: 'Elder Mo teaches only those with Refinement Path Mastery Level 2.',
         req: { mastery: { path: 'refinement', level: 2 } },
+        recognition: { eventId: 'ev_mo_recognition', questId: 'q_mo_trial' },
         grants: { recipes: ['insightEye'], message: '"Hmph. Acceptable waste ratios. Take my Insight Eye recipe — see what you refine before you refine it."' } },
       { kind: 'quest', questId: 'q_mo_ores', text: '"Bring me 3 Iron Ore from the hills. A refiner\u2019s student stocks the furnace himself."' },
       { kind: 'quest', questId: 'q_mo_core', text: '"A mutated beast in the deep forest carries a corrupted core. Fetch it — carefully."' },
@@ -125,6 +129,23 @@ export function reqChecks(state, req = {}) {
 export function masterStageOf(m, ms) {
   if (!ms?.found) return 0;
   return Math.min(4, 1 + (ms.step || 0));
+}
+
+// Recognition-trial state machine (#7): NOT_AVAILABLE / AVAILABLE / ACTIVE /
+// TURN_IN_READY / REWARDED — always derived from the PERSISTED quest record
+// and the master's saved step, never from UI state, so it survives save,
+// reload and restarts and can never double-grant.
+export function masterTrialStateOf(state, m, stepIdx) {
+  const ms = (state.masters || {})[m.id];
+  const step = m.steps[stepIdx];
+  if (!ms?.found || !step?.recognition) return 'NOT_AVAILABLE';
+  if ((ms.step || 0) > stepIdx) return 'REWARDED';
+  const rec = state.quests?.byId?.[step.recognition.questId];
+  if (!rec || rec.status === 'AVAILABLE') return 'AVAILABLE';
+  if (rec.status === 'ACTIVE') return 'ACTIVE';
+  if (rec.status === 'TURN_IN_READY') return 'TURN_IN_READY';
+  if (rec.status === 'TURNED_IN' || rec.status === 'COMPLETED') return 'REWARDED';
+  return 'AVAILABLE'; // abandoned → may seek recognition again
 }
 
 // Fast-forward quest steps that were completed elsewhere (quest turn-ins).

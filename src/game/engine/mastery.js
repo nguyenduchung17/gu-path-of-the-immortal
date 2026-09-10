@@ -81,7 +81,13 @@ export function grantMastery(state, pathId, xp, statKey = null, via = null) {
 export function discoverPath(state, pathId) {
   if (!PATH_BY_ID[pathId] || (state.knownPaths || []).includes(pathId)) return state;
   const def = PATH_BY_ID[pathId];
-  let s = { ...state, knownPaths: [...(state.knownPaths || []), pathId] };
+  // a newly unlocked path enters the Dao menu at Level 1 with 0 XP — never
+  // high mastery for free (#12); the entry makes it visible immediately
+  let s = {
+    ...state,
+    knownPaths: [...(state.knownPaths || []), pathId],
+    mastery: { ...(state.mastery || {}), [pathId]: state.mastery?.[pathId] || { level: 1, xp: 0 } },
+  };
   // discovering the Strength Path (Lực Đạo) grants its level-1 vitality bonus
   if (pathId === 'strength') s = { ...s, player: syncVitality(s.player, strengthLevelOf(s)) };
   s = pushToast(s, { kind: 'path', icon: def.icon, title: T('toast.pathDiscovered', { path: locPathName(def) }), lines: [TL('path.' + def.id + '.desc', def.description)] });

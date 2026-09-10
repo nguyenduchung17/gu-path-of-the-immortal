@@ -5,7 +5,7 @@
 import { QUEST_BY_ID } from '../data/quests';
 import { ITEM_BY_ID } from '../data/items';
 import { NPC_BY_ID } from '../data/npcs';
-import { ENEMY_BY_ID } from '../data/enemies';
+import { ENEMY_BY_ID, visualOf } from '../data/enemies';
 import { ZONES } from '../data/world';
 import { T, TL, locEnemyName, locItemName, locZoneName, locNpcGreeting } from '../i18n/tr';
 
@@ -37,6 +37,10 @@ export function objectiveLabel(o, questId) {
   if (o.type === 'talk') return T('qobj.talk', { npc: NPC_BY_ID[o.npc]?.name || o.npc });
   if (o.type === 'capture') return T('qobj.capture', { gu: o.guId });
   if (o.type === 'refine') return T('qobj.refine', { gu: o.guId });
+  if (o.type === 'travel') return T('qobj.travel');
+  if (o.type === 'defeatAny') return T('qobj.defeatAny', { n: o.minDanger || 0 });
+  if (o.type === 'guUse') return T('qobj.guUse');
+  if (o.type === 'refineAny') return T('qobj.refineAny');
   return T('qobj.default');
 }
 
@@ -100,12 +104,17 @@ export function acceptQuest(state, questId) {
 }
 
 const MATCHERS = {
-  ENEMY_KILLED: (o, ev) => (o.type === 'hunt' || o.type === 'defeat') && o.enemy === ev.id,
+  ENEMY_KILLED: (o, ev) => ((o.type === 'hunt' || o.type === 'defeat') && o.enemy === ev.id)
+    // "worthy foes" — any species whose danger rating clears the bar
+    || (o.type === 'defeatAny' && (visualOf(ev.id)?.danger ?? 0) >= (o.minDanger || 0)),
   ITEM_COLLECTED: (o, ev) => o.type === 'gather' && o.countMode === 'total' && o.item === ev.id,
   LOCATION_DISCOVERED: (o, ev) => o.type === 'reach' && o.area === ev.id,
   NPC_TALKED: (o, ev) => o.type === 'talk' && o.npc === ev.id,
   GU_CAPTURED: (o, ev) => o.type === 'capture' && o.guId === ev.id,
-  GU_REFINED: (o, ev) => o.type === 'refine' && o.guId === ev.id,
+  GU_REFINED: (o, ev) => (o.type === 'refine' && o.guId === ev.id) || o.type === 'refineAny',
+  // mentor-recognition events (#8): wilderness paces, meaningful Gu uses
+  DISTANCE_TRAVELED: (o) => o.type === 'travel',
+  GU_USED: (o) => o.type === 'guUse',
   ARENA_WON: () => false, // reserved — no objective type consumes it yet
 };
 

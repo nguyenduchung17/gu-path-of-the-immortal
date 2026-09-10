@@ -119,6 +119,32 @@ export const QUESTS = [
     objective: { type: 'defeat', enemy: 'mutatedBeast', qty: 1 },
     rewards: { spiritStones: 60, items: { fireEssence: 3 }, message: 'Elder Mo decants the core with steady hands. "You have a refiner\u2019s patience. My furnace is open to you, successor."' },
   },
+  // ---- Master recognition trials (SEEK RECOGNITION → accept → prove → return;
+  //      the mentor's teaching is granted at turn-in — see masters.js) ----
+  {
+    id: 'q_jian_trial', name: 'Steps Worthy of the Sword', giver: 'masterJian', masterTrial: 'masterJian',
+    difficulty: 'Recognition Trial',
+    description: 'Master Jian\u2019s recognition trial. Walk far through dangerous wilderness, spill the blood of worthy foes, and let your Gu speak — then return to the waterfall with steadier steps.',
+    hint: 'Only wilderness paces count — towns and roads behind walls are not proof. Worthy foes are of at least moderate danger; your Gu counts when it meaningfully shapes a battle.',
+    objectives: [
+      { id: 'travel', type: 'travel', qty: 500, label: 'Travel through dangerous wilderness (paces)' },
+      { id: 'kills', type: 'defeatAny', qty: 3, minDanger: 2, label: 'Defeat worthy opponents (moderate danger or higher)' },
+      { id: 'guuse', type: 'guUse', qty: 6, label: 'Use your Gu meaningfully in battle' },
+      { id: 'return', type: 'talk', npc: 'masterJian', qty: 1, label: 'Return to Master Jian' },
+    ],
+    rewards: { insight: 15, message: 'You have returned with steadier steps.' },
+  },
+  {
+    id: 'q_mo_trial', name: 'Hands Worthy of the Furnace', giver: 'elderMo', masterTrial: 'elderMo',
+    difficulty: 'Recognition Trial',
+    description: 'Elder Mo\u2019s recognition trial: prove hands that can refine without waste. One clean refinement, then return to the furnace.',
+    hint: 'Refine any Gu you own at a refinement master\u2019s furnace — a single clean success is proof enough. Failures do not count.',
+    objectives: [
+      { id: 'refine', type: 'refineAny', qty: 1, label: 'Successfully refine a Gu' },
+      { id: 'return', type: 'talk', npc: 'elderMo', qty: 1, label: 'Return to Elder Mo' },
+    ],
+    rewards: { insight: 10, message: 'The furnace remembers every steady hand.' },
+  },
 ];
 
 export const QUEST_BY_ID = Object.fromEntries(QUESTS.map(q => [q.id, q]));

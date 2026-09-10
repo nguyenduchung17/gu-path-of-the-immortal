@@ -2,7 +2,7 @@ import { GU_BY_ID } from '../data/gu';
 import { ITEM_BY_ID } from '../data/items';
 import { QUEST_BY_ID, QUESTS } from '../data/quests';
 import { NPC_BY_ID, guOfferOf } from '../data/npcs';
-import { MASTERS, MASTER_BY_ID, reqChecks, syncMasterSteps } from '../data/masters';
+import { MASTERS, MASTER_BY_ID, reqChecks, syncMasterSteps, masterTrialStateOf } from '../data/masters';
 import { EVENT_BY_ID } from '../data/events';
 import { ENEMY_BY_ID } from '../data/enemies';
 import { initCombat, executeRound, persistCombatEnemyState } from '../engine/combat';
@@ -120,8 +120,10 @@ function pushToast(s, t) {
 function withQuestEvents(s, event) {
   const res = applyQuestEvent(s, event);
   let out = res.state;
+  // silent events (wilderness paces, Gu uses) update the tracker without a
+  // toast per step — the tracker itself shows the live progress
   for (const u of res.updates) {
-    out = pushToast(out, { icon: '📜', title: T('toast.objUpdated'), lines: [T('qs.objLine', { delta: u.delta, label: u.label })] });
+    if (!event.silent) out = pushToast(out, { icon: '📜', title: T('toast.objUpdated'), lines: [T('qs.objLine', { delta: u.delta, label: u.label })] });
   }
   for (const qid of res.ready) {
     const q = QUEST_BY_ID[qid];
@@ -317,6 +319,9 @@ function baseReducer(state, action) {
         s = withQuestEvents(s, { type: 'LOCATION_DISCOVERED', id: zone.id });
         s = applyEffects(s, { insight: BALANCE.insight.zone });
       }
+      // recognition trials: only WILDERNESS paces count as proof — walking
+      // spam inside safe zones is meaningless (#4)
+      if (!zone.safe) s = withQuestEvents(s, { type: 'DISTANCE_TRAVELED', qty: 1, silent: true });
       if (newLm) {
         s = applyEffects(s, { insight: BALANCE.insight.landmark });
         s = pushToast(s, { icon: '📍', title: T('toast.discovered'), lines: [locLandmarkName(newLm)] });
@@ -575,21 +580,43 @@ function baseReducer(state, action) {
     }
 
     // ---------- Mentors / masters ----------
+    // Mentor actions are legal while the mentor dialogue is open (that is
+    // their home) — only real blockers count. Every path returns feedback.
     case 'MASTER_CLAIM': {
-      if (busy(state)) return state;
+      if (state.combat || state.recovery || state.pendingEvent || state.sleeping || state.wildEncounter) return state;
       const m = MASTER_BY_ID[action.masterId];
       const ms = (state.masters || {})[m?.id];
-      if (!m || !ms?.found) return state;
+      if (!m || !ms?.found) {
+        console.debug('[mentor] claim failed', { masterId: action.masterId, failureReason: 'not-found' });
+        return state;
+      }
       const step = m.steps[ms.step];
-      if (!step || step.kind !== 'req') return state;
+      if (!step || step.kind !== 'req') {
+        console.debug('[mentor] claim failed', { masterId: m.id, trialState: 'REWARDED', failureReason: 'no-req-step' });
+        return state;
+      }
       const list = reqChecks(state, step.req);
-      if (!list.ok) return { ...state, log: [...state.log, T('master.noReq')] };
+      if (!list.ok) {
+        // REQUIREMENTS NOT MET — say so, never a silent no-op (#1, #14)
+        console.debug('[mentor] claim failed', { masterId: m.id, bond: ms.step, requirements: list.checks, trialState: 'NOT_AVAILABLE', failureReason: 'requirements' });
+        return pushToast({ ...state, log: [...state.log, T('master.noReq')] }, { icon: '🧘', title: T('master.notReadyTitle'), lines: [T('master.noReq')] });
+      }
+      // A mentor with a real teaching never gives it away at first asking:
+      // the claim opens the RECOGNITION TRIAL offer instead (#3)
+      if (step.recognition) {
+        const ts = masterTrialStateOf(state, m, ms.step);
+        if (ts === 'AVAILABLE') return { ...state, pendingEvent: step.recognition.eventId };
+        // already active / rewarded — defined result with feedback, no duplicates (#15)
+        console.debug('[mentor] trial not startable', { masterId: m.id, bond: ms.step, trialState: ts, failureReason: ts });
+        return pushToast({ ...state, log: [...state.log, T(ts === 'REWARDED' ? 'master.trialRewarded' : 'master.trialActive')] },
+          { icon: '🧘', title: T('master.trialStateTitle'), lines: [T(ts === 'REWARDED' ? 'master.trialRewarded' : 'master.trialActive')] });
+      }
       let s = applyEffects(state, step.grants || {});
       s = syncMasterSteps({ ...s, masters: { ...s.masters, [m.id]: { ...ms, step: ms.step + 1 } } });
       return advanceTime(s, BALANCE.time.talkMinutes);
     }
     case 'MASTER_DUEL': {
-      if (busy(state)) return state;
+      if (state.combat || state.recovery || state.pendingEvent || state.sleeping || state.wildEncounter) return state;
       const m = MASTER_BY_ID[action.masterId];
       const ms = (state.masters || {})[m?.id];
       if (!m || !ms?.found) return state;
@@ -949,6 +976,20 @@ function baseReducer(state, action) {
       if (res.state === state) return state;
       let s = applyEffects(res.state, { ...(q.rewards || {}), insight: BALANCE.insight.quest, message: locQuestRewardMsg(q) || undefined, ...(Object.keys(res.removeItems).length ? { removeItems: res.removeItems } : {}) });
       s = pushToast(s, { icon: '🎉', title: T('toast.questComplete'), lines: [locQuestName(q), locQuestRewardMsg(q) || T('qs.rewards')] });
+      // A RECOGNITION TRIAL turned in: the mentor's bond deepens and the
+      // req step's teaching is granted EXACTLY ONCE — the step advances past
+      // the trial, so a second turn-in can never happen (#11, #15)
+      if (q.masterTrial) {
+        const m = MASTER_BY_ID[q.masterTrial];
+        const ms = s.masters?.[m?.id];
+        if (m && ms && m.steps[ms.step]?.recognition?.questId === q.id) {
+          const step = m.steps[ms.step];
+          s = applyEffects(s, step.grants || {});
+          if (step.grants?.unlockPath) s = grantMastery(s, step.grants.unlockPath, 40, 'guUsed', 'mentor');
+          s = syncMasterSteps({ ...s, masters: { ...s.masters, [m.id]: { ...ms, step: ms.step + 1 } } });
+          s = pushToast(s, { icon: '🧘', title: T('master.recognizedTitle'), lines: [T('master.recognizedLine', { name: m.name })] });
+        }
+      }
       return syncMasterSteps(s);
     }
     case 'TRACK_QUEST': {
@@ -977,6 +1018,9 @@ function baseReducer(state, action) {
     // ---------- Combat ----------
     case 'PLAYER_ACTION': {
       if (state.recovery) return state;
+      // meaningful Gu uses feed recognition-trial objectives (masteryUses only
+      // increments when a Gu actually shaped the action)
+      const usesBefore = Object.values(state.combat?.masteryUses || {}).reduce((a, b) => a + b, 0);
       let s = executeRound(state, { type: action.action, guInstanceId: action.guInstanceId, itemId: action.itemId, targetUid: action.targetUid });
       // the first clash records the foe in your bestiary
       if (state.combat && !state.combat.seen && ENEMY_BY_ID[state.combat.enemyId]) {
@@ -992,6 +1036,10 @@ function baseReducer(state, action) {
         if (s.inventory[it.category][s.combat.usedItem] <= 0) delete s.inventory[it.category][s.combat.usedItem];
         const c = { ...s.combat }; delete c.usedItem; s = { ...s, combat: c };
       }
+      // GU_USED (#8): one event per meaningful Gu use — the combat state keeps
+      // its masteryUses counters even on the finishing blow, so the last use counts
+      const usesAfter = Object.values(s.combat?.masteryUses || {}).reduce((a, b) => a + b, 0);
+      if (usesAfter > usesBefore) s = withQuestEvents(s, { type: 'GU_USED', qty: usesAfter - usesBefore, silent: true });
       return s;
     }
     case 'END_COMBAT': {
@@ -1055,6 +1103,20 @@ function baseReducer(state, action) {
       const ev = EVENT_BY_ID[state.pendingEvent];
       const opt = ev.options[action.optionIndex];
       let s = applyEffects(state, { ...opt.effects, message: locEventMsg(ev, action.optionIndex) || undefined });
+      // recognition-trial offers accept their trial quest through the same
+      // centralized quest system as every other quest (#6, #8) — acceptQuest
+      // itself refuses duplicates, so double-clicks can never double-issue (#15)
+      const acc = opt.effects?.acceptQuest;
+      if (acc && QUEST_BY_ID[acc]) {
+        const res = acceptQuest(s, acc);
+        if (res.state !== s) {
+          const q = QUEST_BY_ID[acc];
+          s = res.state;
+          s = pushToast(s, { icon: '📜', title: T('toast.questAccepted'), lines: [locQuestName(q), T('qs.giver', { name: NPC_BY_ID[q.giver]?.name || q.giver }), res.autoTracked ? T('qs.trackedNow') : T('qs.trackHint')] });
+        } else {
+          console.debug('[mentor] trial not accepted (record exists)', { questId: acc, failureReason: 'duplicate' });
+        }
+      }
       const pending = s._pendingCombat;
       delete s._pendingCombat;
       s = { ...s, pendingEvent: null };

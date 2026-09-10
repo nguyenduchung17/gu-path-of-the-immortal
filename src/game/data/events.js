@@ -46,6 +46,24 @@ export const EVENTS = [
       { label: 'Decline', effects: { message: 'You walk away.' } },
     ],
   },
+  // ---- Master recognition-trial offers (set only by SEEK RECOGNITION —
+  //      accepting starts the mentor's trial quest; see masters.js) ----
+  {
+    id: 'ev_jian_recognition', title: 'Steps Worthy of the Sword',
+    text: 'Master Jian finally looks up. "You have some foundation. Perhaps you are worth testing. Walk the dangerous wilds — far — and let your Gu earn its keep against worthy foes. Return with steadier steps, and I will show you the threshold of the sword."',
+    options: [
+      { label: 'Accept the Trial', effects: { acceptQuest: 'q_jian_trial', message: 'Master Jian nods once. "The trial begins. The wilds will weigh your steps."' } },
+      { label: 'Not Yet', effects: { message: '"Then do not waste my time. Come back when your feet are ready."' } },
+    ],
+  },
+  {
+    id: 'ev_mo_recognition', title: 'Hands Worthy of the Furnace',
+    text: 'Elder Mo finally meets your eyes. "Words are cheap at a furnace. Show me hands that can refine without waste — one clean refinement. Return, and the Insight Eye is yours to learn."',
+    options: [
+      { label: 'Accept the Trial', effects: { acceptQuest: 'q_mo_trial', message: '"The furnace remembers every steady hand. Go."' } },
+      { label: 'Not Yet', effects: { message: '"Hmph. When your hands stop shaking, return."' } },
+    ],
+  },
 ];
 
 export const EVENT_BY_ID = Object.fromEntries(EVENTS.map(e => [e.id, e]));
