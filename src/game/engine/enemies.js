@@ -8,6 +8,7 @@ import { isNight } from './time';
 import { exploreActive, carryIntoCombat, ambushOf, nearbyPackCount } from './exploration';
 import { totalGameMin } from './vitalGu';
 import { BALANCE } from '../config/balance';
+import { T, locEnemyName } from '../i18n/tr';
 
 const ORTH = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 const NPC_CELLS = WORLD_NPCS.map(n => [n.x, n.y]);
@@ -68,7 +69,7 @@ export function tickEnemies(state) {
     const carry = carryIntoCombat(state, ne);
     const amb = ambushOf(state, ne, false);
     const ambIntro = amb.amb === 'enemy'
-      ? `AMBUSHED! ${ENEMY_BY_ID[ne.defId].name} lunges from hiding!`
+      ? T('cmt.enemyAmbushIntro', { enemy: locEnemyName(ENEMY_BY_ID[ne.defId]) })
       : amb.note ? `${intro} ${amb.note}` : intro;
     return initCombat(ne.defId, p, {
       hp: ne.hp, stability: ne.stability, statuses: carry.statuses, playerStatuses: carry.playerStatuses,
@@ -127,13 +128,13 @@ export function tickEnemies(state) {
       if (dist > detect + BALANCE.world.giveUpDist || homeDist > BALANCE.world.leash) {
         ne.state = 'idle';
       } else if (manhattan(ne.x, ne.y, p.x, p.y) === 1) {
-        combat = engage(ne, `${def.name} catches you!`);
+        combat = engage(ne, T('cmt.enemyCaught', { enemy: locEnemyName(def) }));
         return ne;
       } else if (canEnemyMove(ne)) {
         const st = stepToward(ne, p.x, p.y, enemies, p);
         if (st) { ne.x = st.x; ne.y = st.y; }
         if (manhattan(ne.x, ne.y, p.x, p.y) === 1) {
-          combat = engage(ne, `${def.name} closes in!`);
+          combat = engage(ne, T('cmt.enemyCloses', { enemy: locEnemyName(def) }));
         }
       }
       return ne;

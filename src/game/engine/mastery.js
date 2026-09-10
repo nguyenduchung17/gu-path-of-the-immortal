@@ -3,6 +3,7 @@ import { PATH_BY_ID } from '../data/paths';
 import { RECIPES, RECIPE_BY_ID } from '../data/recipes';
 import { GU_BY_ID } from '../data/gu';
 import { BALANCE } from '../config/balance';
+import { T, TL, locGuName, locPathName, locPathLevelText, locRecipeRumor, locRecipeClue, locRecipeLead } from '../i18n/tr';
 
 export function masteryOf(state, pathId) {
   return state.mastery?.[pathId] || { level: 1, xp: 0 };
@@ -60,15 +61,15 @@ export function grantMastery(state, pathId, xp, statKey = null, via = null) {
   while (next.level < 5 && next.xp >= masteryThreshold(next.level + 1)) { next.level++; leveledTo = next.level; }
   if (leveledTo) {
     s.mastery = { ...s.mastery, [pathId]: { ...next } };
-    const lines = [def.levels[leveledTo - 1].text];
+    const lines = [locPathLevelText(def, leveledTo - 1)];
     for (const r of RECIPES.filter(r => r.path === pathId && r.milestoneLevel === leveledTo)) {
       if (!s.knownRecipes.includes(r.id)) {
         s = learnRecipe(s, r.id, true);
-        lines.push(`Unlocked: ${GU_BY_ID[r.guId]?.name || r.guId} recipe`);
+        lines.push(T('mst.unlockedRecipe', { gu: locGuName(GU_BY_ID[r.guId]) }));
       }
     }
-    s = pushToast(s, { kind: 'pathLevel', icon: def.icon, title: `${def.name} — Level ${leveledTo}`, lines: [masteryTitle(leveledTo), ...lines] });
-    s = { ...s, log: [...(s.log || []), `${def.name} reaches Level ${leveledTo} — ${masteryTitle(leveledTo)}.`] };
+    s = pushToast(s, { kind: 'pathLevel', icon: def.icon, title: T('mst.levelToast', { path: locPathName(def), n: leveledTo }), lines: [T(`mst.title${leveledTo}`), ...lines] });
+    s = { ...s, log: [...(s.log || []), T('mst.levelLog', { path: locPathName(def), n: leveledTo, title: T(`mst.title${leveledTo}`) })] };
   }
   return s;
 }
@@ -77,8 +78,8 @@ export function discoverPath(state, pathId) {
   if (!PATH_BY_ID[pathId] || (state.knownPaths || []).includes(pathId)) return state;
   const def = PATH_BY_ID[pathId];
   let s = { ...state, knownPaths: [...(state.knownPaths || []), pathId] };
-  s = pushToast(s, { kind: 'path', icon: def.icon, title: `Path Discovered: ${def.name}`, lines: [def.description] });
-  return { ...s, log: [...(s.log || []), `You discover the ${def.name}.`] };
+  s = pushToast(s, { kind: 'path', icon: def.icon, title: T('toast.pathDiscovered', { path: locPathName(def) }), lines: [TL('path.' + def.id + '.desc', def.description)] });
+  return { ...s, log: [...(s.log || []), T('mst.discoverLog', { path: locPathName(def) })] };
 }
 
 export function learnRecipe(state, recipeId, silent = false) {
@@ -87,9 +88,9 @@ export function learnRecipe(state, recipeId, silent = false) {
   let s = { ...state, knownRecipes: [...(state.knownRecipes || []), recipeId] };
   s = discoverPath(s, r.path);
   s = grantMastery(s, 'refinement', BALANCE.mastery.xpRecipeDiscovery, 'recipes', 'study');
-  s = { ...s, log: [...(s.log || []), `Recipe learned: ${GU_BY_ID[r.guId]?.name || recipeId}.`] };
+  s = { ...s, log: [...(s.log || []), T('mst.recipeLog', { gu: locGuName(GU_BY_ID[r.guId]) || recipeId })] };
   if (!silent) {
-    s = pushToast(s, { kind: 'recipe', icon: '📖', title: `New Recipe: ${GU_BY_ID[r.guId]?.name}`, lines: [`${PATH_BY_ID[r.path].name} · requires mastery level ${r.masteryReq}`] });
+    s = pushToast(s, { kind: 'recipe', icon: '📖', title: T('toast.newRecipe', { gu: locGuName(GU_BY_ID[r.guId]) || '???' }), lines: [T('mst.recipeReq', { path: locPathName(PATH_BY_ID[r.path]), n: r.masteryReq })] });
   }
   return s;
 }
@@ -105,10 +106,10 @@ export function learnClue(state, recipeId, level) {
   const cur = state.recipeKnowledge?.[recipeId];
   if ((CLUE_RANK[level] || 0) <= (cur ? CLUE_RANK[cur] || 0 : 0)) return state;
   let s = { ...state, recipeKnowledge: { ...(state.recipeKnowledge || {}), [recipeId]: level } };
-  const text = level === 'located' ? r.lead : level === 'identified' ? r.clue : r.rumor;
+  const text = level === 'located' ? locRecipeLead(r) : level === 'identified' ? locRecipeClue(r) : locRecipeRumor(r);
   const headline = level === 'located'
-    ? `Recipe located: ${GU_BY_ID[r.guId]?.name || '???'}`
-    : level === 'identified' ? `Recipe identified: ${GU_BY_ID[r.guId]?.name || '???'}` : 'A new recipe rumor reaches your ears.';
-  s = pushToast(s, { icon: '🔍', title: 'NEW CLUE DISCOVERED', lines: [headline, text] });
-  return { ...s, log: [...(s.log || []), `Clue gained — ${headline}: ${text}`] };
+    ? T('mst.clueLocated', { gu: locGuName(GU_BY_ID[r.guId]) || '???' })
+    : level === 'identified' ? T('mst.clueIdentified', { gu: locGuName(GU_BY_ID[r.guId]) || '???' }) : T('mst.clueRumor');
+  s = pushToast(s, { icon: '🔍', title: T('toast.newClue'), lines: [headline, text] });
+  return { ...s, log: [...(s.log || []), T('mst.clueLog', { headline, text })] };
 }

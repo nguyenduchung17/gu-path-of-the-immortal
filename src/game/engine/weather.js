@@ -3,6 +3,7 @@
 // In battle, weather slightly boosts or weakens Gu paths.
 import { PATH_BY_ID } from '../data/paths';
 import { BALANCE } from '../config/balance';
+import { T, locPathName } from '../i18n/tr';
 
 export const WEATHERS = {
   clear:    { icon: '☀️', mods: {} },
@@ -28,16 +29,10 @@ export function weatherModOf(weather, path) {
   return weather?.mods?.[path] || 0;
 }
 
-// English battle-log line describing the current weather's effect on Gu.
+// Battle-log line describing the current weather's effect on Gu.
 export function weatherEffectLine(weather) {
   if (!weather || weather.id === 'clear') return null;
   const parts = Object.entries(weather.mods).map(([p, m]) =>
-    `${PATH_BY_ID[p]?.name || p} ${m > 0 ? '+' : ''}${m}%`);
-  const intro = {
-    rain: 'Rain hammers down —',
-    heatwave: 'The air shimmers with heat —',
-    gale: 'A wild gale howls —',
-    mist: 'Thick spirit-mist coils about —',
-  }[weather.id];
-  return `${intro} ${parts.join(', ')} to Gu power.`;
+    `${PATH_BY_ID[p] ? locPathName(PATH_BY_ID[p]) : p} ${m > 0 ? '+' : ''}${m}%`).join(', ');
+  return T(`weather.line.${weather.id}`, { mods: parts });
 }

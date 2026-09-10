@@ -5,6 +5,7 @@
 import { diffOf } from '../config/balance';
 import { INNS, CAMP_CELLS, zoneAt, isWalkable } from '../data/world';
 import { CULTIVATION_STAGES } from '../data/cultivation';
+import { T, locStageName, locZoneName } from '../i18n/tr';
 
 const cheb = (a, b) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
 
@@ -38,18 +39,19 @@ export function memorialOf(state) {
   const p = state.player;
   const g = Math.min(19, (p.rank || 0) * 4 + (p.stage || 0));
   const levels = Object.values(state.mastery || {}).map(m => m.level || 1);
+  const zone = zoneAt(p.x, p.y);
   return {
     name: p.name,
     day: (state.time || {}).day || 1,
     playtimeSec: state.playtimeSec || 0,
-    realm: CULTIVATION_STAGES[g].name,
+    realm: locStageName(CULTIVATION_STAGES[g]),
     highestMastery: levels.length ? Math.max(...levels) : 0,
     gu: (state.ownedGu || []).length,
     recipes: (state.knownRecipes || []).length,
     kills: Object.values(state.quests?.kills || {}).reduce((a, b) => a + b, 0),
     quests: Object.values(state.quests?.byId || {}).filter(r => r.status === 'TURNED_IN' || r.status === 'COMPLETED').length,
     stones: p.spiritStones || 0,
-    place: (zoneAt(p.x, p.y) || {}).name || 'the Green Valley Region',
+    place: zone ? locZoneName(zone) : T('dth.region'),
   };
 }
 
@@ -64,13 +66,14 @@ export function applyDeath(state, combat, player, cause) {
       player,
       combat: { ...combat, over: true, result: 'defeat' },
       deceased: { cause, at: mem },
-      log: [...state.log, `${player.name} has fallen on Day ${day}, struck down in ${mem.place}. This cultivator's story ends here.`],
+      log: [...state.log, T('dth.permadeath', { name: player.name, day, place: mem.place })],
     };
   }
 
   const at = { x: player.x, y: player.y };
   const spot = d.respawn === 'nearestInn' ? nearestInn(state, at) : randomSpawn(state, at);
-  const placeName = spot.name || (zoneAt(spot.x, spot.y) || {}).name || 'the wilds';
+  const spotZone = zoneAt(spot.x, spot.y);
+  const placeName = spot.name || (spotZone ? locZoneName(spotZone) : T('dth.wilds'));
 
   const p = { ...player };
   p.x = spot.spawn ? spot.spawn[0] : spot.x;
@@ -98,16 +101,16 @@ export function applyDeath(state, combat, player, cause) {
   }
 
   const lost = [];
-  if (d.progressLoss) lost.push(`${Math.round(d.progressLoss * 100)}% of cultivation progress`);
-  if (d.inventoryLoss) lost.push(`~${Math.round(d.inventoryLoss * 100)}% of carried goods`);
-  if (d.stonesLoss) lost.push(`${Math.round(d.stonesLoss * 100)}% of primordial stones`);
-  const summary = lost.length ? ` Lost: ${lost.join(', ')}.` : ' Nothing was lost.';
+  if (d.progressLoss) lost.push(T('dth.lostProgress', { p: Math.round(d.progressLoss * 100) }));
+  if (d.inventoryLoss) lost.push(T('dth.lostGoods', { p: Math.round(d.inventoryLoss * 100) }));
+  if (d.stonesLoss) lost.push(T('dth.lostStones', { p: Math.round(d.stonesLoss * 100) }));
+  const summary = lost.length ? T('dth.lostSummary', { list: lost.join(', ') }) : T('dth.lostNone');
 
   return {
     ...state,
     player: p,
     inventory,
     combat: { ...combat, over: true, result: 'defeat' },
-    log: [...state.log, `You collapse... You wake at ${placeName}, battered but alive.${summary}`],
+    log: [...state.log, T('dth.wake', { place: placeName, summary })],
   };
 }

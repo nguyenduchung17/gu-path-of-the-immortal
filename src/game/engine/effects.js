@@ -2,6 +2,7 @@ import { GU_BY_ID } from '../data/gu';
 import { ITEM_BY_ID } from '../data/items';
 import { RECIPES } from '../data/recipes';
 import { learnRecipe, discoverPath, learnClue } from './mastery';
+import { T, locGuName } from '../i18n/tr';
 
 let _idc = 0;
 const newInstanceId = () => 'g' + Date.now().toString(36) + (_idc++).toString(36);
@@ -60,7 +61,7 @@ export function applyEffects(state, effects) {
   }
   if (effects.giveGu) {
     const gu = GU_BY_ID[effects.giveGu];
-    if (gu) { ownedGu.push({ instanceId: newInstanceId(), guId: effects.giveGu, rank: gu.rank }); log.push(`Obtained ${gu.name}!`); }
+    if (gu) { ownedGu.push({ instanceId: newInstanceId(), guId: effects.giveGu, rank: gu.rank }); log.push(T('cmt.obtained', { gu: locGuName(gu) })); }
   }
   if (effects.reputation) for (const [f, d] of Object.entries(effects.reputation)) reputation[f] = (reputation[f] || 0) + d;
   if (effects.unlockArea && !worldState.unlockedAreas.includes(effects.unlockArea)) worldState.unlockedAreas.push(effects.unlockArea);

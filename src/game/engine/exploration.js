@@ -12,6 +12,7 @@ import { grantMastery } from './mastery';
 import { proficiencyOf, recordUse } from './proficiency';
 import { revealFog } from './guLife';
 import { WORLD_RESOURCES, WORLD, HIDDEN_PATHS, HAZARDS, hazardAt, LANDMARKS } from '../data/world';
+import { T, locGuName, locEnemyName, locHiddenPathName, locHazardName, locLandmarkName, locPathName } from '../i18n/tr';
 
 const cheb = (ax, ay, bx, by) => Math.max(Math.abs(ax - bx), Math.abs(ay - by));
 
@@ -84,8 +85,8 @@ export function checkHiddenPaths(s) {
   return {
     ...s,
     worldState: { ...s.worldState, discovered: { ...s.worldState.discovered, paths: { ...known, [found.id]: true } } },
-    log: [...s.log, `${found.name} revealed — the way is permanently open to you.`],
-    toasts: [...(s.toasts || []), { id: `hp${Date.now().toString(36)}`, icon: '🌀', title: 'HIDDEN PATH REVEALED', lines: [found.name, 'A secret way opens before you.'] }],
+    log: [...s.log, T('exp.pathRevealed', { name: locHiddenPathName(found) })],
+    toasts: [...(s.toasts || []), { id: `hp${Date.now().toString(36)}`, icon: '🌀', title: T('toast.hiddenPath'), lines: [T('exp.pathToastA', { name: locHiddenPathName(found) }), T('exp.pathToastB')] }],
   };
 }
 
@@ -98,14 +99,14 @@ export function moveOverride(state, nx, ny) {
   if (tile === 'P') {
     const hp = HIDDEN_PATHS.find(p => p.cells.some(([cx, cy]) => cx === nx && cy === ny));
     const known = state.worldState.discovered?.paths || {};
-    if (hp && known[hp.id]) return { reason: `You follow ${hp.name}.` };
-    if (hp) return { blocked: 'Something is hidden here — a scouting Gu might reveal the way.' };
+    if (hp && known[hp.id]) return { reason: T('exp.follow', { name: locHiddenPathName(hp) }) };
+    if (hp) return { blocked: T('exp.hiddenHint') };
     return null;
   }
   const hz = hazardAt(nx, ny);
   if (hz?.kind === 'rapids') {
-    if (exploreActive(state).waterwalk) return { reason: 'Tide Binding stills the raging water — you cross.' };
-    return { blocked: 'The Raging Rapids churn — nothing crosses. Perhaps a binding could still the waters…' };
+    if (exploreActive(state).waterwalk) return { reason: T('exp.rapidsCross') };
+    return { blocked: T('exp.rapidsBlocked') };
   }
   return null;
 }
@@ -121,21 +122,21 @@ export function hazardStep(s) {
   const slowMin = (BALANCE.exploration.hazardSlowMinutes || {})[hz.kind] || 0;
   if (hz.kind === 'miasma') {
     if (act.stealth) {
-      return { ...s, log: [...s.log, 'Mist Veil shrouds you — the miasma slides past harmlessly.'] };
+      return { ...s, log: [...s.log, T('exp.miasmaVeil')] };
     }
     const dmg = BALANCE.exploration.hazardDmg;
     const out = {
       ...s,
       player: { ...s.player, hp: Math.max(1, s.player.hp - dmg) },
-      log: [...s.log, `Poison miasma sears your lungs! (-${dmg} HP, +${slowMin} min)`],
+      log: [...s.log, T('exp.miasmaHit', { dmg, min: slowMin })],
     };
     return advanceTime(out, slowMin);
   }
   if (hz.kind === 'unstable') {
     if (act.steady) {
-      return { ...s, log: [...s.log, `${hz.name} shifts and groans — your steady grip keeps your footing sure.`] };
+      return { ...s, log: [...s.log, T('exp.steadyLine', { name: locHazardName(hz) })] };
     }
-    return advanceTime({ ...s, log: [...s.log, `${hz.name} — the shifting ground fights your every step. (+${slowMin} min)`] }, slowMin);
+    return advanceTime({ ...s, log: [...s.log, T('exp.unstableLine', { name: locHazardName(hz), min: slowMin })] }, slowMin);
   }
   return s;
 }
@@ -158,13 +159,13 @@ export function carryIntoCombat(state, enemyRecord) {
 export function applyExploreGu(state, inst) {
   const gu = GU_BY_ID[inst.guId];
   const ex = gu?.explore;
-  if (!ex) return { state, ok: false, reason: 'This Gu has no use in the wilds.' };
+  if (!ex) return { state, ok: false, reason: T('exp.noUse') };
   const p = state.player;
-  if (!p.equippedGu.includes(inst.instanceId)) return { state, ok: false, reason: `${gu.name} must be equipped.` };
+  if (!p.equippedGu.includes(inst.instanceId)) return { state, ok: false, reason: T('exp.mustEquip', { gu: locGuName(gu) }) };
   const now = totalGameMin(state.time);
   const cdLeft = Math.max(0, ((state.exploreCd || {})[inst.instanceId] || 0) - now);
-  if (cdLeft > 0) return { state, ok: false, reason: `${gu.name} is recovering — ${Math.ceil(cdLeft)} min.` };
-  if (p.primevalEssence < ex.essence) return { state, ok: false, reason: 'Not enough essence.' };
+  if (cdLeft > 0) return { state, ok: false, reason: T('exp.cdLeft', { gu: locGuName(gu), n: Math.ceil(cdLeft) }) };
+  if (p.primevalEssence < ex.essence) return { state, ok: false, reason: T('exp.noEssence') };
 
   // a practiced companion works the wilds longer — proficiency extends the effect
   const prof = proficiencyOf(inst);
@@ -193,11 +194,11 @@ export function applyExploreGu(state, inst) {
       const nearRapids = ex.kind === 'root'
         && HAZARDS.some(h => h.kind === 'rapids'
           && h.cells.some(([cx, cy]) => cheb(cx, cy, p.x, p.y) <= 2));
-      if (!nearRapids) return { state, ok: false, reason: `No enemy within ${ex.range || BALANCE.exploration.range} paces.` };
+      if (!nearRapids) return { state, ok: false, reason: T('exp.noEnemy', { n: ex.range || BALANCE.exploration.range }) };
       let s = grantMastery(state, gu.path, BALANCE.exploration.masteryXp, 'guUsed', 'guUse');
       return spend(s, { waterwalk: { until } }, {
-        icon: '⛓️', title: 'WATERS BOUND',
-        lines: [`${gu.name} grips the torrent — the rapids calm for ${dur} min.`, 'Cross while the binding holds!'],
+        icon: '⛓️', title: T('toast.watersBound'),
+        lines: [T('exp.watersLine1', { gu: locGuName(gu), n: dur }), T('exp.watersLine2')],
       });
     }
     const def = ENEMY_BY_ID[e.defId];
@@ -210,10 +211,10 @@ export function applyExploreGu(state, inst) {
     s = grantMastery(s, gu.path, BALANCE.exploration.masteryXp, 'guUsed', 'guUse');
     return spend(s, {}, {
       icon: ex.kind === 'root' ? '⛓️' : '🕸️',
-      title: resistFactor(def) < 1 ? 'PARTIALLY RESISTED' : (ex.kind === 'root' ? 'ENEMY ROOTED' : 'ENEMY SLOWED'),
+      title: resistFactor(def) < 1 ? T('toast.partial') : (ex.kind === 'root' ? T('toast.rooted') : T('toast.slowed')),
       lines: [ex.kind === 'root'
-        ? `${gu.name} lashes out — ${def.name} cannot move for ${effDur} min.`
-        : `${gu.name} coils about ${def.name} — it moves at half pace for ${effDur} min.`],
+        ? T('exp.rootLine', { gu: locGuName(gu), enemy: locEnemyName(def), n: effDur })
+        : T('exp.slowLine', { gu: locGuName(gu), enemy: locEnemyName(def), n: effDur })],
     });
   }
 
@@ -231,11 +232,11 @@ export function applyExploreGu(state, inst) {
     }
     if (foes.length || foundLm.length) s = grantMastery(s, gu.path, BALANCE.exploration.masteryXp, 'guUsed', 'guUse');
     const out = spend(s, { vision: { until, radius: r } }, {
-      icon: '👁️', title: 'SCOUTING',
+      icon: '👁️', title: T('toast.scouting'),
       lines: [
-        `The wilds within ${r} paces are laid bare.`,
-        foes.length ? `${foes.length} threat(s) revealed — details on the left.` : 'No threats within sight.',
-        ...(foundLm.length ? [`🗺️ ${foundLm.length} hidden place(s) charted on your map.`] : []),
+        T('exp.scoutLine1', { r }),
+        foes.length ? T('exp.scoutLine2', { n: foes.length }) : T('exp.scoutLine3'),
+        ...(foundLm.length ? [T('exp.scoutLine4', { n: foundLm.length })] : []),
       ],
     });
     out.state = checkHiddenPaths(out.state);
@@ -251,10 +252,10 @@ export function applyExploreGu(state, inst) {
     let s = revealFog(state, p.x, p.y, r);
     if (near.length) s = grantMastery(s, gu.path, BALANCE.exploration.masteryXp, 'guUsed', 'guUse');
     const out = spend(s, { sense: { until } }, {
-      icon: '🦋', title: 'RESOURCE SENSE',
+      icon: '🦋', title: T('toast.sense'),
       lines: near.length
-        ? [...Object.entries(byName).map(([name, n]) => `${n}× ${name} within ${r} paces`), ...(near.some(n => n.rare) ? ['✨ A rare harvest hides among them.'] : [])]
-        : [`Nothing of use within ${r} paces.`],
+        ? [...Object.entries(byName).map(([name, n]) => T('exp.senseLine', { n, name, r })), ...(near.some(n => n.rare) ? [T('exp.senseRare')] : [])]
+        : [T('exp.senseNone', { r })],
     });
     out.state = checkHiddenPaths(out.state);
     return out;
@@ -267,8 +268,8 @@ export function applyExploreGu(state, inst) {
     let s = state;
     if (foes.length) s = grantMastery(s, gu.path, BALANCE.exploration.masteryXp, 'guUsed', 'guUse');
     return spend(s, { stealth: { until, power } }, {
-      icon: '🌫️', title: 'VEILED',
-      lines: [`Enemy detection −${power}% for ${dur} min.`, ...(foes.length ? ['You slip past unaware eyes.'] : [])],
+      icon: '🌫️', title: T('toast.veiled'),
+      lines: [T('exp.veilLine', { p: power, n: dur }), ...(foes.length ? [T('exp.veilSlip')] : [])],
     });
   }
 
@@ -278,8 +279,8 @@ export function applyExploreGu(state, inst) {
     let s = state;
     if (pursued) s = grantMastery(s, gu.path, BALANCE.exploration.masteryXp, 'guUsed', 'guUse');
     return spend(s, { haste: { until } }, {
-      icon: '💨', title: 'WIND STEP',
-      lines: [`Your stride outpaces the wilds for ${dur} min.`, ...(pursued ? ['You pull ahead of the pursuit!'] : [])],
+      icon: '💨', title: T('toast.windStep'),
+      lines: [T('exp.hasteLine', { n: dur }), ...(pursued ? [T('exp.hastePursuit')] : [])],
     });
   }
 
@@ -289,12 +290,12 @@ export function applyExploreGu(state, inst) {
     let s = state;
     if (near) s = grantMastery(s, gu.path, BALANCE.exploration.masteryXp, 'guUsed', 'guUse');
     return spend(s, { steady: { until } }, {
-      icon: '⛰️', title: 'SURE-FOOTED',
-      lines: [`${gu.name} anchors your steps for ${dur} min.`, ...(near ? ['The shifting ground cannot slow you.'] : [])],
+      icon: '⛰️', title: T('toast.steady'),
+      lines: [T('exp.steadyToast', { gu: locGuName(gu), n: dur }), ...(near ? [T('exp.steadyGround')] : [])],
     });
   }
 
-  return { state, ok: false, reason: 'Unknown exploration effect.' };
+  return { state, ok: false, reason: T('exp.unknown') };
 }
 
 // ---- Ambush ----
@@ -310,7 +311,7 @@ export function ambushOf(state, e, initiatedByPlayer) {
     return { amb: (unaware || !!act.stealth) ? 'player' : null };
   }
   if (def?.ambusher) {
-    if (act.vision || act.sense) return { amb: null, note: `${def.name} lunges from hiding — but your scouting Gu caught the ambush. No edge gained!` };
+    if (act.vision || act.sense) return { amb: null, note: T('exp.ambushCaught', { name: locEnemyName(def) }) };
     return { amb: 'enemy' };
   }
   return { amb: null };

@@ -9,6 +9,7 @@ import { ITEM_BY_ID } from '../data/items';
 import { WORLD } from '../data/world';
 import { SPECIES_BY_ID } from '../data/wildGu';
 import { totalGameMin } from './vitalGu';
+import { T, locGuName, locItemName } from '../i18n/tr';
 
 const DAY_MIN = 24 * 60;
 let _tid = 0;
@@ -98,8 +99,8 @@ export function tickGuLife(state, mins) {
     // injuries heal with time
     if (g.injuredUntilDay && day >= g.injuredUntilDay) {
       g.injuredUntilDay = 0; g.injurySeverity = null;
-      s = toast(s, { icon: '🩹', title: 'GU RECOVERED', lines: [`${GU_BY_ID[g.guId].name} has mended — full power returns.`] });
-      s = addLog(s, `${GU_BY_ID[g.guId].name} recovers from its injuries.`);
+      s = toast(s, { icon: '🩹', title: T('toast.guRecovered'), lines: [T('gl.mended', { gu: locGuName(GU_BY_ID[g.guId]) })] });
+      s = addLog(s, T('gl.mendedLog', { gu: locGuName(GU_BY_ID[g.guId]) }));
       touched = true;
     }
 
@@ -117,18 +118,18 @@ export function tickGuLife(state, mins) {
           const gu = GU_BY_ID[g.guId];
           if (band === 'critical') {
             g.criticalSinceDay = g.criticalSinceDay ?? day;
-            s = toast(s, { icon: '☠️', title: 'CRITICAL HUNGER', lines: [`${gu.name} is starving.`, 'If not fed soon, it may die.'] });
-            s = addLog(s, `WARNING: ${gu.name} is starving — feed it soon or it may die.`);
+            s = toast(s, { icon: '☠️', title: T('toast.criticalHunger'), lines: [T('gl.starving', { gu: locGuName(gu) }), T('gl.starving2')] });
+            s = addLog(s, T('gl.starvingLog', { gu: locGuName(gu) }));
           } else {
-            s = toast(s, { icon: HUNGER_META[band].icon, title: 'GU HUNGER', lines: [`${gu.name} is ${HUNGER_META[band].label.toLowerCase()}.`] });
+            s = toast(s, { icon: HUNGER_META[band].icon, title: T('toast.guHunger'), lines: [T('gl.hungerLine', { gu: locGuName(gu), band: T(`hun.${band}`) })] });
           }
         }
 
         // starvation death — only after days at critical hunger, loudly
         if (g.satiety <= 0 && g.criticalSinceDay != null && (day - g.criticalSinceDay) >= cfg.criticalDaysToDeath) {
           const gu = GU_BY_ID[g.guId];
-          s = toast(s, { icon: '☠', title: 'GU LOST', lines: [`${gu.name} succumbed to starvation.`, 'It can no longer be used.'] });
-          s = addLog(s, `${gu.name} starves and dies — keep your companions fed.`);
+          s = toast(s, { icon: '☠', title: T('toast.guLost'), lines: [T('gl.lostLine', { gu: locGuName(gu) }), T('gl.lostLine2')] });
+          s = addLog(s, T('gl.lostLog', { gu: locGuName(gu) }));
           equipped = equipped.filter(id => id !== g.instanceId);
           dirty = true;
           continue; // removed from the collection
@@ -144,7 +145,7 @@ export function tickGuLife(state, mins) {
             if (cat[food] <= 0) delete cat[food];
             inventory = { ...inventory, [it.category]: cat };
             g.satiety = cfg.maxSatiety; g.criticalSinceDay = null; g.warnDay = null;
-            s = addLog(s, `Auto Feed: ${GU_BY_ID[g.guId].name} eats ${it.name}.`);
+            s = addLog(s, T('gl.autoFed', { gu: locGuName(GU_BY_ID[g.guId]), item: locItemName(it) }));
             touched = true;
           }
         }
@@ -159,8 +160,8 @@ export function tickGuLife(state, mins) {
   const vInst = s.player.vitalInstability;
   if (vInst && totalGameMin(s.time) >= vInst.endMin) {
     s = { ...s, player: { ...s.player, vitalInstability: null } };
-    s = toast(s, { icon: '🩸', title: 'APERTURE STABLE', lines: ['The Vital Gu bond settles — essence recovery returns to normal.'] });
-    s = addLog(s, 'Your aperture settles — the Vital Gu bond is stable once more.');
+    s = toast(s, { icon: '🩸', title: T('toast.apertureStable'), lines: [T('gl.apertureLine')] });
+    s = addLog(s, T('gl.apertureLog'));
     dirty = true;
   }
 

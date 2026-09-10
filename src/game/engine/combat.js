@@ -648,7 +648,7 @@ export function executeRound(state, action) {
     pSt.push({ type: 'guard', power: dc.dmgRedPct, duration: 1 });
     const regen = Math.ceil(player.maxPrimevalEssence * dc.essenceRegenPct / 100);
     player.primevalEssence = Math.min(player.maxPrimevalEssence, player.primevalEssence + regen);
-    push(`You brace behind your Gu aura — the next blows are blunted (-${dc.dmgRedPct}% damage, +${regen} essence).`);
+    push(T('cmt.defend', { pct: dc.dmgRedPct, n: regen }));
   } else if (action.type === 'gu') {
     const inst = state.ownedGu.find(g => g.instanceId === action.guInstanceId);
     if (!inst) return state;
@@ -656,20 +656,20 @@ export function executeRound(state, action) {
     const cond = guCondition(state, inst);
     const prof = proficiencyOf(inst); // a practiced Gu strikes harder
     const cost = effectiveCost(gu, state, inst);
-    if (player.primevalEssence < cost) { push('Not enough primeval essence!'); return { ...state, combat: { ...combat, log } }; }
-    if ((cooldowns[inst.instanceId] || 0) > 0) { push(`${gu.name} is on cooldown.`); return { ...state, combat: { ...combat, log } }; }
+    if (player.primevalEssence < cost) { push(T('cmt.noEssence')); return { ...state, combat: { ...combat, log } }; }
+    if ((cooldowns[inst.instanceId] || 0) > 0) { push(T('cmt.cd', { gu: locGuName(gu) })); return { ...state, combat: { ...combat, log } }; }
     player.primevalEssence -= cost;
     cooldowns[inst.instanceId] = gu.cooldown;
     actAdvancePct = gu.effect.advance?.pct || 0;
     actSelfDelayPct = gu.effect.selfDelay?.pct || 0;
-    if (actAdvancePct) push(`You flow like the wind — your next action comes ${actAdvancePct}% sooner.`);
-    if (actSelfDelayPct) push(`The essence sits heavy — your next action comes ${actSelfDelayPct}% later.`);
+    if (actAdvancePct) push(T('cmt.advance', { p: actAdvancePct }));
+    if (actSelfDelayPct) push(T('cmt.selfDelay', { p: actSelfDelayPct }));
     let activated = true;
     if (isKillerMove(gu)) {
       const chance = activationChanceOf(gu, inst, state, combat);
       if (Math.random() * 100 > chance) {
         activated = false;
-        push(`${gu.name} fails to activate! The essence burns away.`);
+        push(T('cmt.killerFail', { gu: locGuName(gu) }));
       }
     }
     if (activated) {
@@ -683,7 +683,7 @@ export function executeRound(state, action) {
         const decay = BALANCE.mastery.repeatDecay[Math.min(uses - 1, BALANCE.mastery.repeatDecay.length - 1)];
         const xp = Math.round(BALANCE.mastery.xpCombatUse * decay);
         if (xp > 0) {
-          push(`${PATH_BY_ID[gu.path].icon} ${PATH_BY_ID[gu.path].name} mastery +${xp}`);
+          push(T('cmt.masteryGain', { icon: PATH_BY_ID[gu.path].icon, path: locPathName(PATH_BY_ID[gu.path]), xp }));
           pending.push({ pathId: gu.path, xp });
         }
       }
@@ -694,7 +694,7 @@ export function executeRound(state, action) {
   if (guUsedName) {
     const res = recordUse(state, action.guInstanceId);
     state = res.state;
-    if (res.leveledTo) push(`${guUsedName} grows practiced — Proficiency Lv.${res.leveledTo}! (effect power +${(res.leveledTo - 1) * BALANCE.proficiency.powerPerLevel}%)`);
+    if (res.leveledTo) push(T('cmt.profLevel', { gu: guUsedName, n: res.leveledTo, p: (res.leveledTo - 1) * BALANCE.proficiency.powerPerLevel }));
   }
 
   // cooldowns tick per OWNER action — the player's own actions
@@ -702,7 +702,7 @@ export function executeRound(state, action) {
   combat.rounds++;
 
   if (enemy.hp <= 0) {
-    push(`${enemy.name} is defeated!`);
+    push(T('cmt.enemyDefeated', { enemy: locEnemyName(enemy) }));
     const done = { ...combat, enemy, playerStatuses: pSt, cooldowns, log, revealed: combat.revealed };
     if (combat.trial) return finishTrial(state, done, player);
     return finishVictory(state, done, player, pending);
@@ -713,7 +713,7 @@ export function executeRound(state, action) {
     combat.enraged = true;
     enemy.attack = Math.max(1, Math.round(enemy.attack * (1 + (enemy.enrage.atkPct || 0) / 100)));
     enemy.defense = Math.max(0, enemy.defense - (enemy.enrage.defPen || 0));
-    push(`${enemy.name} ENRAGES — its blows fall like landslides, but its guard drops!`);
+    push(T('cmt.enrage', { enemy: locEnemyName(enemy) }));
   }
 
   // schedule the player's next action (Advance/aftermath reshaped above)
@@ -735,12 +735,12 @@ export function executeRound(state, action) {
     if (enemy.telegraph && (hasStatus(eSt, 'stun') || hasStatus(eSt, 'broken'))) {
       enemy.telegraph = null;
       enemy.planned = null;
-      push(`${enemy.name}'s charged attack is INTERRUPTED!`);
+      push(T('cmt.interrupted', { enemy: locEnemyName(enemy) }));
     }
     if (hasStatus(eSt, 'broken')) {
-      push(`${enemy.name} reels, guard shattered — the opening is yours!`);
+      push(T('cmt.reel', { enemy: locEnemyName(enemy) }));
     } else if (hasStatus(eSt, 'stun')) {
-      push(`${enemy.name} is stunned and cannot move!`);
+      push(T('cmt.stunCannot', { enemy: locEnemyName(enemy) }));
     } else if (enemy.telegraph) {
       executeTelegraph(enemy, player, pSt, push);
     } else {
@@ -756,9 +756,9 @@ export function executeRound(state, action) {
     if (enemy.hp <= 0) break;
   }
 
-  if (player.hp <= 0) { push('You have been defeated...'); return finishDefeat(state, { ...combat, enemy, statuses: eSt, playerStatuses: pSt, cooldowns, log, revealed: combat.revealed }, player); }
+  if (player.hp <= 0) { push(T('cmt.youDefeated')); return finishDefeat(state, { ...combat, enemy, statuses: eSt, playerStatuses: pSt, cooldowns, log, revealed: combat.revealed }, player); }
   if (enemy.hp <= 0) {
-    push(`${enemy.name} is defeated!`);
+    push(T('cmt.enemyDefeated', { enemy: locEnemyName(enemy) }));
     const done = { ...combat, enemy, playerStatuses: pSt, cooldowns, log, revealed: combat.revealed };
     if (combat.trial) return finishTrial(state, done, player);
     return finishVictory(state, done, player, pending);
@@ -768,7 +768,7 @@ export function executeRound(state, action) {
     const tr = combat.trial;
     const passed = tr.type === 'survive' ? combat.rounds >= tr.turns : (enemy.maxHp - enemy.hp) >= (tr.amount || 0);
     if (passed) {
-      push('The master raises a hand — the trial is complete.');
+      push(T('cmt.trialComplete'));
       return finishTrial(state, { ...combat, enemy, playerStatuses: pSt, cooldowns, log, revealed: combat.revealed }, player);
     }
   }
