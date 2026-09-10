@@ -45,8 +45,9 @@ export default function StarterPreview({ guId }) {
         {/* foe token — reels when struck */}
         <div className={`absolute right-5 bottom-4 w-8 h-8 rounded-sm ${phase === 2 ? 'animate-battle-shake' : ''}`}
           style={{ background: 'linear-gradient(180deg, #9f1239, #4c0519)', opacity: phase >= 3 ? 0.45 : 1 }} />
-        {/* projectile in flight */}
-        {phase === 1 && (
+        {/* projectile in flight — the Strength Path is pure melee: its fists
+            lunge and connect, they never shoot a magical bolt */}
+        {phase === 1 && gu.path !== 'strength' && (
           <div className="absolute left-14 bottom-6 w-2.5 h-2.5 rounded-full animate-battle-projectile"
             style={{ background: tint, boxShadow: `0 0 10px 3px ${tint}` }} />
         )}
