@@ -1,14 +1,17 @@
 import React from 'react';
 import { GameProvider, useGame } from '@/game/state/GameContext';
+import { LangProvider } from '@/game/i18n/LangContext';
 import SlotSelect from '@/components/game/SlotSelect';
 import CharacterCreation from '@/components/game/CharacterCreation';
 import GameScreen from '@/components/game/GameScreen';
 
 export default function Game() {
   return (
-    <GameProvider>
-      <GameRoot />
-    </GameProvider>
+    <LangProvider>
+      <GameProvider>
+        <GameRoot />
+      </GameProvider>
+    </LangProvider>
   );
 }
 

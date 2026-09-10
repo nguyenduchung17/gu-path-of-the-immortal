@@ -132,6 +132,31 @@ export const GU = [
     energyCost: 7, cooldown: 2,
     effect: { attack: { power: 12 } },
   },
+  // ---- Starter Gu (chosen at character creation) ----
+  {
+    id: 'flameSpark', name: 'Flame Spark Gu', rank: 1, type: 'Attack', path: 'fire', element: 'fire', rarity: 'common',
+    description: 'A drifting spark of living flame that clings to the foe and burns on.',
+    energyCost: 4, cooldown: 1,
+    effect: { attack: { power: 5 }, burn: { power: 2, duration: 3 } },
+  },
+  {
+    id: 'stoneSkin', name: 'Stone Skin Gu', rank: 1, type: 'Defense', path: 'earth', element: 'earth', rarity: 'common',
+    description: 'Coats you in a skin of soft stone that steadily hardens against blows.',
+    energyCost: 5, cooldown: 3,
+    effect: { defense: { power: 7, duration: 3 } },
+  },
+  {
+    id: 'healingDew', name: 'Healing Dew Gu', rank: 1, type: 'Healing', path: 'water', element: 'water', rarity: 'common',
+    description: 'Condenses healing dew from the air, knitting wounds and steadying essence.',
+    energyCost: 5, cooldown: 3,
+    effect: { heal: { power: 14 }, essence: { power: 4 } },
+  },
+  {
+    id: 'beastCall', name: 'Beast Call Gu', rank: 1, type: 'Summon', path: 'enslavement', element: 'none', rarity: 'common',
+    description: 'A low call that binds a tamed beast to your will for a short pact.',
+    energyCost: 5, cooldown: 3,
+    effect: { summon: { power: 4, duration: 3 } },
+  },
   // ---- Refinement-adjacent ----
   {
     id: 'insightEye', name: 'Insight Eye Gu', rank: 1, type: 'Investigation', path: 'refinement', element: 'none', rarity: 'common',

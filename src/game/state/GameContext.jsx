@@ -31,7 +31,7 @@ if (typeof window !== 'undefined') adoptLegacySave();
 // After a page refresh: clear stale UI state, settle any unfinished sleep, and
 // grant essence accrued while recovery was running offline (capped at max).
 function normalize(raw) {
-  let s = raw.version >= 4 ? raw : migrateSave(raw);
+  let s = raw.version >= 5 ? raw : migrateSave(raw);
   s = { ...s, toasts: [], breakthrough: null, dialogue: null, pendingEvent: null, combat: null };
   if (s.sleeping && (!s.sleeping.wakeAt || Date.now() >= s.sleeping.wakeAt)) s = { ...s, sleeping: null };
   // respawn any world enemies whose timer elapsed while away
@@ -81,9 +81,9 @@ export function GameProvider({ children }) {
 
   const beginCreate = useCallback((i) => setCreateSlot(i), []);
   const cancelCreate = useCallback(() => setCreateSlot(null), []);
-  const finishCreate = useCallback((name, gender, age, difficulty, appearance) => {
+  const finishCreate = useCallback((name, gender, age, difficulty, appearance, aptitude, starterGuId) => {
     const slot = createSlot;
-    dispatch({ type: 'NEW_GAME', name, gender, age, difficulty, slot, appearance });
+    dispatch({ type: 'NEW_GAME', name, gender, age, difficulty, slot, appearance, aptitude, starterGuId });
     setCreateSlot(null);
     setActiveSlot(slot);
   }, [createSlot]);

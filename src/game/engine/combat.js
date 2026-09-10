@@ -1,4 +1,4 @@
-import { GU_BY_ID } from '../data/gu';
+import { GU_BY_ID, isKillerMove } from '../data/gu';
 import { ENEMY_BY_ID } from '../data/enemies';
 import { ITEM_BY_ID } from '../data/items';
 import { PATH_BY_ID, SYNERGIES } from '../data/paths';
@@ -28,6 +28,16 @@ export function initCombat(enemyId, player, opts = {}) {
     masteryUses: {},   // per-Gu-instance use counter (anti-spam mastery decay)
     contributed: {},   // paths that meaningfully affected the enemy
   };
+}
+
+// Killer-Move activation chance: base + path mastery level, worn down by
+// repeated use within one battle. Normal Gu always activate (100%).
+export function activationChanceOf(gu, inst, state, combat) {
+  if (!isKillerMove(gu)) return 100;
+  const cfg = BALANCE.combat.killerActivation;
+  const level = state?.mastery?.[gu.path]?.level || 1;
+  const uses = inst && combat ? (combat.masteryUses?.[inst.instanceId] || 0) : 0;
+  return Math.max(cfg.min, Math.min(cfg.max, cfg.base + (level - 1) * cfg.perMasteryLevel - uses * cfg.repeatPenalty));
 }
 
 const effValue = (statuses, type) => statuses.filter(s => s.type === type).reduce((a, s) => a + (s.power || 0), 0);
@@ -205,6 +215,11 @@ export function executeRound(state, action) {
     if (it.use.essence) player.primevalEssence = Math.min(player.maxPrimevalEssence, player.primevalEssence + it.use.essence);
     push(`You use ${it.name}.`);
     combat.usedItem = action.itemId;
+  } else if (action.type === 'defend') {
+    pSt.push({ type: 'defense', power: 4 + Math.floor(player.agility * 0.5), duration: 2 });
+    const regen = Math.ceil(player.maxPrimevalEssence * 0.08);
+    player.primevalEssence = Math.min(player.maxPrimevalEssence, player.primevalEssence + regen);
+    push(`You brace behind your Gu aura and steady your essence (+${regen}).`);
   } else if (action.type === 'gu') {
     const inst = state.ownedGu.find(g => g.instanceId === action.guInstanceId);
     if (!inst) return state;
@@ -214,6 +229,14 @@ export function executeRound(state, action) {
     if ((cooldowns[inst.instanceId] || 0) > 0) { push(`${gu.name} is on cooldown.`); return { ...state, combat: { ...combat, log } }; }
     player.primevalEssence -= cost;
     cooldowns[inst.instanceId] = gu.cooldown;
+    // Killer Moves can fail to activate — essence burns away regardless.
+    if (isKillerMove(gu)) {
+      const chance = activationChanceOf(gu, inst, state, combat);
+      if (Math.random() * 100 > chance) {
+        push(`${gu.name} fails to activate! The essence burns away.`);
+        return { ...state, combat: { ...combat, cooldowns, log }, player };
+      }
+    }
     const fx = bonusOf(state, gu.path);
     const meaningful = applyGu(gu, player, enemy, pSt, eSt, combat, push, fx, syn);
     if (meaningful) {

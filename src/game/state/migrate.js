@@ -1,8 +1,13 @@
 // Save migrations: v1 (realm/exp) → v2 (stages/mastery) → v3 (large world)
-//                 → v4 (game clock, difficulty modes, save slots).
+//                 → v4 (game clock, difficulty modes, save slots)
+//                 → v5 (numeric cultivation aptitude + special constitutions).
 import { CULTIVATION_STAGES } from '../data/cultivation';
 import { GU_BY_ID } from '../data/gu';
 import { initialEnemies } from '../data/world';
+import { normalizeAptitude, essenceCapFor } from '../config/aptitude';
+
+// v4 aptitudes were flat strings — map them onto the v5 numeric scale.
+const LEGACY_APTITUDE = { Dull: 3, Ordinary: 5, Good: 6.5, Outstanding: 8, Heavenly: 9.5 };
 
 export function migrateSave(old) {
   if (!old) return old;
@@ -74,6 +79,25 @@ export function migrateSave(old) {
         discovered: { ...disc, inns: { ...(disc.inns || {}), townInn: true } },
       },
       log: [...(s.log || []), 'The world breathes — day and night now pass over the Green Valley.'],
+    };
+  }
+
+  if (s.version < 5) {
+    const p = s.player || {};
+    const rawApt = (typeof p.aptitude === 'object' && p.aptitude) ? p.aptitude : { score: LEGACY_APTITUDE[p.aptitude] ?? 5 };
+    const apt = normalizeAptitude(rawApt);
+    const st = CULTIVATION_STAGES[Math.min(19, (p.rank || 0) * 4 + (p.stage || 0))];
+    const cap = essenceCapFor(st.maxEssence, apt);
+    s = {
+      ...s,
+      version: 5,
+      player: {
+        ...p,
+        aptitude: apt,
+        maxPrimevalEssence: cap,
+        primevalEssence: Math.min(p.primevalEssence ?? cap, cap),
+      },
+      log: [...(s.log || []), 'Your aperture settles — cultivation aptitude now shapes your essence.'],
     };
   }
 

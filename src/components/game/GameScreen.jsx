@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useGame } from '@/game/state/GameContext';
 import { BALANCE } from '@/game/config/balance';
+import { useT } from '@/game/i18n/LangContext';
 import WorldView from './WorldView';
 import HUDTop from './hud/HUDTop';
 import Hotbar from './hud/Hotbar';
@@ -30,17 +31,18 @@ import MemorialPanel from './MemorialPanel';
 import Toasts from './Toasts';
 
 const PANEL_META = {
-  cultivation: { title: 'Cultivation', icon: '🧘' },
-  gu: { title: 'Gu', icon: '🐉' },
-  recipes: { title: 'Recipes', icon: '📖' },
-  dao: { title: 'Dao Mastery', icon: '☯️' },
-  inventory: { title: 'Inventory', icon: '🎒' },
-  quests: { title: 'Quests', icon: '📜' },
-  map: { title: 'Region Map', icon: '🧭', wide: true },
+  cultivation: { titleKey: 'ui.cultivation', icon: '🧘' },
+  gu: { titleKey: 'ui.gu', icon: '🐉' },
+  recipes: { titleKey: 'ui.recipes', icon: '📖' },
+  dao: { titleKey: 'ui.dao', icon: '☯️' },
+  inventory: { titleKey: 'ui.inventory', icon: '🎒' },
+  quests: { titleKey: 'ui.quests', icon: '📜' },
+  map: { titleKey: 'ui.map', icon: '🧭', wide: true },
 };
 
 export default function GameScreen() {
   const { state, dispatch, activeSlot, exitToSlots, deleteSlot } = useGame();
+  const { t } = useT();
   const [panel, setPanel] = useState(null);
   const [shop, setShop] = useState(null);
   const [service, setService] = useState(null);
@@ -105,7 +107,7 @@ export default function GameScreen() {
 
       {/* in-game panel overlays (world stays visible underneath) */}
       {panel && (
-        <OverlayWindow title={meta.title} icon={meta.icon} wide={meta.wide} onClose={() => setPanel(null)}>
+        <OverlayWindow title={t(meta.titleKey)} icon={meta.icon} wide={meta.wide} onClose={() => setPanel(null)}>
           {panel === 'cultivation' && <CharacterPanel onRecover={() => setRecoveryOpen(true)} />}
           {panel === 'gu' && <GuPanel />}
           {panel === 'recipes' && <RecipesPanel />}

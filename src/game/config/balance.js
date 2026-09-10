@@ -1,4 +1,6 @@
 // Central game-balance configuration — every tunable number lives here.
+import { recoveryMulOf } from './aptitude';
+
 export const BALANCE = {
   cultivation: {
     essenceCostBase: 8,      // cultivate cost = base + perRank * rank
@@ -40,6 +42,12 @@ export const BALANCE = {
   combat: {
     victoryProgress: 2,     // % cultivation progress per victory
     weaknessBonusPct: 25,   // damage bonus when Gu path matches enemy weakness
+    killerActivation: {     // Killer-Move activation chance (normal Gu: 100%)
+      base: 85,
+      perMasteryLevel: 3,   // + per path mastery level
+      repeatPenalty: 10,    // − per prior use of the same Gu this battle
+      min: 40, max: 100,
+    },
   },
   world: {
     respawnMs: 4 * 60 * 1000,        // world enemy respawn timer
@@ -115,5 +123,8 @@ export function recoveryRatePerSec(player, mode) {
   const cfg = BALANCE.recovery;
   const stage = player.rank * 4 + (player.stage || 0);
   const secs = Math.max(cfg.minRecoverySeconds, cfg.fullRecoverySeconds * (1 - cfg.rankEfficiencyPerStage * stage));
-  return (player.maxPrimevalEssence / secs) * (mode === 'accelerated' ? cfg.acceleratedMultiplier : 1);
+  // aptitude (and any Special Constitution) speeds essence recovery
+  const apt = player.aptitude && typeof player.aptitude === 'object' ? player.aptitude : null;
+  const aptMul = apt ? recoveryMulOf(apt) : 1;
+  return (player.maxPrimevalEssence / secs) * aptMul * (mode === 'accelerated' ? cfg.acceleratedMultiplier : 1);
 }

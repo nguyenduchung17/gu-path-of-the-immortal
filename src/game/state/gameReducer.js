@@ -20,14 +20,19 @@ import { MISSION_BY_ID } from '../data/missions';
 import { CONTRIBUTION_OFFERS } from '../data/contribution';
 import { ARENA_BY_ID } from '../data/arena';
 import { DEFAULT_APPEARANCE } from '../data/appearance';
+import { essenceCapFor, cultivateMulOf, normalizeAptitude, rollAptitudeScore, rollConstitution } from '../config/aptitude';
+import { starterGuOf } from '../data/starterGu';
 
-const APTITUDES = ['Dull', 'Ordinary', 'Good', 'Outstanding', 'Heavenly'];
 const START_STAGE = CULTIVATION_STAGES[0];
 
-export function createNewGame(name, gender, age, difficulty, slot, appearance) {
-  const aptitude = APTITUDES[Math.floor(Math.random() * APTITUDES.length)];
+export function createNewGame(name, gender, age, difficulty, slot, appearance, aptitude, starterGuId) {
+  const starter = starterGuOf(starterGuId);
+  const apt = normalizeAptitude(
+    aptitude && typeof aptitude.score === 'number' ? aptitude : { score: rollAptitudeScore(), constitution: rollConstitution() }
+  );
+  const essenceCap = essenceCapFor(START_STAGE.maxEssence, apt);
   return {
-    version: 4,
+    version: 5,
     difficulty: DIFFICULTIES[difficulty] ? difficulty : 'standard',
     slot: slot || 1,
     time: { day: BALANCE.time.startDay, min: BALANCE.time.startMinutes },
@@ -37,16 +42,16 @@ export function createNewGame(name, gender, age, difficulty, slot, appearance) {
     player: {
       name: name || 'Nameless', gender: gender || 'other', age: Number(age) || 16,
       rank: 0, stage: 0, cultivationProgress: 0,
-      aptitude,
+      aptitude: apt,
       hp: START_STAGE.maxHp, maxHp: START_STAGE.maxHp,
-      primevalEssence: START_STAGE.maxEssence, maxPrimevalEssence: START_STAGE.maxEssence,
+      primevalEssence: essenceCap, maxPrimevalEssence: essenceCap,
       willpower: 10,
       strength: 6, agility: 6, perception: 6, intelligence: 6, luck: 6,
       x: 42, y: 44, currentArea: 'greenValleyRegion', facing: 'down',
       spiritStones: 50, equippedGu: ['g_start'], totalInsight: 0,
       appearance: appearance || DEFAULT_APPEARANCE,
     },
-    ownedGu: [{ instanceId: 'g_start', guId: 'swiftFang', rank: 1 }],
+    ownedGu: [{ instanceId: 'g_start', guId: starter.id, rank: starter.rank }],
     inventory: { materials: { herb: 3 }, medicine: { medicine: 1 }, food: { ration: 2 }, questItems: {} },
     quests: { active: [], completed: [], kills: {}, flags: {} },
     reputation: { villagers: 0, merchants: 0, sect: 0, blackMarket: 0 },
@@ -56,20 +61,21 @@ export function createNewGame(name, gender, age, difficulty, slot, appearance) {
       enemies: initialEnemies(),
     },
     mastery: {}, masteryStats: {},
-    knownPaths: ['wind'], knownRecipes: [],
+    knownPaths: [starter.path], knownRecipes: [],
     contribution: { greenValley: 0 },
     missions: { active: [], completed: [] },
     arena: { wins: 0, losses: 0 },
     recovery: null, breakthrough: null, toasts: [],
     combat: null, pendingEvent: null, dialogue: null,
-    log: ['You stand in Green Valley Town — a Rank 1 · Early Stage cultivator of the Wind Path. Roads lead out into the wilds.'],
+    log: [
+      'You stand in Green Valley Town — a Rank 1 · Early Stage cultivator of the Wind Path. Roads lead out into the wilds.',
+      `${starter.name} responds to your essence — your first companion on the path.`,
+    ],
     createdAt: Date.now(),
   };
 }
 
-function aptitudeMul(apt) {
-  return ['Dull', 'Ordinary', 'Good', 'Outstanding', 'Heavenly'].indexOf(apt) * 0.15 + 0.85;
-}
+
 
 export function globalStage(p) { return p.rank * 4 + (p.stage || 0); }
 
@@ -160,7 +166,7 @@ export function gameReducer(state, action) {
     case 'LOAD':
       return action.state;
     case 'NEW_GAME':
-      return createNewGame(action.name, action.gender, action.age, action.difficulty, action.slot, action.appearance);
+      return createNewGame(action.name, action.gender, action.age, action.difficulty, action.slot, action.appearance, action.aptitude, action.starterGuId);
     case 'RESET':
       return { noSave: true };
 
@@ -421,7 +427,7 @@ export function gameReducer(state, action) {
       const cost = cfg.essenceCostBase + cfg.essenceCostPerRank * p.rank;
       if (p.primevalEssence < cost) return { ...state, log: [...state.log, 'Not enough essence to cultivate.'] };
       const atSect = WORLD.tiles[p.y] && WORLD.tiles[p.y][p.x] === '*';
-      const gain = Math.min(cfg.progressCap, Math.floor((cfg.progressBase + p.intelligence * cfg.progressPerInt) * aptitudeMul(p.aptitude) * (atSect ? cfg.sectBonus : 1)));
+      const gain = Math.min(cfg.progressCap, Math.floor((cfg.progressBase + p.intelligence * cfg.progressPerInt) * cultivateMulOf(p.aptitude) * (atSect ? cfg.sectBonus : 1)));
       const progress = Math.min(100, (p.cultivationProgress || 0) + gain);
       const np = {
         ...p,
@@ -455,8 +461,8 @@ export function gameReducer(state, action) {
       const st = CULTIVATION_STAGES[np.rank * 4 + np.stage];
       np.maxHp = st.maxHp;
       np.hp = Math.min(st.maxHp, np.hp + (st.maxHp - p.maxHp));
-      np.maxPrimevalEssence = st.maxEssence;
-      np.primevalEssence = st.maxEssence; // fully restored
+      np.maxPrimevalEssence = essenceCapFor(st.maxEssence, np.aptitude);
+      np.primevalEssence = np.maxPrimevalEssence; // fully restored
       const statGain = major ? 2 : 1;
       np.strength += statGain; np.agility += statGain; np.perception += statGain; np.intelligence += statGain;
       s = {

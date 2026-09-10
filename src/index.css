@@ -141,3 +141,9 @@
 .animate-battle-faint { animation: battleFaint 0.9s ease-in forwards; }
 @keyframes battleSway { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
 .animate-battle-sway { animation: battleSway 2.2s ease-in-out infinite; }
+@keyframes battleCharge { 0%, 100% { opacity: 0.35; transform: scale(0.8); } 50% { opacity: 0.95; transform: scale(1.15); } }
+.animate-battle-charge { animation: battleCharge 0.9s ease-in-out infinite; }
+@keyframes battleQuake { 0%, 100% { transform: translate(0, 0); } 25% { transform: translate(-6px, 3px); } 50% { transform: translate(5px, -4px); } 75% { transform: translate(-4px, -2px); } }
+.animate-battle-quake { animation: battleQuake 0.45s ease-out; }
+@keyframes battleProjectileFar { 0% { transform: translateX(0); opacity: 1; } 100% { transform: translateX(34vw); opacity: 0.35; } }
+.animate-battle-projectile-far { animation: battleProjectileFar 0.5s ease-out forwards; }

@@ -6,6 +6,8 @@ import { diffOf } from '@/game/config/balance';
 import { phaseOf, timeLabel, PHASE_ICON } from '@/game/engine/time';
 import { zoneAt, DEFAULT_ZONE } from '@/game/data/world';
 import { appearanceOf } from '@/game/data/appearance';
+import { tierOf, constitutionName } from '@/game/config/aptitude';
+import { useT } from '@/game/i18n/LangContext';
 import PortraitFrame from '../PortraitFrame';
 
 const DANGER_CHIP = {
@@ -29,11 +31,14 @@ function Bar({ value, max, from, to }) {
 // Compact floating top HUD over the fullscreen world.
 export default function HUDTop() {
   const { state } = useGame();
+  const { t: tr, lang } = useT();
   const [muted, setMuted] = useState(isMuted());
   const p = state.player;
   const stage = CULTIVATION_STAGES[Math.min(19, p.rank * 4 + (p.stage || 0))];
   const t = state.time || { day: 1, min: 420 };
   const zone = zoneAt(p.x, p.y) || DEFAULT_ZONE;
+  const tier = tierOf(p.aptitude);
+  const conName = constitutionName(p.aptitude, lang);
 
   return (
     <div className="absolute top-0 inset-x-0 z-20 pointer-events-none">
@@ -43,7 +48,9 @@ export default function HUDTop() {
           <PortraitFrame appearance={appearanceOf(p)} size={38} />
           <div className="leading-tight">
             <div className="text-xs font-semibold text-stone-100">{p.name}</div>
-            <div className="text-[10px] text-emerald-300/80">{stage.name} · {p.aptitude} · <span className="text-amber-200/70">{diffOf(state).label}</span></div>
+            <div className="text-[10px] text-emerald-300/80">
+              {stage.name} · {tr(`apt.tier.${tier.id}`)}{conName ? ` · ${conName}` : ''} · <span className="text-amber-200/70">{diffOf(state).label}</span>
+            </div>
           </div>
           <div className="w-24 sm:w-40 space-y-1.5">
             <div>
@@ -54,7 +61,7 @@ export default function HUDTop() {
             </div>
             <div>
               <div className="flex justify-between text-[8px] text-sky-300/80 leading-none mb-0.5">
-                <span>Essence</span><span>{Math.floor(p.primevalEssence)}/{p.maxPrimevalEssence}</span>
+                <span>{tr('ui.essence')}</span><span>{Math.floor(p.primevalEssence)}/{p.maxPrimevalEssence}</span>
               </div>
               <Bar value={p.primevalEssence} max={p.maxPrimevalEssence} from="#0284c7" to="#7dd3fc" />
             </div>
@@ -71,8 +78,8 @@ export default function HUDTop() {
             {muted ? '🔇' : '🔊'}
           </button>
           <div className="text-[11px] px-2.5 py-1.5 rounded-full bg-black/45 backdrop-blur border border-amber-500/30 text-amber-200" title="Primordial Stones">💎 {p.spiritStones}</div>
-          <div className="text-[11px] px-2.5 py-1.5 rounded-full bg-black/45 backdrop-blur border border-stone-700 text-stone-300" title={`Day ${t.day}`}>
-            Day {t.day} · {PHASE_ICON[phaseOf(t.min)]} {timeLabel(t.min)}
+          <div className="text-[11px] px-2.5 py-1.5 rounded-full bg-black/45 backdrop-blur border border-stone-700 text-stone-300" title={`${tr('ui.day')} ${t.day}`}>
+            {tr('ui.day')} {t.day} · {PHASE_ICON[phaseOf(t.min)]} {timeLabel(t.min)}
           </div>
           <div className={`text-[11px] px-2.5 py-1.5 rounded-full bg-black/45 backdrop-blur border ${DANGER_CHIP[zone.danger] ?? DANGER_CHIP[2]}`} title={zone.safe ? 'Safe zone' : zone.dangerLabel}>
             {zone.name}
