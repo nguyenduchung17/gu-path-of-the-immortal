@@ -12,6 +12,7 @@ import { zoneAt } from '@/game/data/world';
 import BattleScene from './battle/BattleScene';
 import BattleCommandMenu from './battle/BattleCommandMenu';
 import Timeline from './battle/Timeline';
+import TargetSelect from './battle/TargetSelect';
 import { biomeOf } from './battle/biomes';
 import IntentPanel from './battle/IntentPanel';
 import { weatherOf } from '@/game/engine/weather';
@@ -48,6 +49,7 @@ const STATUS_META = {
   frozen: { icon: '❄️', label: 'Frozen', desc: 'Loses its next action — charged attacks are interrupted.', tone: 'bg-sky-900/50 text-sky-100 border-cyan-500/50' },
   momentum: { icon: '💨', label: 'Wind Momentum', desc: 'Each stack: +5% Speed. Lasts the whole battle (max 5).', tone: 'bg-teal-900/50 text-teal-200 border-teal-600/50' },
   ccResist: { icon: '🧿', label: 'Hardened', desc: 'Control resistance +30% — paralysis and freeze land less often.', tone: 'bg-indigo-900/50 text-indigo-200 border-indigo-600/50' },
+  demoralized: { icon: '🏳️', label: 'Demoralized', desc: 'Its leader has fallen — damage and speed reduced.', tone: 'bg-stone-800/60 text-stone-300 border-stone-500/50' },
 };
 
 // scouting: what an enemy's status resistances look like on the panel
@@ -93,6 +95,7 @@ function StatusChips({ statuses }) {
         const meta = STATUS_META[g.type];
         const value = g.type === 'barrier' ? `${g.power}·${g.duration}`
           : g.type === 'momentum' ? `×${g.count}`
+          : g.type === 'demoralized' ? '—'
           : `${g.count > 1 ? `×${g.count} ` : ''}${g.duration}`;
         return (
           <span key={i} title={`${meta?.label || g.type} — ${meta?.desc || ''}`}
@@ -107,18 +110,27 @@ function StatusChips({ statuses }) {
 
 // Fullscreen turn-based battle: staged scene up top, command interface at the
 // bottom. Turns are paced — cast anticipation → action dispatch → impact VFX —
-// instead of resolving instantly.
+// instead of resolving instantly. Multi-enemy packs interleave on one timeline;
+// single-target actions aim at the selected enemy (#14), and every hit foe
+// shows its own damage number (#48).
 export default function CombatView() {
   const { state, dispatch } = useGame();
   const { t } = useT();
   const c = state.combat;
   const p = state.player;
-  const enemy = c.enemy;
+  const enemies = c.enemies || [c.enemy];
+  const living = enemies.filter(e => e.hp > 0);
   const stage = CULTIVATION_STAGES[Math.min(19, p.rank * 4 + (p.stage || 0))];
   const app = appearanceOf(p);
   const tier = tierOf(p.aptitude);
   const biome = biomeOf(zoneAt(p.x, p.y)?.id, !!c.arena);
   const weather = weatherOf(state.time);
+
+  // the selected target — an explicit tactical choice (#14), falling back to
+  // the primary foe; clicking a figure or a target card re-aims it
+  const [targetUid, setTargetUid] = useState(c.primaryUid);
+  const sel = living.find(e => e.uid === targetUid) || living[0] || enemies[0];
+  const selUid = sel?.uid;
 
   const [fx, setFx] = useState(null);
   const [casting, setCasting] = useState(null);
@@ -141,18 +153,17 @@ export default function CombatView() {
     const lines = c.log.slice(-added);
     const gu = pendingGu.current;
     const kinds = {};
-    let enemyDmg = 0, playerDmg = 0, dodge = false, block = false, crit = false, fail = false, heal = 0, essence = 0;
+    let playerDmg = 0, dodge = false, block = false, crit = false, fail = false, heal = 0, essence = 0;
     let statusText = null, playerStatusText = null;
     let m;
     for (const l of lines) {
-      if ((m = l.match(/strikes .*? for (\d+) damage/)) || (m = l.match(/is cut by thorns for (\d+) damage/))) enemyDmg += +m[1];
-      else if (m = l.match(/enslaved beast strikes .*? for (\d+) damage/)) { enemyDmg += +m[1]; kinds.summon = true; }
-      else if (m = l.match(/attacks for (\d+) damage/)) playerDmg += +m[1];
-      else if (m = l.match(/hits you for (\d+) damage/)) playerDmg += +m[1];
-      else if (m = l.match(/suffers (\d+) burn damage/)) { enemyDmg += +m[1]; }
-      else if (m = l.match(/You suffer (\d+) poison damage/)) playerDmg += +m[1];
-      else if (m = l.match(/restores (\d+) HP/)) heal += +m[1];
-      else if (m = l.match(/restores (\d+) essence/)) essence += +m[1];
+      if ((m = l.match(/enslaved beast strikes .*? for (\d+) damage/))) { kinds.summon = true; }
+      else if ((m = l.match(/attacks for (\d+) damage/))) playerDmg += +m[1];
+      else if ((m = l.match(/hits you for (\d+) damage/))) playerDmg += +m[1];
+      else if ((m = l.match(/sinks its fangs in for (\d+) damage/))) playerDmg += +m[1];
+      else if ((m = l.match(/You suffer (\d+) poison damage/))) playerDmg += +m[1];
+      else if ((m = l.match(/restores (\d+) HP/))) heal += +m[1];
+      else if ((m = l.match(/restores (\d+) essence/))) essence += +m[1];
       else if (l.includes('dodge')) dodge = true;
       else if (l.includes('barrier absorbs')) block = true;
       else if (l.includes('vulnerable')) crit = true;
@@ -171,20 +182,26 @@ export default function CombatView() {
       else if (l.includes('empowers your')) kinds.buff = true;
       else if (l.includes('answers the pact')) kinds.summon = true;
       else if (l.includes('reveals the enemy') || l.includes('intent — weaknesses')) kinds.investigate = true;
-      else if ((m = l.match(/You strike .*? for (\d+) damage/))) enemyDmg += +m[1];
-      else if ((m = l.match(/sinks its fangs in for (\d+) damage/))) playerDmg += +m[1];
       else if (l.includes('guard SHATTERS')) kinds.broken = true;
       else if (l.includes('feasts on the burning')) crit = true;
       else if (l.includes('blunts')) block = true;
       else if (l.includes('quickens your form')) kinds.haste = true;
+      else if (l.includes('HOWLS')) kinds.haste = true;
     }
     if (gu) {
-      for (const key of Object.keys(gu.effect || {})) kinds[key] = kinds[key] ?? key !== 'attack';
+      for (const key of Object.keys(gu.effect || {})) {
+        if (key === 'target') continue;
+        kinds[key] = kinds[key] ?? key !== 'attack';
+      }
       if (gu.effect.attack) kinds.attack = true;
     }
     pendingGu.current = null;
     const castColor = gu ? PATH_COLORS[gu.path] || '#8fd8a0' : null;
-    setFx({ key: logLen, gu, kinds, killer: !!(gu && isKillerMove(gu)), castColor, enemyDmg, playerDmg, dodge, block, crit, fail, heal, essence, statusText, playerStatusText });
+    // per-enemy damage comes from the engine's exact HP deltas (#48) —
+    // every hit figure shows its own number, all of them react
+    const enemyHits = { ...(c.lastHits || {}) };
+    const enemyDmg = Object.values(enemyHits).reduce((a, b) => a + b, 0);
+    setFx({ key: logLen, gu, kinds, killer: !!(gu && isKillerMove(gu)), castColor, enemyHits, enemyDmg, playerDmg, dodge, block, crit, fail, heal, essence, statusText, playerStatusText });
     if (kinds.broken) sfx('crit');
     if (fail) sfx('fail');
     else if (gu) sfx(guSound(gu, kinds));
@@ -215,12 +232,14 @@ export default function CombatView() {
     timers.current.push(setTimeout(() => {
       if (gu) pendingGu.current = gu;
       setCasting(null);
-      dispatch({ type: 'PLAYER_ACTION', action, guInstanceId: opts.guInst?.instanceId, itemId: opts.itemId });
+      dispatch({ type: 'PLAYER_ACTION', action, guInstanceId: opts.guInst?.instanceId, itemId: opts.itemId, targetUid: selUid });
       timers.current.push(setTimeout(() => setBusy(false), 1300));
     }, ms));
   };
 
   const equippedCount = p.equippedGu.length;
+  const telegraphs = living.filter(e => e.telegraph);
+  const selLeader = sel && (sel.packRole === 'leader' || sel.packLeader);
 
   return (
     <div className="fixed inset-0 z-[60] flex flex-col bg-[#0a0f0c] animate-pop">
@@ -229,42 +248,49 @@ export default function CombatView() {
 
       {/* ---- battlefield ---- */}
       <div className="relative flex-1 min-h-0">
-        <BattleScene enemy={enemy} fx={fx} casting={casting} appearance={app} biome={biome} result={c.over ? c.result : null} />
+        <BattleScene combat={c} enemies={enemies} fx={fx} casting={casting} appearance={app} biome={biome}
+          result={c.over ? c.result : null} targetUid={selUid} onTarget={setTargetUid} />
 
-        {/* enemy info panel */}
-        <div className="absolute top-3 left-3 w-44 sm:w-64 rounded-xl bg-black/60 backdrop-blur border border-rose-900/60 p-2.5 sm:p-3 animate-pop">
-          <div className="flex items-center justify-between gap-2 mb-2">
-            <div className="text-sm font-semibold text-rose-100 truncate">{enemy.name}</div>
-            <div className="text-[10px] text-stone-400 shrink-0">ATK {enemy.attack} · DEF {enemy.defense} · {t('battle.spd')} {enemy.baseSpeed}</div>
-          </div>
-          <div className="text-[9px] text-stone-400 -mt-1 mb-1">
-            {enemy.elite && <span className="text-rose-400 font-semibold">☠ {t('battle.elite')} · </span>}
-            {visualOf(enemy.id).rank}{!c.arena && !c.trial ? ` · ${DANGER_LABEL[visualOf(enemy.id).danger] || ''}` : ''}
-          </div>
-          <Bar value={enemy.hp} max={enemy.maxHp} from="#9f1239" to="#fb7185" label={t('ui.hp')} />
-          <div className="mt-1.5">
-            <Bar value={enemy.stability ?? enemy.maxStability} max={enemy.maxStability} from="#64748b" to="#cbd5e1"
-              label={enemy.statuses?.some(s => s.type === 'broken') ? t('battle.broken') : t('battle.guard')} />
-          </div>
-          {c.revealed && (
-            <div className="text-[10px] text-amber-300/80 mt-1">
-              {t('battle.weakness')}: <span className="capitalize">{enemy.weakness === 'none' ? t('ui.none') : `${PATH_BY_ID[enemy.weakness]?.name || enemy.weakness}`}</span>
+        {/* selected-enemy info panel (#14) */}
+        {sel && (
+          <div className="absolute top-3 left-3 w-44 sm:w-64 rounded-xl bg-black/60 backdrop-blur border border-rose-900/60 p-2.5 sm:p-3 animate-pop">
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <div className="text-sm font-semibold text-rose-100 truncate flex items-center gap-1">
+                {selLeader && <span className="text-amber-300" title={t('battle.leader')}>♛</span>}
+                {sel.label}
+              </div>
+              <div className="text-[10px] text-stone-400 shrink-0">ATK {sel.attack} · DEF {sel.defense} · {t('battle.spd')} {sel.baseSpeed}</div>
             </div>
-          )}
-          {c.revealed && enemy.resists?.length > 0 && (
-            <div className="text-[10px] text-sky-300/80 mt-0.5">
-              {t('battle.resists')}: {enemy.resists.map(p => PATH_BY_ID[p]?.name || p).join(' · ')}
+            <div className="text-[9px] text-stone-400 -mt-1 mb-1">
+              {selLeader && <span className="text-amber-300 font-semibold">♛ {t('battle.leader')} · </span>}
+              {sel.elite && <span className="text-rose-400 font-semibold">☠ {t('battle.elite')} · </span>}
+              {visualOf(sel.id).rank}{!c.arena && !c.trial ? ` · ${DANGER_LABEL[visualOf(sel.id).danger] || ''}` : ''}
             </div>
-          )}
-          {c.revealed && enemy.statusResist && (
-            <div className="text-[9px] text-stone-400 mt-0.5">
-              {t('battle.statusResists')}: {Object.entries(enemy.statusResist)
-                .map(([k, v]) => `${STATUS_RESIST_ICON[k] || k} ${v >= 100 ? t('battle.resImmune') : `${v}%`}`).join(' · ')}
+            <Bar value={sel.hp} max={sel.maxHp} from="#9f1239" to="#fb7185" label={t('ui.hp')} />
+            <div className="mt-1.5">
+              <Bar value={sel.stability ?? sel.maxStability} max={sel.maxStability} from="#64748b" to="#cbd5e1"
+                label={sel.statuses?.some(s => s.type === 'broken') ? t('battle.broken') : t('battle.guard')} />
             </div>
-          )}
-          {!c.over && <IntentPanel combat={c} enemy={enemy} />}
-          <StatusChips statuses={enemy.statuses} />
-        </div>
+            {c.revealed && (
+              <div className="text-[10px] text-amber-300/80 mt-1">
+                {t('battle.weakness')}: <span className="capitalize">{sel.weakness === 'none' ? t('ui.none') : `${PATH_BY_ID[sel.weakness]?.name || sel.weakness}`}</span>
+              </div>
+            )}
+            {c.revealed && sel.resists?.length > 0 && (
+              <div className="text-[10px] text-sky-300/80 mt-0.5">
+                {t('battle.resists')}: {sel.resists.map(p2 => PATH_BY_ID[p2]?.name || p2).join(' · ')}
+              </div>
+            )}
+            {c.revealed && sel.statusResist && (
+              <div className="text-[9px] text-stone-400 mt-0.5">
+                {t('battle.statusResists')}: {Object.entries(sel.statusResist)
+                  .map(([k2, v]) => `${STATUS_RESIST_ICON[k2] || k2} ${v >= 100 ? t('battle.resImmune') : `${v}%`}`).join(' · ')}
+              </div>
+            )}
+            {!c.over && <IntentPanel combat={c} enemy={sel} />}
+            <StatusChips statuses={sel.statuses} />
+          </div>
+        )}
 
         {/* player info panel */}
         <div className="absolute bottom-3 right-3 w-44 sm:w-64 rounded-xl bg-black/60 backdrop-blur border border-emerald-900/60 p-2.5 sm:p-3 animate-pop">
@@ -300,10 +326,10 @@ export default function CombatView() {
         {/* action timeline — who acts next, so the player can plan ahead */}
         {!c.over && <Timeline combat={c} />}
 
-        {/* telegraphed heavy move — answer with Defend, delay, a stun or a BREAK */}
-        {!c.over && enemy.telegraph && (
-          <div className="absolute top-[76px] left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-amber-950/80 border border-amber-500/60 text-[10px] text-amber-200 font-heading tracking-wide animate-pulse whitespace-nowrap pointer-events-none">
-            ⚠ {enemy.name} prepares {enemy.telegraph.name} — brace yourself!
+        {/* telegraphed heavy moves — answer with Defend, delay, a stun or a BREAK */}
+        {!c.over && telegraphs.length > 0 && (
+          <div className="absolute top-[76px] left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-amber-950/80 border border-amber-500/60 text-[10px] text-amber-200 font-heading tracking-wide animate-pulse whitespace-nowrap pointer-events-none max-w-[92vw] truncate">
+            ⚠ {telegraphs.map(e2 => `${e2.label} prepares ${e2.telegraph.name}`).join(' · ')}
           </div>
         )}
 
@@ -311,7 +337,7 @@ export default function CombatView() {
         {c.terrain && !c.over && (
           <div className="absolute top-12 right-3 px-3 py-1.5 rounded-full bg-black/55 backdrop-blur border border-emerald-800/60 text-[10px] text-stone-300 whitespace-nowrap animate-pop pointer-events-none">
             ⛰ {t('intent.terrain')} · <span className="text-emerald-200/80">
-              {Object.entries(c.terrain).map(([p, m]) => `${PATH_BY_ID[p]?.name || p} ${m > 0 ? '+' : ''}${m}%`).join(' · ')}
+              {Object.entries(c.terrain).map(([p2, mm]) => `${PATH_BY_ID[p2]?.name || p2} ${mm > 0 ? '+' : ''}${mm}%`).join(' · ')}
             </span>
           </div>
         )}
@@ -320,7 +346,7 @@ export default function CombatView() {
         {weather.id !== 'clear' && !c.over && (
           <div className="absolute top-3 right-3 px-3 py-1.5 rounded-full bg-black/55 backdrop-blur border border-stone-700/60 text-[10px] text-stone-300 whitespace-nowrap animate-pop">
             {weather.icon} {t(`weather.${weather.id}`)} · <span className="text-amber-200/80">
-              {Object.entries(weather.mods).map(([p, m]) => `${PATH_BY_ID[p]?.name || p} ${m > 0 ? '+' : ''}${m}%`).join(' · ')}
+              {Object.entries(weather.mods).map(([p2, mm]) => `${PATH_BY_ID[p2]?.name || p2} ${mm > 0 ? '+' : ''}${mm}%`).join(' · ')}
             </span>
           </div>
         )}
@@ -345,12 +371,12 @@ export default function CombatView() {
               {c.result === 'victory' && c.rewards && (
                 <div className="text-xs text-amber-200/90 space-y-0.5 mb-3 text-center">
                   {Object.keys(c.rewards.items).length > 0 && (
-                    <div>{t('battle.loot')}: {Object.entries(c.rewards.items).map(([k, v]) => `${v} ${ITEM_BY_ID[k]?.name || k}`).join(', ')}</div>
+                    <div>{t('battle.loot')}: {Object.entries(c.rewards.items).map(([k2, v]) => `${v} ${ITEM_BY_ID[k2]?.name || k2}`).join(', ')}</div>
                   )}
                   <div>{t('battle.stonesGain', { n: c.rewards.spiritStones, p: c.rewards.progress })}</div>
                   {c.rewards.insight > 0 && <div className="text-violet-300/90">✧ {t('cult.insight')} +{c.rewards.insight}</div>}
-                  {(c.rewards.mastery || []).map((m, i) => (
-                    <div key={i} className="text-emerald-300/90">{PATH_BY_ID[m.pathId].icon} {PATH_BY_ID[m.pathId].name} +{m.xp}</div>
+                  {(c.rewards.mastery || []).map((mm, i) => (
+                    <div key={i} className="text-emerald-300/90">{PATH_BY_ID[mm.pathId].icon} {PATH_BY_ID[mm.pathId].name} +{mm.xp}</div>
                   ))}
                 </div>
               )}
@@ -366,6 +392,7 @@ export default function CombatView() {
       {/* ---- bottom command interface ---- */}
       {!c.over && (
         <div className="shrink-0 bg-[#0c1310]/95 border-t-2 border-amber-900/40 px-2.5 sm:px-3 py-2.5">
+          <TargetSelect combat={c} targetUid={selUid} onPick={setTargetUid} />
           <BattleCommandMenu
             state={state}
             combat={c}

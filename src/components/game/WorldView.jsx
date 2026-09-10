@@ -245,7 +245,13 @@ export default function WorldView({ paused, inputLocked }) {
           {interactable.type === 'camp' && <><b>[E]</b> Rest at the campsite</>}
           {interactable.type === 'cultivate' && <><b>[E]</b> Cultivate at the terrace (×1.5)</>}
           {interactable.type === 'formation' && <><b>[E]</b> Examine the formation</>}
-          {interactable.type === 'enemy' && <><b>[E]</b> Attack — {ENEMY_BY_ID[interactable.enemy.defId].name}</>}
+          {interactable.type === 'enemy' && (() => {
+            const en = interactable.enemy;
+            const def2 = ENEMY_BY_ID[en.defId];
+            const packN = en.packId ? (state.worldState.enemies || []).filter(o => !o.dead && o.packId === en.packId).length : 0;
+            const leader = en.packRole === 'leader' || def2?.packLeader;
+            return <><b>[E]</b> Attack — {def2?.name}{packN > 1 ? ` (×${packN})` : ''}{leader ? ' ♛' : ''}</>;
+          })()}
         </div>
       )}
 

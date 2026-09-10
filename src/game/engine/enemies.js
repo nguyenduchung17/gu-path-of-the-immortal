@@ -1,11 +1,17 @@
 // Visible-enemy AI. Enemies exist in the world, wander their home area, notice
 // the player ('?'), give chase ('!') and start combat on contact — or when the
 // player attacks them first. No random encounters.
+//
+// PACKS (#6, #7, #36): members of a pack keep loose cohesion — a member that
+// strays too far from its leader (or the pack's center) drifts back instead of
+// wandering. When one member takes notice, nearby kin within the species'
+// assist radius grow alert too: gradual ('?'), never an instant mob.
 import { ENEMY_BY_ID, ecoOf } from '../data/enemies';
 import { isWalkable, zoneAt, DEFAULT_ZONE, WORLD_NPCS } from '../data/world';
 import { initCombat, maxStabilityOf } from './combat';
 import { isNight } from './time';
-import { exploreActive, carryIntoCombat, ambushOf, nearbyPackCount } from './exploration';
+import { exploreActive, carryIntoCombat, ambushOf } from './exploration';
+import { socialOf, isLeaderDef } from '../data/packs';
 import { totalGameMin } from './vitalGu';
 import { BALANCE } from '../config/balance';
 import { T, locEnemyName } from '../i18n/tr';
@@ -42,6 +48,39 @@ function wander(e, enemies, player) {
   return cellFree(nx, ny, enemies, player) ? { x: nx, y: ny } : null;
 }
 
+// Pack cohesion anchor (#7): the leader while it lives, else the pack's living
+// center, else home. Members drift back toward it when separated.
+function packAnchorOf(enemies, e) {
+  if (!e.packId) return null;
+  const mates = enemies.filter(o => !o.dead && o.packId === e.packId && o.id !== e.id);
+  if (!mates.length) return e.home;
+  const leader = mates.find(m => m.packRole === 'leader' || isLeaderDef(m.defId));
+  if (leader) return leader;
+  return {
+    x: Math.round(mates.reduce((a, m) => a + m.x, 0) / mates.length),
+    y: Math.round(mates.reduce((a, m) => a + m.y, 0) / mates.length),
+  };
+}
+
+// PACK ASSIST (#2, #3): the packmates that join a fight started against `e` —
+// same pack, alive, within the species' assist radius of the ENGAGED member
+// (never the whole map), capped so battles stay readable (#37).
+export function packPull(state, e) {
+  if (!e?.packId) return [];
+  const assist = socialOf(e.defId).assistRadius ?? BALANCE.world.pack.assistRadius;
+  const pZone = zoneAt(state.player.x, state.player.y);
+  // group-size balance (#37): pack territory caps the joiners — early zones
+  // throw at most 3 combatants at a new cultivator, only the deepest wilds 4
+  const danger = zoneAt(e.x, e.y)?.danger ?? 2;
+  const cap = Math.min(BALANCE.combat.maxPackCombat || 4, 1 + Math.max(1, danger)) - 1;
+  return (state.worldState.enemies || [])
+    .filter(o => !o.dead && o.packId === e.packId && o.id !== e.id
+      && cheb(o.x, o.y, e.x, e.y) <= assist
+      && !(pZone?.safe))
+    .sort((a, b) => (Math.abs(a.x - e.x) + Math.abs(a.y - e.y)) - (Math.abs(b.x - e.x) + Math.abs(b.y - e.y)))
+    .slice(0, cap);
+}
+
 // Runs once per player step. Returns { state, combat }.
 export function tickEnemies(state) {
   const p = state.player;
@@ -64,17 +103,25 @@ export function tickEnemies(state) {
   const pfx = exploreActive(state);
   const stealthMul = pfx.stealth ? Math.max(0, 1 - (pfx.stealth.power || 0) / 100) : 1;
   const nowMin = totalGameMin(state.time);
-  // engagement funnel: carry-overs, terrain, ambush and pack support all apply here
+  // engagement funnel: the whole nearby pack enters the battle with the foe
+  // the player actually met (#1) — extras carry their own wounds and control
   const engage = (ne, intro) => {
     const carry = carryIntoCombat(state, ne);
     const amb = ambushOf(state, ne, false);
     const ambIntro = amb.amb === 'enemy'
       ? T('cmt.enemyAmbushIntro', { enemy: locEnemyName(ENEMY_BY_ID[ne.defId]) })
       : amb.note ? `${intro} ${amb.note}` : intro;
+    const extras = packPull(state, ne).map(m => ({
+      defId: m.defId, worldId: m.id, hp: m.hp, stability: m.stability,
+      statuses: carryIntoCombat(state, m).statuses,
+      packId: m.packId, packRole: m.packRole, packLeaderId: m.packLeaderId,
+    }));
     return initCombat(ne.defId, p, {
       hp: ne.hp, stability: ne.stability, statuses: carry.statuses, playerStatuses: carry.playerStatuses,
       worldId: ne.id, difficulty: state.difficulty, zoneId: pZone.id, scouted: !!pfx.vision,
-      ambush: amb.amb, allies: nearbyPackCount(state, ne.defId, ne.x, ne.y, ne.id), intro: ambIntro,
+      ambush: amb.amb, intro: ambIntro,
+      packId: ne.packId, packRole: ne.packRole, packLeaderId: ne.packLeaderId,
+      pack: extras,
     });
   };
   const canEnemyMove = (ne) => {
@@ -116,7 +163,13 @@ export function tickEnemies(state) {
     // passive creatures only fight when attacked
     if (e.behavior === 'passive') {
       ne.state = 'idle';
-      if (Math.random() < 0.25 && canEnemyMove(ne)) { const st = wander(ne, enemies, p); if (st) { ne.x = st.x; ne.y = st.y; } }
+      // a herd still keeps together — stragglers drift back to the herd (#7)
+      if (Math.random() < 0.25 && canEnemyMove(ne)) {
+        const anchor = packAnchorOf(enemies, ne);
+        const far = ne.packId && anchor && cheb(ne.x, ne.y, anchor.x, anchor.y) > (socialOf(ne.defId).cohesion ?? BALANCE.world.pack.cohesion);
+        const st = far ? stepToward(ne, anchor.x, anchor.y, enemies, p) : wander(ne, enemies, p);
+        if (st) { ne.x = st.x; ne.y = st.y; }
+      }
       return ne;
     }
 
@@ -151,26 +204,45 @@ export function tickEnemies(state) {
       : 0.15 + (eco.activity === 'nocturnal' ? (night ? 0.10 : -0.07)
         : eco.activity === 'diurnal' ? (night ? -0.08 : 0.05) : 0);
     if (Math.random() < Math.max(0, wanderRate) && canEnemyMove(ne)) {
-      const st = homeDist > 2 ? stepToward(ne, ne.home.x, ne.home.y, enemies, p) : wander(ne, enemies, p);
+      // pack cohesion (#6, #7): a member too far from its anchor drifts back
+      // to the group; otherwise it wanders near home with natural spacing
+      const anchor = packAnchorOf(enemies, ne);
+      const cohesion = socialOf(ne.defId).cohesion ?? BALANCE.world.pack.cohesion;
+      const far = ne.packId && anchor && cheb(ne.x, ne.y, anchor.x, anchor.y) > cohesion;
+      const st = far
+        ? stepToward(ne, anchor.x, anchor.y, enemies, p)
+        : homeDist > 2 ? stepToward(ne, ne.home.x, ne.home.y, enemies, p) : wander(ne, enemies, p);
       if (st) { ne.x = st.x; ne.y = st.y; }
     }
     return ne;
   });
 
+  // PACK AGGRO (#36): once one member hunts, nearby kin within the pack's
+  // assist radius take notice too — one '?' tick, never an instant mob.
+  const hot = enemies.filter(e => !e.dead && (e.state === 'chase' || e.state === 'alert'));
+  if (hot.length) {
+    enemies = enemies.map(e => {
+      if (e.dead || !e.packId || e.state === 'chase' || e.state === 'alert' || e.behavior === 'passive') return e;
+      const assist = socialOf(e.defId).assistRadius ?? BALANCE.world.pack.assistRadius;
+      const roused = hot.some(h => h.packId === e.packId && cheb(h.x, h.y, e.x, e.y) <= assist);
+      return roused ? { ...e, state: 'alert' } : e;
+    });
+  }
+
   return { state: { ...state, worldState: { ...ws, enemies } }, combat };
 }
 
 // Natural recovery between fights — % of max HP per in-game minute (slow by
-// design; see BALANCE.combat.regen). Never instantly heals; the enemy
-// currently in combat is skipped. Guard (stability) mends a little faster.
+// design; see BALANCE.combat.regen). Never instantly heals; enemies currently
+// in combat are skipped. Guard (stability) mends a little faster.
 export function regenWorldEnemies(state, minutes = 1) {
   const ws = state.worldState;
   if (!ws?.enemies?.length) return state;
   const cfg = BALANCE.combat.regen;
-  const inCombatId = state.combat?.worldId || null;
+  const inCombat = new Set((state.combat?.enemies || []).map(e => e.worldId).filter(Boolean));
   let changed = false;
   const enemies = ws.enemies.map(e => {
-    if (e.dead || e.id === inCombatId) return e;
+    if (e.dead || inCombat.has(e.id)) return e;
     const def = ENEMY_BY_ID[e.defId];
     if (!def) return e;
     const maxHp = def.hp;

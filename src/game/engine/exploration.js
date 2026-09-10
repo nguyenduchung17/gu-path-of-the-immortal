@@ -316,14 +316,3 @@ export function ambushOf(state, e, initiatedByPlayer) {
   }
   return { amb: null };
 }
-
-// Same-species kin within sight of a fight — they embolden the fighter
-// (applied in initCombat) and converge on the player afterwards.
-export function nearbyPackCount(state, defId, x, y, excludeId, r = 2) {
-  let n = 0;
-  for (const o of state.worldState.enemies || []) {
-    if (o.dead || o.id === excludeId || o.defId !== defId) continue;
-    if (Math.abs(o.x - x) <= r && Math.abs(o.y - y) <= r) n++;
-  }
-  return n;
-}

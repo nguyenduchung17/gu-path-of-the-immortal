@@ -388,8 +388,19 @@ export function drawWorld(display, state, view) {
       const sheet = beastSheet(e.defId);
       const off = sheet.h > 16 ? 8 : 4; // humanoid enemies stand taller in frame
       const hover = vis.kind === 'bird' ? 3 + (f ? 1 : 0) : 0;
+      const leader = e.packRole === 'leader' || def?.packLeader;
+      const img = alert ? sheet.alert : (chase ? sheet.move[f] : sheet.idle[f]);
       shadow(sx + 8, sy + 13);
-      g.drawImage(alert ? sheet.alert : (chase ? sheet.move[f] : sheet.idle[f]), sx, sy - off - bob - hover);
+      if (leader) {
+        // pack leaders loom (#9): larger, wrapped in a faint red aura, crowned
+        const sw = img.width, sh2 = img.height;
+        g.drawImage(img, sx - sw * 0.15, sy - off - bob - hover - sh2 * 0.3, sw * 1.3, sh2 * 1.3);
+        glows.push({ x: sx + 8, y: sy - 2, r: 24, col: '255,70,70', a: 0.35 + 0.15 * Math.sin(t / 300) });
+        g.fillStyle = '#f0c95a';
+        g.fillRect(sx + 5, sy - off - 20, 2, 2); g.fillRect(sx + 8, sy - off - 21, 2, 3); g.fillRect(sx + 11, sy - off - 20, 2, 2);
+      } else {
+        g.drawImage(img, sx, sy - off - bob - hover);
+      }
       if (chase) label('!', sx + 8, sy - off - 6, 8, '#ff5a4a');
       else if (alert) label('?', sx + 8, sy - off - 6, 8, '#f0c95a');
       if (def && e.hp < def.hp) { // wounded: mini HP bar
@@ -481,7 +492,12 @@ export function drawWorld(display, state, view) {
     roundRectPath(ctx, bx, by, w, h, 6); ctx.stroke();
     ctx.textAlign = 'center';
     ctx.fillStyle = '#f2d5d0'; ctx.font = `bold ${Math.max(10, Math.round(tile / 3))}px monospace`;
-    ctx.fillText(ENEMY_BY_ID[e.defId]?.name || '', ex, by + 15);
+    // pack identity on the plate (#38): a crown for leaders, ×n for pack size
+    const eDef = ENEMY_BY_ID[e.defId];
+    const eLeader = e.packRole === 'leader' || eDef?.packLeader;
+    let packN = 0;
+    if (e.packId) for (const o of state.worldState.enemies || []) if (!o.dead && o.packId === e.packId) packN++;
+    ctx.fillText((eLeader ? '♛ ' : '') + (eDef?.name || '') + (packN > 1 ? `  ×${packN}` : ''), ex, by + 15);
     ctx.fillStyle = '#b8c0b8'; ctx.font = `${Math.max(8, Math.round(tile / 4))}px monospace`;
     ctx.fillText(vis.rank || '', ex, by + 28);
     ctx.fillStyle = DANGER_COLOR[vis.danger] || '#f0c95a';

@@ -6,6 +6,7 @@ import { ITEM_BY_ID, ITEMS } from '@/game/data/items';
 import { PATH_BY_ID } from '@/game/data/paths';
 import { ROLES, rolesOf } from '@/game/data/roles';
 import { effectiveCost, activationChanceOf, strikeRange, guAttackRange } from '@/game/engine/combat';
+import { targetKindOf, targetLabelKey, targetSummary } from '@/game/engine/targeting';
 
 // Short localized summary of what a Gu does in battle.
 export function effectSummary(gu, t) {
@@ -37,6 +38,7 @@ export function effectSummary(gu, t) {
   if (e.attack?.guard) parts.push(`${t('fx.stoneGuard')} ${e.attack.guard.chance}%`);
   if (e.poison) parts.push(`${t('fx.poison')} ${e.poison.power}×${e.poison.duration}`);
   if (e.essenceRecovery) parts.push(`${t('fx.essenceRecovery')} ${e.essenceRecovery.chance}%`);
+  if (e.attack?.armorPen) parts.push(`${t('fx.armorPen')} ${e.attack.armorPen}%`);
   if (e.selfDelay) parts.push(`${t('fx.selfDelay')} +${e.selfDelay.pct}%`);
   if (e.soak) parts.push(t('fx.soak'));
   return parts.join(' · ');
@@ -64,6 +66,13 @@ function GuOption({ inst, state, combat, killer, onClick }) {
   const chance = activationChanceOf(gu, inst, state, combat);
   const noEssence = state.player.primevalEssence < cost;
   const disabled = cd > 0 || noEssence;
+  // targeting (#15–#18): the card names its category, and area Gu show how
+  // many living enemies they would hit right now
+  const kind = targetKindOf(gu);
+  const livingN = (combat.enemies || []).filter(x => x.hp > 0).length;
+  const areaN = kind !== 'single' && livingN > 1
+    ? (kind === 'random' ? Math.min(livingN, gu.effect.target?.hits || 3) : livingN)
+    : 0;
   return (
     <button disabled={disabled} onClick={onClick}
       className={`text-left rounded-lg border px-2.5 py-2 transition ${
@@ -80,6 +89,7 @@ function GuOption({ inst, state, combat, killer, onClick }) {
       </div>
       <div className="text-[10px] text-stone-500 truncate mt-0.5">
         {gu.effect?.attack && <span className="text-amber-200/80">🎯 {t('battle.crit')} {gu.effect.attack.crit ?? 5}% · </span>}
+        <span className="text-sky-200/80">{t(targetLabelKey(gu))}{targetSummary(gu) ? ` (${targetSummary(gu)})` : ''}{areaN ? ` · ${t('fx.targets')} ${areaN}` : ''} · </span>
         {t('battle.activation')} {chance}% · {effectSummary(gu, t)}
       </div>
     </button>

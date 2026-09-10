@@ -3,13 +3,27 @@
 // ACTION ORDER: no rigid player→enemy alternation. Every combatant has a
 // Speed; its next action comes after BASE/Speed time units. After the player
 // acts, every enemy action due before the player's next move resolves in
-// order — a fast enemy acts twice between player moves; a fast (or hastened)
+// order — fast enemies act twice between player moves; a fast (or hastened)
 // player double-acts. Speed buffs/debuffs, Action Advance (act sooner) and
 // Action Delay (push the enemy back) reshape the visible TIMELINE live.
+//
+// MULTI-ENEMY PACK COMBAT (#1–#3, #13, #27): a battle holds an `enemies`
+// array (a lone foe is simply a one-entry array). Each enemy keeps its own
+// HP, GUARD (stability), statuses, telegraph, committed intent and action
+// clock; the timeline interleaves all of them. Pack members that joined the
+// fight carry their packId / packRole so leader buffs and morale apply.
+//
+// TARGETING (#14–#18): single-target actions hit the selected enemy; AoE
+// kinds (all / cleave / chain / random) resolve via engine/targeting.js.
+// Single-target power > per-target AoE power; AoE costs more essence (#42).
 //
 // GUARD (STABILITY): enemies carry a second pool. Basic Strikes and control
 // Gu chip it; at zero the enemy is BROKEN — defense collapses, damage taken
 // rises and its next action is thrown back. See BALANCE.combat.gauge / break.
+//
+// PACK LEADERS (#8–#12, #30, #31): while a leader lives its packmates fight
+// under its leaderBuff; the leader may commit a Pack Howl that quickens the
+// whole pack; when it falls, survivors suffer the morale debuff (LEADER_DOWN).
 //
 // PERSISTENCE: a fleeing (or interrupted) battle never resets a foe — see
 // persistCombatEnemyState; HP only returns via natural regen or respawn.
@@ -28,6 +42,8 @@ import { SPECIES_BY_ID } from '../data/wildGu';
 import { ecoOf } from '../data/enemies';
 import { planIntent } from './intent';
 import { terrainModsOf, TERRAIN_LABELS } from '../data/terrain';
+import { LEADER_DOWN } from '../data/packs';
+import { resolveTargets, targetKindOf } from './targeting';
 import { T, TL, locGuName, locEnemyName, locPathName, locItemName, locTerrainLabel } from '../i18n/tr';
 
 const G = () => BALANCE.combat.gauge;
@@ -51,6 +67,11 @@ export function speedMulOf(statuses) {
 }
 const effSpeed = (base, statuses) => Math.max(20, Math.round(base * speedMulOf(statuses)));
 const actDelay = (base, statuses) => G().act / effSpeed(base, statuses);
+// push one enemy's action clock later (freeze-resist, Earth delay, GUARD break)
+const delayEnemy = (combat, enemy, amt) => {
+  if (combat.nextAct?.enemies) combat.nextAct.enemies[enemy.uid] += amt;
+};
+const dispOf = (e) => e.label || locEnemyName(ENEMY_BY_ID[e.defId] || e);
 
 // ---- Damage ranges & crits ----
 // Every damaging action rolls inside a visible min–max range (BALANCE), so
@@ -78,19 +99,28 @@ function critMulOf(gu) {
 }
 
 // Visible action order: simulate the schedule ahead so the player can plan.
+// With a pack in the fight every enemy's clock interleaves (#27).
 export function timelineOf(combat, n = 6) {
   const items = [];
   if (!combat?.nextAct) return items;
+  const clocks = (combat.enemies || [])
+    .filter(e => e.hp > 0)
+    .map(e => ({ e, at: combat.nextAct.enemies[e.uid] ?? Infinity }));
   let tp = combat.nextAct.player;
-  let te = combat.nextAct.enemy;
   const pDelay = actDelay(combat.speeds.player, combat.playerStatuses);
-  const eDelay = actDelay(combat.enemy.baseSpeed, combat.enemy.statuses);
   items.push({ uid: 'player', at: tp });
   tp += pDelay;
   let guard = 0;
-  while (items.length < n && guard++ < 24) {
-    if (te <= tp) { items.push({ uid: 'enemy', at: te, telegraph: !!combat.enemy.telegraph }); te += eDelay; }
-    else { items.push({ uid: 'player', at: tp }); tp += pDelay; }
+  while (items.length < n && guard++ < 40) {
+    clocks.sort((a, b) => a.at - b.at);
+    const next = clocks[0];
+    if (next && next.at <= tp) {
+      items.push({ uid: next.e.uid, at: next.at, telegraph: !!next.e.telegraph });
+      next.at += actDelay(next.e.baseSpeed, next.e.statuses);
+    } else {
+      items.push({ uid: 'player', at: tp });
+      tp += pDelay;
+    }
   }
   return items;
 }
@@ -105,59 +135,122 @@ function aiOf(def) {
   return 'predator';
 }
 
-export function initCombat(enemyId, player, opts = {}) {
-  const def = opts.def || ENEMY_BY_ID[enemyId];
-  const d = DIFFICULTIES[opts.difficulty] || DIFFICULTIES.standard;
+// Build ONE combatant from its world roster entry (its own def, HP, guard,
+// pack identity and any control effects carried in from exploration).
+function buildCombatant(r, idx, d, player, opts) {
+  const def = r.def;
   const eco = ecoOf(def.id);
   const maxHp = Math.max(1, Math.round(def.hp * d.enemyHpMul));
-  const startHp = Math.min(maxHp, Math.max(1, Math.round((opts.hp ?? def.hp) * d.enemyHpMul)));
-  const eBase = enemySpeedOf(def);
+  const startHp = Math.min(maxHp, Math.max(1, Math.round((r.hp ?? def.hp) * d.enemyHpMul)));
   const maxStab = maxStabilityOf(def);
-  const statuses = (opts.statuses || []).map(s => ({ ...s }));
-  // pack support: kin within sight embolden the fighter — never a free win
-  const allies = opts.allies || 0;
-  const packAtk = allies ? 1 + (BALANCE.combat.pack.atkPct / 100) : 1;
-  const packStab = allies ? 1 + (BALANCE.combat.pack.stabPct / 100) : 1;
-  // ambush: striking an unaware foe shatters its opening stance
-  const ambush = opts.ambush === 'player' || opts.ambush === 'enemy' ? opts.ambush : null;
-  let stability = opts.stability ?? maxStab;
-  if (ambush === 'player') stability = Math.max(0, Math.round(stability - maxStab * BALANCE.combat.ambush.stabLossPct / 100));
-  const terrain = opts.zoneId ? terrainModsOf(opts.zoneId) : null;
-  const log = [opts.intro || T('cmt.intro', { enemy: locEnemyName(def) })];
-  if (ambush === 'player') log.push(T('cmt.ambushPlayer', { enemy: locEnemyName(def), pct: BALANCE.combat.ambush.stabLossPct }));
-  if (ambush === 'enemy') log.push(T('cmt.ambushEnemy', { enemy: locEnemyName(def) }));
-  if (allies) log.push(T('cmt.pack', { n: allies, enemy: locEnemyName(def), atk: BALANCE.combat.pack.atkPct, stab: BALANCE.combat.pack.stabPct }));
-  if (terrain) log.push(T('cmt.terrain', { label: locTerrainLabel(opts.zoneId), mods: Object.entries(terrain).map(([p, m]) => `${locPathName(PATH_BY_ID[p]) || p} ${m > 0 ? '+' : ''}${m}%`).join(' · ') }));
-  const enemy = {
+  const statuses = (r.statuses || []).map(s => ({ ...s }));
+  const eBase = enemySpeedOf(def);
+  return {
+    uid: `e${idx}`,
     ...def,
     activity: eco.activity,
     stabMul: eco.stabMul,
     stabWeakness: eco.stabWeakness,
     ambusher: eco.ambusher,
-    attack: Math.max(1, Math.round(def.attack * d.enemyDmgMul * packAtk)),
+    attack: Math.max(1, Math.round(def.attack * d.enemyDmgMul)),
     maxHp, hp: startHp,
     baseSpeed: eBase,
     statuses,
-    stability: Math.min(Math.round(maxStab * packStab), Math.round(stability * packStab)),
-    maxStability: Math.round(maxStab * packStab),
+    stability: Math.min(maxStab, Math.round((r.stability ?? maxStab))),
+    maxStability: maxStab,
     ai: aiOf(def),
     aiCounters: {},
     telegraph: null,          // announced heavy move, executes on its next action
     planned: null,            // committed NEXT action — the Intent system
+    worldId: r.worldId || null,
+    packId: r.packId || null,
+    packRole: r.packRole || null,
+    packLeaderId: r.packLeaderId || null,
   };
-  enemy.planned = planIntent(enemy, statuses);
+}
+
+export function initCombat(enemyId, player, opts = {}) {
+  const def = opts.def || ENEMY_BY_ID[enemyId];
+  const d = DIFFICULTIES[opts.difficulty] || DIFFICULTIES.standard;
+  // ---- roster: the engaged foe, then any nearby pack members (#1–#3) ----
+  const roster = [{
+    def, hp: opts.hp, stability: opts.stability, statuses: opts.statuses, worldId: opts.worldId,
+    packId: opts.packId, packRole: opts.packRole, packLeaderId: opts.packLeaderId,
+  }];
+  for (const m of opts.pack || []) {
+    roster.push({
+      def: ENEMY_BY_ID[m.defId], hp: m.hp, stability: m.stability, statuses: m.statuses,
+      worldId: m.worldId, packId: m.packId, packRole: m.packRole, packLeaderId: m.packLeaderId,
+    });
+  }
+  const ambush = opts.ambush === 'player' || opts.ambush === 'enemy' ? opts.ambush : null;
+  const terrain = opts.zoneId ? terrainModsOf(opts.zoneId) : null;
+  const log = [opts.intro || T('cmt.intro', { enemy: locEnemyName(def) })];
+
+  // display labels — duplicate species get letter suffixes so the player can
+  // tell "Wolf A" from "Wolf B" in the log, timeline and target strip (#13)
+  const counts = {};
+  for (const r of roster) counts[r.def.id] = (counts[r.def.id] || 0) + 1;
+  const seen = {};
+  const enemies = roster.map((r, idx) => {
+    const c = buildCombatant(r, idx, d, player, opts);
+    if ((counts[r.def.id] || 0) > 1) {
+      const i = (seen[r.def.id] = (seen[r.def.id] ?? -1) + 1);
+      const base = locEnemyName(r.def);
+      c.label = `${base} ${String.fromCharCode(65 + i)}`;
+      c.short = `${base.split(' ')[0]}${String.fromCharCode(65 + i)}`;
+    } else {
+      c.label = locEnemyName(r.def);
+      c.short = locEnemyName(r.def).split(' ')[0];
+    }
+    return c;
+  });
+
+  // ambush: striking an unaware foe shatters its opening stance
+  if (ambush === 'player') {
+    const p0 = enemies[0];
+    p0.stability = Math.max(0, Math.round(p0.stability - p0.maxStability * BALANCE.combat.ambush.stabLossPct / 100));
+    log.push(T('cmt.ambushPlayer', { enemy: p0.label, pct: BALANCE.combat.ambush.stabLossPct }));
+  }
+  if (ambush === 'enemy') log.push(T('cmt.ambushEnemy', { enemy: enemies[0].label }));
+  if (enemies.length > 1) log.push(T('cmt.packIntro', { n: enemies.length }));
+  if (terrain) log.push(T('cmt.terrain', { label: locTerrainLabel(opts.zoneId), mods: Object.entries(terrain).map(([p, m]) => `${locPathName(PATH_BY_ID[p]) || p} ${m > 0 ? '+' : ''}${m}%`).join(' · ') }));
+
+  // pack leader buff (#11): while the leader lives, its packmates fight harder
+  const leader = enemies.find(e => e.packRole === 'leader' || ENEMY_BY_ID[e.defId]?.packLeader);
+  if (leader) {
+    const lb = ENEMY_BY_ID[leader.defId].leaderBuff || {};
+    for (const e of enemies) {
+      if (e === leader || !e.packId || e.packId !== leader.packId) continue;
+      if (lb.dmgPct) e.attack = Math.max(1, Math.round(e.attack * (1 + lb.dmgPct / 100)));
+      if (lb.speedPct) e.baseSpeed = Math.max(20, Math.round(e.baseSpeed * (1 + lb.speedPct / 100)));
+    }
+    if (lb.dmgPct || lb.speedPct) {
+      log.push(T('cmt.howl', { enemy: leader.label, sp: lb.speedPct || 0, dmg: lb.dmgPct || 0 }));
+    }
+  }
+
+  for (const e of enemies) e.planned = planIntent(e, e.statuses);
   const pBase = playerSpeedOf(player);
   const pDelay = actDelay(pBase, opts.playerStatuses || []);
-  const eDelay = actDelay(eBase, statuses);
+  const clocks = {};
+  for (const e of enemies) clocks[e.uid] = e.uid === enemies[0].uid
+    ? (ambush === 'player'
+      ? actDelay(e.baseSpeed, e.statuses) * (1 + BALANCE.combat.ambush.delayPct / 100)
+      : actDelay(e.baseSpeed, e.statuses))
+    : actDelay(e.baseSpeed, e.statuses);
   return {
     enemyId: def.id,
-    enemy,
+    enemy: enemies[0],          // primary combatant (back-compat)
+    enemies,
+    primaryUid: enemies[0].uid,
+    targetUid: enemies[0].uid,
     hpScale: d.enemyHpMul,
     speeds: { player: pBase },
     // action-order clock: the player opens — unless ambushed.
     nextAct: {
       player: ambush === 'enemy' ? Math.round(pDelay * 0.6) : 0,
-      enemy: ambush === 'player' ? Math.round(eDelay * (1 + BALANCE.combat.ambush.delayPct / 100)) : eDelay,
+      enemies: clocks,
     },
     clock: 0,
     worldId: opts.worldId || null,
@@ -176,6 +269,7 @@ export function initCombat(enemyId, player, opts = {}) {
     result: null,
     masteryUses: {},
     contributed: {},
+    lastHits: {},
   };
 }
 
@@ -188,7 +282,7 @@ export function activationChanceOf(gu, inst, state, combat) {
   const uses = inst && combat ? (combat.masteryUses?.[inst.instanceId] || 0) : 0;
   const cond = inst && state ? guCondition(state, inst) : null;
   const focus = (combat?.playerStatuses || []).filter(s => s.type === 'focus').reduce((a, s) => a + (s.power || 0), 0);
-  const broken = (combat?.enemy?.statuses || []).some(s => s.type === 'broken') ? (cfg.brokenBonus || 0) : 0;
+  const broken = (combat?.enemies || []).some(e => (e.statuses || []).some(s => s.type === 'broken')) ? (cfg.brokenBonus || 0) : 0;
   return Math.max(cfg.min, Math.min(cfg.max, Math.round(
     cfg.base + (level - 1) * cfg.perMasteryLevel - uses * cfg.repeatPenalty
     + (cond?.stability || 0) + focus + broken)));
@@ -243,11 +337,12 @@ function activeSynergies(state) {
 }
 
 // A broken enemy's defense collapses; armor break chips it away otherwise.
-function effDefenseOf(enemy) {
+// Sword's armorPen (#16) ignores part of what remains.
+function effDefenseOf(enemy, penPct = 0) {
   let d = enemy.defense;
   for (const s of enemy.statuses) if (s.type === 'armorBreak') d = Math.max(0, d - (s.power || 0));
   if (hasStatus(enemy.statuses, 'broken')) d = 0;
-  return d;
+  return Math.max(0, d * (1 - (penPct || 0) / 100));
 }
 function damageTakenMul(enemy) {
   let m = 1;
@@ -264,23 +359,29 @@ function applyStabilityDamage(enemy, combat, amount, push, path) {
   // some hides are built to be broken — the right Path finds the flaw
   if (path && path === enemy.stabWeakness) {
     amt *= 1.5;
-    push(T('cmt.flaw', { path: locPathName(PATH_BY_ID[path]), enemy: locEnemyName(enemy) }));
+    push(T('cmt.flaw', { path: locPathName(PATH_BY_ID[path]), enemy: dispOf(enemy) }));
   }
   enemy.stability = Math.max(0, (enemy.stability ?? enemy.maxStability) - Math.round(amt));
   if (enemy.stability <= 0) {
     enemy.statuses.push({ type: 'broken', power: 0, duration: cfg.brokenDuration });
     enemy.stability = Math.round(enemy.maxStability * 0.4);
-    combat.nextAct.enemy += actDelay(enemy.baseSpeed, enemy.statuses) * cfg.delayPct / 100;
-    if (enemy.telegraph) { enemy.telegraph = null; push(T('cmt.telegraphScattered', { enemy: locEnemyName(enemy) })); }
-    push(T('cmt.shatters', { enemy: locEnemyName(enemy) }));
+    delayEnemy(combat, enemy, actDelay(enemy.baseSpeed, enemy.statuses) * cfg.delayPct / 100);
+    if (enemy.telegraph) { enemy.telegraph = null; push(T('cmt.telegraphScattered', { enemy: dispOf(enemy) })); }
+    push(T('cmt.shatters', { enemy: dispOf(enemy) }));
   }
 }
 
 // applyGu: the Gu's living condition (hunger, injury, Vital bond, rank) scales
 // only the Gu's contribution — never the player's own strength.
-function applyGu(gu, player, enemy, pSt, eSt, combat, push, fx, syn, weather, mul = 1) {
+//   mul  — total power multiplier for THIS target (AoE falloff, cleave %…)
+//   opt.selfFx — self-side effects (defenses, momentum, regain) apply ONCE,
+//                on the first target only, never once per enemy
+//   opt.procMul — control proc chance scale for secondary targets (chain: 0.6)
+function applyGu(gu, player, enemy, pSt, eSt, combat, push, fx, syn, weather, mul = 1, opt = {}) {
   const e = gu.effect;
   const G_ = BALANCE.combat;
+  const selfFx = opt.selfFx !== false;
+  const procMul = opt.procMul ?? 1;
   let meaningful = false;
   const killer = isKillerMove(gu);
   if (e.attack) {
@@ -290,7 +391,7 @@ function applyGu(gu, player, enemy, pSt, eSt, combat, push, fx, syn, weather, mu
       dmg = Math.floor(dmg * elementBuffMul(pSt, gu.element));
       if (enemy.resists?.includes(gu.path)) {
         dmg = Math.floor(dmg * (1 - BALANCE.combat.elite.resistPct / 100));
-        push(T('cmt.resist', { enemy: locEnemyName(enemy), path: locPathName(PATH_BY_ID[gu.path]) }));
+        push(T('cmt.resist', { enemy: dispOf(enemy), path: locPathName(PATH_BY_ID[gu.path]) }));
       }
       dmg = Math.floor(dmg * (1 + weatherModOf(weather, gu.path) / 100));
       // the ground lends its essence — battlefield terrain shifts Path power
@@ -302,41 +403,41 @@ function applyGu(gu, player, enemy, pSt, eSt, combat, push, fx, syn, weather, mu
       dmg = Math.floor(dmg * (1 + (fx.damagePct || 0) / 100));
       if (gu.path === enemy.weakness) {
         dmg = Math.floor(dmg * (1 + BALANCE.combat.weaknessBonusPct / 100));
-        push(T('cmt.weaknessRoar', { path: locPathName(PATH_BY_ID[gu.path]), enemy: locEnemyName(enemy) }));
+        push(T('cmt.weaknessRoar', { path: locPathName(PATH_BY_ID[gu.path]), enemy: dispOf(enemy) }));
       }
       // path synergy — lightning races across a soaked hide
       if (gu.element === 'lightning' && hasStatus(eSt, 'soaked')) {
         dmg = Math.floor(dmg * 1.4);
-        push(T('cmt.lightningSoaked', { enemy: locEnemyName(enemy) }));
+        push(T('cmt.lightningSoaked', { enemy: dispOf(enemy) }));
       }
       // setup pays off: broken/exposed targets take amplified damage
       dmg = Math.floor(dmg * damageTakenMul(enemy));
       const guard = eSt.find(s => s.type === 'guard');
-      if (guard) { dmg = Math.floor(dmg * (1 - (guard.power || 0) / 100)); push(T('cmt.guardHunker', { enemy: locEnemyName(enemy) })); }
-      dmg = Math.max(1, dmg - Math.floor(effDefenseOf(enemy) * 0.5));
+      if (guard) { dmg = Math.floor(dmg * (1 - (guard.power || 0) / 100)); push(T('cmt.guardHunker', { enemy: dispOf(enemy) })); }
+      dmg = Math.max(1, dmg - Math.floor(effDefenseOf(enemy, e.attack.armorPen) * 0.5));
       const critMul = critMulOf(gu);
       if (critMul > 1) { dmg = Math.floor(dmg * critMul); push(T('cmt.crit', { gu: locGuName(gu) })); }
       enemy.hp -= dmg;
-      push(T('cmt.guStrike', { gu: locGuName(gu), enemy: locEnemyName(enemy), dmg }));
+      push(T('cmt.guStrike', { gu: locGuName(gu), enemy: dispOf(enemy), dmg }));
       meaningful = true;
     }
-    if (e.attack.stun && Math.random() * 100 < e.attack.stun) {
-      if (enemy.immune?.includes('stun')) push(T('cmt.stunImmune', { enemy: locEnemyName(enemy) }));
-      else { eSt.push({ type: 'stun', power: 0, duration: 1 }); push(T('cmt.stunned', { enemy: locEnemyName(enemy) })); meaningful = true; }
+    if (e.attack.stun && Math.random() * 100 < e.attack.stun * procMul) {
+      if (enemy.immune?.includes('stun')) push(T('cmt.stunImmune', { enemy: dispOf(enemy) }));
+      else { eSt.push({ type: 'stun', power: 0, duration: 1 }); push(T('cmt.stunned', { enemy: dispOf(enemy) })); meaningful = true; }
     }
     // LIGHTNING — paralysis: the foe may lose its next action. After it lands,
     // its nerves harden (+30% control resistance for 2 actions), so paralysis
     // can never chain-lock; resistant foes (bosses, elites) shake it off in
-    // proportion to their statusResist.
+    // proportion to their statusResist. Secondary (chain) targets proc less.
     if (e.attack.paralysis) {
       const res = (enemy.statusResist?.paralysis || 0) + effValue(eSt, 'ccResist');
-      if (enemy.immune?.includes('stun')) push(T('cmt.stunImmune', { enemy: locEnemyName(enemy) }));
-      else if (Math.random() * 100 < e.attack.paralysis.chance * (1 - Math.min(100, res) / 100)) {
+      if (enemy.immune?.includes('stun')) push(T('cmt.stunImmune', { enemy: dispOf(enemy) }));
+      else if (Math.random() * 100 < e.attack.paralysis.chance * procMul * (1 - Math.min(100, res) / 100)) {
         eSt.push({ type: 'paralysis', power: 0, duration: e.attack.paralysis.duration || 1 });
         addStatus(eSt, { type: 'ccResist', power: 30, duration: 2 });
-        push(T('cmt.paralyzed', { enemy: locEnemyName(enemy) }));
+        push(T('cmt.paralyzed', { enemy: dispOf(enemy) }));
         meaningful = true;
-      } else push(T('cmt.paralysisShrugs', { enemy: locEnemyName(enemy) }));
+      } else push(T('cmt.paralysisShrugs', { enemy: dispOf(enemy) }));
     }
     // ICE — freeze: a frozen foe loses its next action outright. Fully
     // freeze-resistant foes (rune-bound colossi) only slow: action delay
@@ -344,25 +445,25 @@ function applyGu(gu, player, enemy, pSt, eSt, combat, push, fx, syn, weather, mu
     // (+control resistance), preventing chain-freezes.
     if (e.attack.freeze) {
       const res = (enemy.statusResist?.freeze || 0) + effValue(eSt, 'ccResist');
-      if (enemy.immune?.includes('stun')) push(T('cmt.stunImmune', { enemy: locEnemyName(enemy) }));
+      if (enemy.immune?.includes('stun')) push(T('cmt.stunImmune', { enemy: dispOf(enemy) }));
       else if (res >= 100) {
-        combat.nextAct.enemy += actDelay(enemy.baseSpeed, eSt) * 0.4;
-        push(T('cmt.frozenSlows', { enemy: locEnemyName(enemy) }));
-      } else if (Math.random() * 100 < e.attack.freeze.chance * (1 - res / 100)) {
+        delayEnemy(combat, enemy, actDelay(enemy.baseSpeed, eSt) * 0.4);
+        push(T('cmt.frozenSlows', { enemy: dispOf(enemy) }));
+      } else if (Math.random() * 100 < e.attack.freeze.chance * procMul * (1 - res / 100)) {
         eSt.push({ type: 'frozen', power: 0, duration: e.attack.freeze.duration || 1 });
         addStatus(eSt, { type: 'ccResist', power: 30, duration: 2 });
-        push(T('cmt.frozen', { enemy: locEnemyName(enemy) }));
+        push(T('cmt.frozen', { enemy: dispOf(enemy) }));
         meaningful = true;
-      } else push(T('cmt.freezeShrugs', { enemy: locEnemyName(enemy) }));
+      } else push(T('cmt.freezeShrugs', { enemy: dispOf(enemy) }));
     }
     // EARTH — some strikes leave your stance rooted: a chance at Stone Guard.
-    if (e.attack.guard && Math.random() * 100 < e.attack.guard.chance) {
+    if (selfFx && e.attack.guard && Math.random() * 100 < e.attack.guard.chance) {
       pSt.push({ type: 'defense', power: e.attack.guard.power, duration: e.attack.guard.duration });
       push(T('cmt.stoneGuard', { p: e.attack.guard.power }));
     }
     // WATER — flowing essence: a small chance to draw essence back after the
     // strike. Capped at 1–2 per activation — efficiency, never free casting.
-    if (e.essenceRecovery && Math.random() * 100 < e.essenceRecovery.chance) {
+    if (selfFx && e.essenceRecovery && Math.random() * 100 < e.essenceRecovery.chance) {
       const er = e.essenceRecovery;
       const amt = er.min + Math.floor(Math.random() * (er.max - er.min + 1));
       player.primevalEssence = Math.min(player.maxPrimevalEssence, player.primevalEssence + amt);
@@ -385,40 +486,40 @@ function applyGu(gu, player, enemy, pSt, eSt, combat, push, fx, syn, weather, mu
       for (let i = eSt.length - 1; i >= 0; i--) if (eSt[i].type === 'soaked') eSt.splice(i, 1);
       push(T('cmt.burnSteam'));
     }
-    if ((enemy.statusResist?.burn || 0) >= 100) push(T('cmt.burnImmune', { enemy: locEnemyName(enemy) }));
-    else {
+    if ((enemy.statusResist?.burn || 0) >= 100) push(T('cmt.burnImmune', { enemy: dispOf(enemy) }));
+    else if (Math.random() * 100 < (e.burn.chance ?? 100)) {
       addStatus(eSt, { type: 'burn', power, duration: dur });
-      push(T('cmt.ablaze', { enemy: locEnemyName(enemy) }));
+      push(T('cmt.ablaze', { enemy: dispOf(enemy) }));
       meaningful = true;
     }
   }
   // POISON — stacking damage over time: every strike adds another layer of
   // venom (×n, up to the cap). Weak immediately, brutal in long fights.
   if (e.poison) {
-    if ((enemy.statusResist?.poison || 0) >= 100) push(T('cmt.poisonImmune', { enemy: locEnemyName(enemy) }));
+    if ((enemy.statusResist?.poison || 0) >= 100) push(T('cmt.poisonImmune', { enemy: dispOf(enemy) }));
     else {
-      addStatus(eSt, { type: 'poison', power: e.poison.power, duration: e.poison.duration });
-      push(T('cmt.venomApplied', { enemy: locEnemyName(enemy), n: eSt.filter(s => s.type === 'poison').length, d: e.poison.power }));
+      addStatus(eSt, { type: 'poison', power: Math.max(1, Math.round(e.poison.power * (mul >= 1 ? 1 : mul))), duration: e.poison.duration });
+      push(T('cmt.venomApplied', { enemy: dispOf(enemy), n: eSt.filter(s => s.type === 'poison').length, d: e.poison.power }));
       meaningful = true;
     }
   }
   if (e.soak) {
     eSt.push({ type: 'soaked', power: 0, duration: 3 });
-    push(T('cmt.soaked', { enemy: locEnemyName(enemy) }));
+    push(T('cmt.soaked', { enemy: dispOf(enemy) }));
     meaningful = true;
   }
-  if (e.slow) { eSt.push({ type: 'slow', power: e.slow.power, duration: e.slow.duration }); push(T('cmt.slowed', { enemy: locEnemyName(enemy) })); meaningful = true; }
+  if (e.slow) { eSt.push({ type: 'slow', power: e.slow.power, duration: e.slow.duration }); push(T('cmt.slowed', { enemy: dispOf(enemy) })); meaningful = true; }
   if (e.delay) {
-    combat.nextAct.enemy += actDelay(enemy.baseSpeed, eSt) * (e.delay.pct / 100);
-    push(T('cmt.dragged', { enemy: locEnemyName(enemy) }));
+    delayEnemy(combat, enemy, actDelay(enemy.baseSpeed, eSt) * (e.delay.pct / 100));
+    push(T('cmt.dragged', { enemy: dispOf(enemy) }));
     meaningful = true;
   }
-  if (e.expose) { eSt.push({ type: 'weakness', power: e.expose.power, duration: e.expose.duration }); push(T('cmt.exposed', { enemy: locEnemyName(enemy) })); meaningful = true; }
-  if (e.armorBreak) { eSt.push({ type: 'armorBreak', power: e.armorBreak.power, duration: e.armorBreak.duration }); push(T('cmt.armorBreak', { enemy: locEnemyName(enemy) })); meaningful = true; }
-  if (e.self?.haste) { pSt.push({ type: 'haste', power: e.self.haste.power, duration: e.self.haste.duration }); push(T('cmt.selfHaste', { gu: locGuName(gu) })); }
+  if (e.expose) { eSt.push({ type: 'weakness', power: e.expose.power, duration: e.expose.duration }); push(T('cmt.exposed', { enemy: dispOf(enemy) })); meaningful = true; }
+  if (e.armorBreak) { eSt.push({ type: 'armorBreak', power: e.armorBreak.power, duration: e.armorBreak.duration }); push(T('cmt.armorBreak', { enemy: dispOf(enemy) })); meaningful = true; }
+  if (selfFx && e.self?.haste) { pSt.push({ type: 'haste', power: e.self.haste.power, duration: e.self.haste.duration }); push(T('cmt.selfHaste', { gu: locGuName(gu) })); }
   // WIND — momentum: each meaningful strike adds a stack of +power% Speed (up
   // to cap). Stacks last the whole battle — wind grows stronger as it blows.
-  if (e.self?.momentum) {
+  if (selfFx && e.self?.momentum) {
     const mom = e.self.momentum;
     const stacks = pSt.filter(s => s.type === 'momentum').length;
     if (stacks < (mom.cap || 5)) {
@@ -427,27 +528,27 @@ function applyGu(gu, player, enemy, pSt, eSt, combat, push, fx, syn, weather, mu
     } else push(T('cmt.momentumMax', { cap: mom.cap || 5 }));
   }
   if (e.stab) applyStabilityDamage(enemy, combat, e.stab * (mul >= 1 ? 1 : 0.75), push, gu.path);
-  if (e.summon) {
+  if (selfFx && e.summon) {
     const p = Math.max(1, Math.floor(e.summon.power * mul * (1 + (fx.summonPct || 0) / 100) * (syn.has('tamedTides') ? 1.15 : 1)));
     eSt.push({ type: 'summon', power: p, duration: (e.summon.duration || 3) + (fx.summonTurns || 0) });
     push(T('cmt.summon', { p }));
     meaningful = true;
   }
-  if (e.defense) { pSt.push({ type: 'defense', power: Math.max(1, Math.floor(e.defense.power * mul * (1 + (fx.defensePct || 0) / 100))), duration: e.defense.duration }); push(T('cmt.hardens', { gu: locGuName(gu) })); }
-  if (e.evasion) { pSt.push({ type: 'evasion', power: Math.max(1, Math.floor(e.evasion.power * mul * (1 + (fx.evasionPct || 0) / 100))), duration: e.evasion.duration }); push(T('cmt.blurs', { gu: locGuName(gu) })); }
-  if (e.barrier) {
+  if (selfFx && e.defense) { pSt.push({ type: 'defense', power: Math.max(1, Math.floor(e.defense.power * mul * (1 + (fx.defensePct || 0) / 100))), duration: e.defense.duration }); push(T('cmt.hardens', { gu: locGuName(gu) })); }
+  if (selfFx && e.evasion) { pSt.push({ type: 'evasion', power: Math.max(1, Math.floor(e.evasion.power * mul * (1 + (fx.evasionPct || 0) / 100))), duration: e.evasion.duration }); push(T('cmt.blurs', { gu: locGuName(gu) })); }
+  if (selfFx && e.barrier) {
     const power = Math.max(1, Math.floor(e.barrier.power * mul * (1 + (fx.barrierPct || 0) / 100) * (syn.has('mountainSpring') ? 1.15 : 1)));
     pSt.push({ type: 'barrier', power, duration: e.barrier.duration });
     push(T('cmt.barrier', { gu: locGuName(gu), p: power }));
   }
-  if (e.heal) { const h = Math.max(1, Math.floor(e.heal.power * mul * (1 + (fx.healPct || 0) / 100))); player.hp = Math.min(player.maxHp, player.hp + h); push(T('cmt.heal', { gu: locGuName(gu), n: h })); }
-  if (e.essence) { const r = Math.max(1, Math.round(e.essence.power * mul)); player.primevalEssence = Math.min(player.maxPrimevalEssence, player.primevalEssence + r); push(T('cmt.essence', { gu: locGuName(gu), n: r })); }
+  if (selfFx && e.heal) { const h = Math.max(1, Math.floor(e.heal.power * mul * (1 + (fx.healPct || 0) / 100))); player.hp = Math.min(player.maxHp, player.hp + h); push(T('cmt.heal', { gu: locGuName(gu), n: h })); }
+  if (selfFx && e.essence) { const r = Math.max(1, Math.round(e.essence.power * mul)); player.primevalEssence = Math.min(player.maxPrimevalEssence, player.primevalEssence + r); push(T('cmt.essence', { gu: locGuName(gu), n: r })); }
   if (e.control) {
-    if (enemy.immune?.includes('control')) push(T('cmt.controlImmune', { enemy: locEnemyName(enemy) }));
-    else { eSt.push({ type: 'control', power: Math.max(1, Math.floor(e.control.power * mul * (1 + (fx.controlPct || 0) / 100))), duration: e.control.duration }); push(T('cmt.controlBound', { gu: locGuName(gu), enemy: locEnemyName(enemy) })); meaningful = true; }
+    if (enemy.immune?.includes('control')) push(T('cmt.controlImmune', { enemy: dispOf(enemy) }));
+    else { eSt.push({ type: 'control', power: Math.max(1, Math.floor(e.control.power * mul * (1 + (fx.controlPct || 0) / 100))), duration: e.control.duration }); push(T('cmt.controlBound', { gu: locGuName(gu), enemy: dispOf(enemy) })); meaningful = true; }
   }
-  if (e.buff) { pSt.push({ type: 'buff', element: e.buff.element, power: Math.round(e.buff.power * mul), duration: e.buff.duration }); push(T('cmt.buff', { gu: locGuName(gu), element: TL(`guEl.${e.buff.element}`, e.buff.element) })); }
-  if (e.investigate) { combat.revealed = true; combat.scouted = true; push(T('cmt.investigate', { gu: locGuName(gu) })); }
+  if (selfFx && e.buff) { pSt.push({ type: 'buff', element: e.buff.element, power: Math.round(e.buff.power * mul), duration: e.buff.duration }); push(T('cmt.buff', { gu: locGuName(gu), element: TL(`guEl.${e.buff.element}`, e.buff.element) })); }
+  if (selfFx && e.investigate) { combat.revealed = true; combat.scouted = true; push(T('cmt.investigate', { gu: locGuName(gu) })); }
   return meaningful;
 }
 
@@ -461,7 +562,7 @@ function playerGuardDr(pSt, dmg, push) {
 
 function enemyAct(enemy, player, pSt, push, windEvasion, thorns) {
   const ev = effValue(pSt, 'evasion') + windEvasion;
-  if (ev > 0 && Math.random() * 100 < ev) { push(T('cmt.dodge', { enemy: locEnemyName(enemy) })); return; }
+  if (ev > 0 && Math.random() * 100 < ev) { push(T('cmt.dodge', { enemy: dispOf(enemy) })); return; }
   let dmg = enemy.attack + Math.floor(Math.random() * 3);
   dmg = Math.max(1, dmg - effValue(enemy.statuses, 'control'));
   dmg = Math.max(1, dmg - effValue(pSt, 'defense'));
@@ -469,8 +570,8 @@ function enemyAct(enemy, player, pSt, push, windEvasion, thorns) {
   const bar = pSt.find(s => s.type === 'barrier' && s.power > 0);
   if (bar) { const absorb = Math.min(bar.power, dmg); bar.power -= absorb; dmg -= absorb; push(T('cmt.barrierAbsorb', { n: absorb })); }
   player.hp -= dmg;
-  push(T('cmt.enemyAttack', { enemy: locEnemyName(enemy), dmg }));
-  if (thorns) { enemy.hp -= thorns; push(T('cmt.thorns', { enemy: locEnemyName(enemy), dmg: thorns })); }
+  push(T('cmt.enemyAttack', { enemy: dispOf(enemy), dmg }));
+  if (thorns) { enemy.hp -= thorns; push(T('cmt.thorns', { enemy: dispOf(enemy), dmg: thorns })); }
   if (enemy.abilities && enemy.abilities.includes('poison')) {
     const resist = (player.foodBuffs || []).filter(b => b.type === 'poisonResist').reduce((a, b) => a + (b.power || 0), 0);
     if (Math.random() < 0.4 * (1 - Math.min(90, resist) / 100)) {
@@ -481,7 +582,7 @@ function enemyAct(enemy, player, pSt, push, windEvasion, thorns) {
   // next actions later — the enemy side of the paralysis lesson
   if (enemy.abilities && enemy.abilities.includes('numb') && Math.random() < 0.18) {
     addStatus(pSt, { type: 'slow', power: 30, duration: 2 });
-    push(T('cmt.youNumbed', { enemy: locEnemyName(enemy) }));
+    push(T('cmt.youNumbed', { enemy: dispOf(enemy) }));
   }
 }
 
@@ -501,32 +602,56 @@ function executeTelegraph(enemy, player, pSt, push) {
   push(T('cmt.telegraphHit', { name: tg.name, dmg }));
 }
 
-// Archetype AI — now driven by the INTENT system: the enemy commits its next
+// Archetype AI — driven by the INTENT system: the enemy commits its next
 // action one beat ahead (see engine/intent.js) and executes exactly that plan,
 // so what the player reads is what the enemy does. Battles begun before the
 // system existed (old saves mid-fight) fall back to deciding on the spot.
-function enemyAI(enemy, player, pSt, eSt, push, windEvasion, thorns) {
+// PACK LEADERS (#12, #30): a committed Pack Howl quickens the whole pack.
+function enemyAI(enemy, player, pSt, eSt, push, windEvasion, thorns, combat) {
   const c = enemy.aiCounters || (enemy.aiCounters = {});
   c.acts = (c.acts || 0) + 1;
   let plan = enemy.planned;
   enemy.planned = null;
   if (!plan) {
+    const isLeader = enemy.packRole === 'leader' || enemy.packLeader;
     const every = enemy.charge?.every || (enemy.ai === 'brute' ? 3 : 4);
-    if (enemy.ai === 'brute' && enemy.hp < enemy.maxHp * 0.5 && !hasStatus(eSt, 'guard') && Math.random() < 0.4) plan = { kind: 'guard' };
+    if (isLeader && !c.howled && c.acts >= 2 && Math.random() < 0.3) plan = { kind: 'howl' };
+    else if (enemy.ai === 'brute' && enemy.hp < enemy.maxHp * 0.5 && !hasStatus(eSt, 'guard') && Math.random() < 0.4) plan = { kind: 'guard' };
     else if (enemy.ai === 'skirmisher' && enemy.hp < enemy.maxHp * 0.7 && !c.hasted) plan = { kind: 'buff' };
     else if (enemy.ai === 'poisoner' && Math.random() < 0.6) plan = { kind: 'poison' };
     else if (c.acts % every === 0) plan = { kind: 'heavy', name: enemy.charge ? TL(`charge.${enemy.id}`, enemy.charge.name) : T('cmt.savage'), power: enemy.charge?.power || 1.8 };
     else plan = { kind: 'attack' };
   }
+  if (plan.kind === 'howl') {
+    c.howled = true;
+    if (!c.howlBuffed) {
+      c.howlBuffed = true;
+      enemy.attack = Math.max(1, Math.round(enemy.attack * 1.1));
+    }
+    let pack = 0;
+    for (const mate of (combat.enemies || [])) {
+      if (mate === enemy || mate.hp <= 0 || !mate.packId || mate.packId !== enemy.packId) continue;
+      addStatus(mate.statuses, { type: 'haste', power: 20, duration: 2 });
+      if (!mate.aiCounters?.howlBuffed) {
+        mate.aiCounters = mate.aiCounters || {};
+        mate.aiCounters.howlBuffed = true;
+        mate.attack = Math.max(1, Math.round(mate.attack * 1.1));
+      }
+      pack++;
+    }
+    push(T('cmt.howl', { enemy: dispOf(enemy), sp: 20, dmg: 10 }));
+    if (!pack) push(T('cmt.aiBuff', { enemy: dispOf(enemy) }));
+    return;
+  }
   if (plan.kind === 'guard') {
     eSt.push({ type: 'guard', power: 40, duration: 1 });
-    push(T('cmt.aiGuard', { enemy: locEnemyName(enemy) }));
+    push(T('cmt.aiGuard', { enemy: dispOf(enemy) }));
     return;
   }
   if (plan.kind === 'buff') {
     c.hasted = true;
     eSt.push({ type: 'haste', power: 25, duration: 2 });
-    push(T('cmt.aiBuff', { enemy: locEnemyName(enemy) }));
+    push(T('cmt.aiBuff', { enemy: dispOf(enemy) }));
     return;
   }
   if (plan.kind === 'poison') {
@@ -534,12 +659,12 @@ function enemyAI(enemy, player, pSt, eSt, push, windEvasion, thorns) {
     dmg = playerGuardDr(pSt, dmg, push);
     player.hp -= dmg;
     addStatus(pSt, { type: 'poison', power: 3, duration: 3 });
-    push(T('cmt.aiPoison', { enemy: locEnemyName(enemy), dmg }));
+    push(T('cmt.aiPoison', { enemy: dispOf(enemy), dmg }));
     return;
   }
   if (plan.kind === 'heavy') {
     enemy.telegraph = { name: plan.name, power: plan.power || 1.8 };
-    push(T('cmt.aiHeavy', { enemy: locEnemyName(enemy), name: plan.name }));
+    push(T('cmt.aiHeavy', { enemy: dispOf(enemy), name: plan.name }));
     return;
   }
   enemyAct(enemy, player, pSt, push, windEvasion, thorns);
@@ -552,13 +677,13 @@ function tick(statuses, push, target, who) {
   for (const s of statuses) {
     if (s.type === 'poison') {
       target.hp -= s.power;
-      push(who === 'player' ? T('cmt.poisonTickYou', { n: s.power }) : T('cmt.poisonTick', { enemy: locEnemyName(target), n: s.power }));
+      push(who === 'player' ? T('cmt.poisonTickYou', { n: s.power }) : T('cmt.poisonTick', { enemy: dispOf(target), n: s.power }));
     } else if (s.type === 'burn') {
       target.hp -= s.power;
-      push(T('cmt.burnTick', { enemy: locEnemyName(target), n: s.power }));
+      push(T('cmt.burnTick', { enemy: dispOf(target), n: s.power }));
     } else if (s.type === 'summon') {
       target.hp -= s.power;
-      push(T('cmt.summonTick', { enemy: locEnemyName(target), n: s.power }));
+      push(T('cmt.summonTick', { enemy: dispOf(target), n: s.power }));
     }
     const nd = s.duration - 1;
     if (nd > 0 && !(s.type === 'barrier' && s.power <= 0)) out.push({ ...s, duration: nd });
@@ -571,27 +696,63 @@ function applyPendingMastery(s, pending) {
   return s;
 }
 
-function finishVictory(state, combat, player, pending) {
-  const enemy = combat.enemy;
-  const items = {};
-  const dropMul = DIFFICULTIES[state.difficulty]?.dropMul ?? 1;
-  for (const d of enemy.drops || []) {
-    if (Math.random() * 100 < Math.min(100, (d.chance || 100) * dropMul)) items[d.itemId] = (items[d.itemId] || 0) + (d.qty || 1);
+// A pack leader's death breaks the pack's spirit (#31): survivors lose damage
+// and speed for the rest of the battle — the simple morale architecture.
+function packMorale(combat, leader, push) {
+  const cfg = LEADER_DOWN;
+  let hit = false;
+  for (const m of combat.enemies) {
+    if (m === leader || m.hp <= 0 || !m.packId || m.packId !== leader.packId) continue;
+    hit = true;
+    m.attack = Math.max(1, Math.round(m.attack * (1 - cfg.dmgPct / 100)));
+    m.baseSpeed = Math.max(20, Math.round(m.baseSpeed * (1 - cfg.speedPct / 100)));
+    addStatus(m.statuses, { type: 'demoralized', power: 0, duration: 99 });
   }
-  const spiritStones = Math.floor(enemy.maxHp / 4) + Math.floor(Math.random() * 5);
-  const progress = BALANCE.combat.victoryProgress + Math.floor(enemy.maxHp / 40);
-  const droppedRecipes = (enemy.recipeDrops || []).filter(d => Math.random() * 100 < (d.chance || 100)).map(d => d.recipeId);
-  // Realm Insight — a species' first kill is a true lesson; grinding the
-  // same weak foe yields diminishing insight, never zero.
+  if (hit) push(T('cmt.leaderDown', { enemy: dispOf(leader), dmg: cfg.dmgPct, sp: cfg.speedPct }));
+}
+
+// Mid-battle death bookkeeping: announce each newly-dead foe, and shatter the
+// pack's morale if that foe was its leader.
+function settleDeaths(combat, hpBefore, push) {
+  for (const en of combat.enemies) {
+    if ((hpBefore[en.uid] ?? en.hp) > 0 && en.hp <= 0) {
+      push(T('cmt.enemyDefeated', { enemy: dispOf(en) }));
+      if (en.packRole === 'leader' || en.packLeader) packMorale(combat, en, push);
+    }
+  }
+}
+
+// Victory sweeps EVERY defeated combatant (#40): normal loot per enemy,
+// leader-only rare recipe rolls, and rewards that grow with the pack — but
+// per-species Insight decay (#41) keeps weak-pack farming thin.
+function finishVictory(state, combat, player, pending) {
+  const dropMul = DIFFICULTIES[state.difficulty]?.dropMul ?? 1;
+  const items = {};
+  let spiritStones = 0, progress = 0, insight = 0;
+  const killed = [];
+  const droppedRecipes = [];
   const icfg = BALANCE.insight;
-  const kills = state.bestiary?.[enemy.id]?.kills || 0;
-  const decay = Math.max(icfg.killDecayFloor, icfg.killDecay[Math.min(kills, icfg.killDecay.length - 1)]);
-  const insight = Math.max(1, Math.round((icfg.victoryBase + (kills === 0 ? icfg.firstKillBonus : 0)) * decay));
-  let s = { ...state, player, combat: { ...combat, over: true, result: 'victory', rewards: { items, spiritStones, progress, insight, mastery: [] } } };
-  s = applyEffects(s, { items, spiritStones, progress, insight, recipes: droppedRecipes, message: T('cmt.victory', { stones: spiritStones, progress }) });
   const b = { ...(state.bestiary || {}) };
-  const rec = b[enemy.id] || { seen: 0, kills: 0 };
-  b[enemy.id] = { ...rec, kills: rec.kills + 1 };
+  for (const en of combat.enemies) {
+    if (en.hp > 0) continue;
+    const def = ENEMY_BY_ID[en.defId] || en;
+    killed.push(def.id);
+    for (const d of def.drops || []) {
+      if (Math.random() * 100 < Math.min(100, (d.chance || 100) * dropMul)) items[d.itemId] = (items[d.itemId] || 0) + (d.qty || 1);
+    }
+    for (const d of def.recipeDrops || []) {
+      if (Math.random() * 100 < (d.chance || 100)) droppedRecipes.push(d.recipeId);
+    }
+    spiritStones += Math.floor(en.maxHp / 4) + Math.floor(Math.random() * 5);
+    progress += BALANCE.combat.victoryProgress + Math.floor(en.maxHp / 40);
+    const kills = state.bestiary?.[def.id]?.kills || 0;
+    const decay = Math.max(icfg.killDecayFloor, icfg.killDecay[Math.min(kills, icfg.killDecay.length - 1)]);
+    insight += Math.max(1, Math.round((icfg.victoryBase + (kills === 0 ? icfg.firstKillBonus : 0)) * decay));
+    const rec = b[def.id] || { seen: 0, kills: 0 };
+    b[def.id] = { ...rec, kills: rec.kills + 1 };
+  }
+  let s = { ...state, player, combat: { ...combat, over: true, result: 'victory', killed, rewards: { items, spiritStones, progress, insight, mastery: [] } } };
+  s = applyEffects(s, { items, spiritStones, progress, insight, recipes: droppedRecipes, message: T('cmt.victory', { stones: spiritStones, progress }) });
   s = { ...s, bestiary: b };
   const masteryGains = [];
   for (const pathId of Object.keys(combat.contributed)) {
@@ -601,7 +762,9 @@ function finishVictory(state, combat, player, pending) {
   s = applyPendingMastery(s, pending);
   for (const m of pending) masteryGains.push(m);
   s = { ...s, combat: { ...s.combat, rewards: { ...s.combat.rewards, mastery: masteryGains } } };
-  s.quests = { ...s.quests, kills: { ...s.quests.kills, [enemy.id]: (s.quests.kills[enemy.id] || 0) + 1 } };
+  const qk = { ...(s.quests.kills || {}) };
+  for (const id of killed) qk[id] = (qk[id] || 0) + 1;
+  s = { ...s, quests: { ...s.quests, kills: qk } };
   return s;
 }
 
@@ -622,33 +785,39 @@ function finishDefeat(state, combat, player) {
 // Carries the exact combat state (HP, guard/stability, lingering burn &
 // poison, last-combat time) back onto the world record — for a finished
 // battle via END_COMBAT and for one interrupted by a page refresh via
-// normalize(). Only a kill (respawn timer) or natural regen ever restores.
+// normalize(). Every pack member is settled separately (#45): dead members
+// stay dead on their own respawn timers (leaders return far slower, #46),
+// survivors keep their exact wounds. Only a kill or natural regen ever restores.
 export function persistCombatEnemyState(state, c) {
-  if (!c?.enemy) return state;
+  if (!c) return state;
+  const list = (c.enemies?.length ? c.enemies : (c.enemy ? [c.enemy] : [])).filter(Boolean);
   const now = Date.now();
   let s = state;
-  if (c.worldId && s.worldState?.enemies) {
+  if (s.worldState?.enemies && list.length) {
     s = {
       ...s,
       worldState: {
         ...s.worldState,
-        enemies: s.worldState.enemies.map(e => {
-          if (e.id !== c.worldId) return e;
-          const def = ENEMY_BY_ID[e.defId];
-          if (c.result === 'victory') {
+        enemies: s.worldState.enemies.map(rec => {
+          const ce = list.find(e => e.worldId === rec.id);
+          if (!ce) return rec;
+          const def = ENEMY_BY_ID[rec.defId];
+          const isLeader = ce.packRole === 'leader' || def?.packLeader;
+          if (c.result === 'victory' || (c.result && ce.hp <= 0)) {
             return {
-              ...e, dead: true, state: 'idle',
-              respawnAt: now + BALANCE.world.respawnMs * (def?.respawnMul || 1),
-              x: e.home?.x ?? e.x, y: e.home?.y ?? e.y,
-              hp: def?.hp ?? e.hp, stability: def ? maxStabilityOf(def) : e.stability, statuses: [],
+              ...rec, dead: true, state: 'idle',
+              respawnAt: now + BALANCE.world.respawnMs * (def?.respawnMul || 1)
+                * (isLeader ? (BALANCE.world.pack.leaderRespawnMul || 3) : 1),
+              x: rec.home?.x ?? rec.x, y: rec.home?.y ?? rec.y,
+              hp: def?.hp ?? rec.hp, stability: def ? maxStabilityOf(def) : rec.stability, statuses: [],
             };
           }
           // survived the battle (flee / defeat): keep the exact remaining state
-          const lingering = (c.enemy.statuses || []).filter(st => st.type === 'burn' || st.type === 'poison').map(st => ({ ...st }));
+          const lingering = (ce.statuses || []).filter(st => st.type === 'burn' || st.type === 'poison').map(st => ({ ...st }));
           return {
-            ...e,
-            hp: Math.max(1, Math.round(c.enemy.hp / (c.hpScale || 1))),
-            stability: Math.round(c.enemy.stability ?? e.stability ?? (def ? maxStabilityOf(def) : 0)),
+            ...rec,
+            hp: Math.max(1, Math.round(ce.hp / (c.hpScale || 1))),
+            stability: Math.round(ce.stability ?? rec.stability ?? (def ? maxStabilityOf(def) : 0)),
             statuses: lingering,
             lastCombatAt: now,
             state: 'idle',
@@ -677,14 +846,36 @@ export function persistCombatEnemyState(state, c) {
 
 export function executeRound(state, action) {
   if (!state.combat || state.combat.over) return state;
+  // snapshot per-enemy HP so the round can report exact damage deltas to the
+  // battle VFX — language-independent, works for every AoE shape (#48)
+  const hpBefore = {};
+  for (const en of state.combat.enemies || []) hpBefore[en.uid] = en.hp;
+  const s = executeRoundInner(state, action, hpBefore);
+  if (s.combat && !s.combat.over) {
+    const hits = {};
+    for (const en of s.combat.enemies || []) {
+      const d = (hpBefore[en.uid] ?? en.hp) - en.hp;
+      if (d > 0) hits[en.uid] = d;
+    }
+    return { ...s, combat: { ...s.combat, lastHits: hits } };
+  }
+  return s;
+}
+
+function executeRoundInner(state, action, hpBefore) {
+  if (!state.combat || state.combat.over) return state;
   const cfg = BALANCE.combat;
-  let combat = { ...state.combat, enemy: { ...state.combat.enemy, statuses: state.combat.enemy.statuses.map(s => ({ ...s })) } };
+  let combat = {
+    ...state.combat,
+    enemies: (state.combat.enemies || [state.combat.enemy]).map(en => ({
+      ...en, statuses: (en.statuses || []).map(s => ({ ...s })),
+    })),
+  };
   let player = { ...state.player };
   let log = combat.log.slice();
   let cooldowns = { ...combat.cooldowns };
   let pSt = combat.playerStatuses.map(s => ({ ...s }));
-  let enemy = combat.enemy;
-  let eSt = enemy.statuses;
+  const enemies = combat.enemies;
   const push = (m) => log.push(m);
   const syn = activeSynergies(state);
   const windFx = bonusOf(state, 'wind');
@@ -700,26 +891,36 @@ export function executeRound(state, action) {
   combat.clock = combat.nextAct.player;
   let actAdvancePct = 0, actSelfDelayPct = 0;
 
+  const livingOf = () => enemies.filter(e => e.hp > 0);
   // the player's own statuses act first: poison bites, auras fade
   pSt = tick(pSt, push, player, 'player');
 
+  // the selected target (#14): an explicit choice, else the primary foe
+  const wantedUid = action.targetUid || combat.targetUid || combat.primaryUid;
+  let target = livingOf().find(e => e.uid === wantedUid) || livingOf()[0] || enemies[0];
+  combat.targetUid = target.uid;
+  combat.enemy = enemies.find(e => e.uid === combat.primaryUid) || enemies[0];
+
   if (action.type === 'flee') {
     const hasWind = state.player.equippedGu.some(id => { const g = state.ownedGu.find(o => o.instanceId === id); return g && GU_BY_ID[g.guId].id === 'windStep'; });
+    // escape is judged against the FASTEST able pursuer — not one random
+    // packmate; a slowed or frozen foe cannot cut you off (#32)
+    const pursuers = livingOf().filter(e => !incapacitated(e.statuses));
+    const fastest = pursuers.length ? Math.max(...pursuers.map(e => effSpeed(e.baseSpeed, e.statuses))) : 0;
     const pSpd = effSpeed(combat.speeds.player, pSt);
-    const eSpd = effSpeed(enemy.baseSpeed, eSt);
-    const chance = 38 + player.agility * 2 + (pSpd - eSpd) * 0.25 + (hasWind ? 20 : 0) + (windFx.fleePct || 0);
+    const chance = 38 + player.agility * 2 + (pSpd - fastest) * 0.25 + (hasWind ? 20 : 0) + (windFx.fleePct || 0);
     if (Math.random() * 100 < chance) {
       push(T('cmt.fleeOk'));
       // Escaping is a generic action — no mastery for Flee itself; only a Gu
       // that actively carried the escape (Wind Step) earns its Path a little.
       if (hasWind) push(T('cmt.windCarry', { n: BALANCE.mastery.xpFleeAssist }));
-      let s = { ...state, combat: { ...combat, enemy, playerStatuses: pSt, log, over: true, result: 'flee' }, player };
+      let s = { ...state, combat: { ...combat, enemy: combat.enemy, playerStatuses: pSt, log, over: true, result: 'flee' }, player };
       if (hasWind) s = grantMastery(s, 'wind', BALANCE.mastery.xpFleeAssist, 'guUsed', 'guUse');
       return s;
     }
     push(T('cmt.fleeFail'));
-    // a failed escape invites the enemy's next action immediately
-    combat.nextAct.enemy = Math.min(combat.nextAct.enemy, combat.clock + 1);
+    // a failed escape invites every enemy's next action immediately
+    for (const e of livingOf()) combat.nextAct.enemies[e.uid] = Math.min(combat.nextAct.enemies[e.uid], combat.clock + 1);
   } else if (action.type === 'item') {
     const it = ITEM_BY_ID[action.itemId];
     if (!it || !it.use || !it.combatUsable) return state;
@@ -739,28 +940,28 @@ export function executeRound(state, action) {
     const sc = cfg.strike;
     const rng = strikeRange(player);
     if (Math.random() * 100 >= rng.accuracy) {
-      push(T('cmt.strikeMiss', { enemy: locEnemyName(enemy) }));
+      push(T('cmt.strikeMiss', { enemy: dispOf(target) }));
     } else {
       let dmg = rollIn(rng);
-      dmg = Math.floor(dmg * damageTakenMul(enemy));
-      const guard = eSt.find(s => s.type === 'guard');
-      if (guard) { dmg = Math.floor(dmg * (1 - (guard.power || 0) / 100)); push(T('cmt.guardHunker', { enemy: locEnemyName(enemy) })); }
-      dmg = Math.max(1, dmg - Math.floor(effDefenseOf(enemy) * 0.5));
+      dmg = Math.floor(dmg * damageTakenMul(target));
+      const guard = target.statuses.find(s => s.type === 'guard');
+      if (guard) { dmg = Math.floor(dmg * (1 - (guard.power || 0) / 100)); push(T('cmt.guardHunker', { enemy: dispOf(target) })); }
+      dmg = Math.max(1, dmg - Math.floor(effDefenseOf(target) * 0.5));
       const critMul = critMulOf(null);
       if (critMul > 1) { dmg = Math.floor(dmg * critMul); push(T('cmt.strikeCrit')); }
-      enemy.hp -= dmg;
-      push(T('cmt.strike', { enemy: locEnemyName(enemy), dmg }));
-      applyStabilityDamage(enemy, combat, Math.round(sc.stab + player.strength * sc.stabPerStr), push);
+      target.hp -= dmg;
+      push(T('cmt.strike', { enemy: dispOf(target), dmg }));
+      applyStabilityDamage(target, combat, Math.round(sc.stab + player.strength * sc.stabPerStr), push);
     }
   } else if (action.type === 'observe') {
-    // free recon: reveal the foe and steady your Killer-Move focus
+    // free recon: reveal the foes and steady your Killer-Move focus
     const oc = cfg.observe;
     combat.revealed = true;
     combat.scouted = true;
     const regen = Math.min(player.maxPrimevalEssence - player.primevalEssence, oc.essence);
     player.primevalEssence += regen;
     pSt.push({ type: 'focus', power: oc.focusPct, duration: 3 });
-    push(T('cmt.observe', { enemy: locEnemyName(enemy), n: regen, p: oc.focusPct }));
+    push(T('cmt.observe', { enemy: dispOf(target), n: regen, p: oc.focusPct }));
   } else if (action.type === 'defend') {
     const dc = cfg.defend;
     pSt.push({ type: 'guard', power: dc.dmgRedPct, duration: 1 });
@@ -792,7 +993,19 @@ export function executeRound(state, action) {
     }
     if (activated) {
       const fx = bonusOf(state, gu.path);
-      const meaningful = applyGu(gu, player, enemy, pSt, eSt, combat, push, fx, syn, weather, cond.effMul * (1 + prof.powerPct / 100));
+      // targeting categories (#15–#23): resolve who is hit and how hard
+      const tlist = resolveTargets(combat, gu, target.uid);
+      let meaningful = false;
+      tlist.forEach((t, i) => {
+        const foe = enemies.find(e => e.uid === t.e.uid);
+        if (!foe || foe.hp <= 0) return;
+        const kind = targetKindOf(gu);
+        if (kind === 'chain' && i > 0) push(T('cmt.chainLeap', { enemy: dispOf(foe) }));
+        if (kind === 'cleave' && i > 0) push(T('cmt.cleaveHit', { enemy: dispOf(foe) }));
+        const m = applyGu(gu, player, foe, pSt, foe.statuses, combat, push, fx, syn, weather,
+          cond.effMul * (1 + prof.powerPct / 100) * t.mul, { selfFx: i === 0, procMul: t.sec ? 0.6 : 1 });
+        if (m) meaningful = true;
+      });
       if (meaningful) {
         combat.contributed[gu.path] = true;
         guUsedName = gu.name;
@@ -819,83 +1032,95 @@ export function executeRound(state, action) {
   for (const k in cooldowns) cooldowns[k] = Math.max(0, cooldowns[k] - 1);
   combat.rounds++;
 
-  if (enemy.hp <= 0) {
-    push(T('cmt.enemyDefeated', { enemy: locEnemyName(enemy) }));
-    const done = { ...combat, enemy, playerStatuses: pSt, cooldowns, log, revealed: combat.revealed };
+  // mid-action deaths: announce, settle morale, then check the battle's end
+  settleDeaths(combat, hpBefore, push);
+  if (enemies.every(e => e.hp <= 0)) {
+    const done = { ...combat, enemy: combat.enemy, playerStatuses: pSt, cooldowns, log, revealed: combat.revealed };
     if (combat.trial) return finishTrial(state, done, player);
     return finishVictory(state, done, player, pending);
   }
 
   // elite enrage — once per battle, crossing the threshold ignites a fury
-  if (enemy.enrage && !combat.enraged && enemy.hp > 0 && enemy.hp <= enemy.maxHp * enemy.enrage.at) {
-    combat.enraged = true;
-    enemy.attack = Math.max(1, Math.round(enemy.attack * (1 + (enemy.enrage.atkPct || 0) / 100)));
-    enemy.defense = Math.max(0, enemy.defense - (enemy.enrage.defPen || 0));
-    push(T('cmt.enrage', { enemy: locEnemyName(enemy) }));
+  for (const enemy of livingOf()) {
+    if (enemy.enrage && !combat.enraged?.[enemy.uid] && enemy.hp > 0 && enemy.hp <= enemy.maxHp * enemy.enrage.at) {
+      combat.enraged = { ...(combat.enraged || {}), [enemy.uid]: true };
+      enemy.attack = Math.max(1, Math.round(enemy.attack * (1 + (enemy.enrage.atkPct || 0) / 100)));
+      enemy.defense = Math.max(0, enemy.defense - (enemy.enrage.defPen || 0));
+      push(T('cmt.enrage', { enemy: dispOf(enemy) }));
+    }
   }
 
   // schedule the player's next action (Advance/aftermath reshaped above)
   const pDelay = actDelay(combat.speeds.player, pSt);
   combat.nextAct.player += pDelay * (1 - actAdvancePct / 100 + actSelfDelayPct / 100);
   combat.nextAct.player = Math.max(combat.nextAct.player, combat.clock);
-  // anti-starve / anti-delay cap: the enemy never falls further behind than
+  // anti-starve / anti-delay cap: no enemy ever falls further behind than
   // catchUpFactor × its own delay — speed is powerful, never infinite
-  const eDelayNow = actDelay(enemy.baseSpeed, eSt);
-  combat.nextAct.enemy = Math.min(combat.nextAct.enemy, combat.nextAct.player + eDelayNow * G().catchUpFactor);
+  for (const e of livingOf()) {
+    const eDelayNow = actDelay(e.baseSpeed, e.statuses);
+    combat.nextAct.enemies[e.uid] = Math.min(combat.nextAct.enemies[e.uid], combat.nextAct.player + eDelayNow * G().catchUpFactor);
+  }
 
   // ---- enemy phase: every enemy action due before the player's next move ----
   let phaseGuard = 0;
-  while (enemy.hp > 0 && player.hp > 0 && combat.nextAct.enemy <= combat.nextAct.player && phaseGuard++ < 12) {
-    combat.clock = combat.nextAct.enemy;
-    eSt = tick(eSt, push, enemy, 'enemy');
+  for (;;) {
+    const due = livingOf()
+      .filter(e => combat.nextAct.enemies[e.uid] <= combat.nextAct.player)
+      .sort((a, b) => (combat.nextAct.enemies[a.uid] - combat.nextAct.enemies[b.uid]) || (a.uid < b.uid ? -1 : 1));
+    if (!due.length || phaseGuard++ > 24) break;
+    const enemy = due[0];
+    combat.clock = combat.nextAct.enemies[enemy.uid];
+    let eSt = tick(enemy.statuses, push, enemy, 'enemy');
     enemy.statuses = eSt;
     // a stunned, paralyzed, FROZEN or BROKEN enemy loses any charged attack
     if (enemy.telegraph && (incapacitated(eSt) || hasStatus(eSt, 'broken'))) {
       enemy.telegraph = null;
       enemy.planned = null;
-      push(T('cmt.interrupted', { enemy: locEnemyName(enemy) }));
+      push(T('cmt.interrupted', { enemy: dispOf(enemy) }));
     }
     if (hasStatus(eSt, 'broken')) {
-      push(T('cmt.reel', { enemy: locEnemyName(enemy) }));
+      push(T('cmt.reel', { enemy: dispOf(enemy) }));
     } else if (hasStatus(eSt, 'frozen')) {
-      push(T('cmt.frozenCannot', { enemy: locEnemyName(enemy) }));
+      push(T('cmt.frozenCannot', { enemy: dispOf(enemy) }));
     } else if (hasStatus(eSt, 'paralysis')) {
-      push(T('cmt.paralysisCannot', { enemy: locEnemyName(enemy) }));
+      push(T('cmt.paralysisCannot', { enemy: dispOf(enemy) }));
     } else if (hasStatus(eSt, 'stun')) {
-      push(T('cmt.stunCannot', { enemy: locEnemyName(enemy) }));
+      push(T('cmt.stunCannot', { enemy: dispOf(enemy) }));
     } else if (enemy.telegraph) {
       executeTelegraph(enemy, player, pSt, push);
     } else {
-      enemyAI(enemy, player, pSt, eSt, push, windFx.evasionPct || 0, earthFx.thorns || 0);
+      enemyAI(enemy, player, pSt, eSt, push, windFx.evasionPct || 0, earthFx.thorns || 0, combat);
     }
     if (!hasStatus(eSt, 'broken')) {
       enemy.stability = Math.min(enemy.maxStability, (enemy.stability ?? enemy.maxStability)
         + Math.round(enemy.maxStability * cfg.break.stabRegenPctPerAction / 100));
     }
-    combat.nextAct.enemy += actDelay(enemy.baseSpeed, eSt);
+    combat.nextAct.enemies[enemy.uid] += actDelay(enemy.baseSpeed, eSt);
     // commit the NEXT intent one action ahead — the player can read and answer it
     if (enemy.hp > 0 && !hasStatus(eSt, 'broken') && !incapacitated(eSt)) enemy.planned = planIntent(enemy, eSt);
-    if (enemy.hp <= 0) break;
+    if (player.hp <= 0) break;
+    if (enemies.every(e => e.hp <= 0)) break;
   }
+  settleDeaths(combat, hpBefore, push);
 
-  if (player.hp <= 0) { push(T('cmt.youDefeated')); return finishDefeat(state, { ...combat, enemy, statuses: eSt, playerStatuses: pSt, cooldowns, log, revealed: combat.revealed }, player); }
-  if (enemy.hp <= 0) {
-    push(T('cmt.enemyDefeated', { enemy: locEnemyName(enemy) }));
-    const done = { ...combat, enemy, playerStatuses: pSt, cooldowns, log, revealed: combat.revealed };
+  if (player.hp <= 0) { push(T('cmt.youDefeated')); return finishDefeat(state, { ...combat, enemy: combat.enemy, playerStatuses: pSt, cooldowns, log, revealed: combat.revealed }, player); }
+  if (enemies.every(e => e.hp <= 0)) {
+    const done = { ...combat, enemy: combat.enemy, playerStatuses: pSt, cooldowns, log, revealed: combat.revealed };
     if (combat.trial) return finishTrial(state, done, player);
     return finishVictory(state, done, player, pending);
   }
   // a master's trial: survive N of the player's own actions, or deal set damage
   if (combat.trial && player.hp > 0) {
     const tr = combat.trial;
-    const passed = tr.type === 'survive' ? combat.rounds >= tr.turns : (enemy.maxHp - enemy.hp) >= (tr.amount || 0);
+    const foe = enemies[0];
+    const passed = tr.type === 'survive' ? combat.rounds >= tr.turns : (foe.maxHp - foe.hp) >= (tr.amount || 0);
     if (passed) {
       push(T('cmt.trialComplete'));
-      return finishTrial(state, { ...combat, enemy, playerStatuses: pSt, cooldowns, log, revealed: combat.revealed }, player);
+      return finishTrial(state, { ...combat, enemy: combat.enemy, playerStatuses: pSt, cooldowns, log, revealed: combat.revealed }, player);
     }
   }
 
-  let s = { ...state, combat: { ...combat, enemy, playerStatuses: pSt, cooldowns, log, revealed: combat.revealed }, player };
+  let s = { ...state, combat: { ...combat, enemy: combat.enemy, playerStatuses: pSt, cooldowns, log, revealed: combat.revealed }, player };
   s = applyPendingMastery(s, pending);
   return s;
 }

@@ -10,6 +10,7 @@ import { initialWildGu } from '../data/wildGu';
 import { seedFog } from '../engine/guLife';
 import { normalizeAptitude, essenceCapFor } from '../config/aptitude';
 import { normalizeQuestState } from '../engine/questEngine';
+import { LEADER_LINKS, isLeaderDef } from '../data/packs';
 
 // v4 aptitudes were flat strings — map them onto the v5 numeric scale.
 const LEGACY_APTITUDE = { Dull: 3, Ordinary: 5, Good: 6.5, Outstanding: 8, Heavenly: 9.5 };
@@ -217,6 +218,50 @@ export function migrateSave(old) {
       version: 14,
       player: { ...p, realmInsight: p.realmInsight ?? 0, cultStreak: p.cultStreak ?? 0 },
       log: [...(s.log || []), 'A deeper truth settles over the valley — breakthroughs now ask for Realm Insight, earned in battle, discovery and deed, never on a cushion alone.'],
+    };
+  }
+
+  // v15: packs & herds — existing world records are BOUND into packs by species
+  // and proximity (nothing moves, nothing is added or removed); leader defs
+  // organize their linked species (alpha → wolves, chief → bandits). New saves
+  // spawn pack-aware from the start.
+  if (s.version < 15) {
+    const cheb = (ax, ay, bx, by) => Math.max(Math.abs(ax - bx), Math.abs(ay - by));
+    const enemies = (s.worldState?.enemies || []).map(e => ({ ...e }));
+    // single-link clusters of the same species within 3 tiles
+    const groups = [];
+    for (const e of enemies) {
+      if (e.dead) continue;
+      let g = groups.find(g2 => g2.defId === e.defId && g2.cells.some(([x, y]) => cheb(x, y, e.x, e.y) <= 3));
+      if (!g) { g = { defId: e.defId, members: [], cells: [] }; groups.push(g); }
+      g.members.push(e); g.cells.push([e.x, e.y]);
+    }
+    // leaders fold into a nearby group of their linked species
+    for (const lg of groups.filter(g => LEADER_LINKS[g.defId])) {
+      const tgt = groups.find(g => g.defId === LEADER_LINKS[lg.defId] && g !== lg
+        && g.cells.some(([x, y]) => lg.cells.some(([lx, ly]) => cheb(x, y, lx, ly) <= 6)));
+      if (tgt) {
+        tgt.members.push(...lg.members);
+        tgt.cells.push(...lg.cells);
+        groups.splice(groups.indexOf(lg), 1);
+      }
+    }
+    let n = 0;
+    for (const g of groups) {
+      if (g.members.length < 2) continue;
+      const packId = `pk_m${n++}`;
+      const leader = g.members.find(m => isLeaderDef(m.defId));
+      for (const m of g.members) {
+        m.packId = packId;
+        m.packRole = leader && m === leader ? 'leader' : 'member';
+        m.packLeaderId = leader ? leader.id : null;
+      }
+    }
+    s = {
+      ...s,
+      version: 15,
+      worldState: { ...s.worldState, enemies },
+      log: [...(s.log || []), 'You notice it now — the beasts of the valley move in packs, and some packs have leaders.'],
     };
   }
 

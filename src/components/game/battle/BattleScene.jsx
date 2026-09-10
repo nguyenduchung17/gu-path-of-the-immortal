@@ -1,35 +1,37 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { getCharacterSheet, canvasURL } from '@/game/gfx/characterSprites';
 import { appearanceOf } from '@/game/data/appearance';
-import { getBeastSheet } from '@/game/gfx/beastSprites';
+import { visualOf } from '@/game/data/enemies';
 import { useT } from '@/game/i18n/LangContext';
+import EnemyFigure from './EnemyFigure';
 
 // Fullscreen pixel-art battle stage: location-based backdrops, staged combatants
 // on opposing sides with perspective ground, pose animation, cast anticipation,
 // per-Gu VFX and Killer Move presentation.
-// fx: { key, gu, kinds, killer, castColor, enemyDmg, playerDmg, dodge, block, crit, fail, heal, essence }
-export default function BattleScene({ enemy, fx, casting, appearance, biome, result }) {
+//
+// MULTI-ENEMY (#13, #47): each foe gets its own figure at a staggered, depth-
+// spaced formation slot — small fast foes forward, the pack leader center-back,
+// fliers raised. Sprites never overlap.
+const LAYOUT = {
+  1: [[16, 36]],
+  2: [[24, 33], [8, 43]],
+  3: [[27, 31], [11, 39], [26, 47]],
+  4: [[29, 29], [13, 37], [29, 44], [11, 50]],
+};
+
+export default function BattleScene({ combat, enemies, fx, casting, appearance, biome, result, targetUid, onTarget }) {
   const { t } = useT();
   const sheet = getCharacterSheet(appearanceOf({ appearance }));
-  const beast = useMemo(() => {
-    const bs = getBeastSheet(enemy.id);
-    return {
-      fit: bs.h > 16 ? 'h-full w-auto' : 'w-full h-full',
-      idleA: canvasURL(bs.idle[0]), idleB: canvasURL(bs.idle[1]),
-      attack: canvasURL(bs.attack), hurt: canvasURL(bs.hurt), defeat: canvasURL(bs.defeat),
-    };
-  }, [enemy.id]);
   const [tick, setTick] = useState(0);
   useEffect(() => {
-    const t = setInterval(() => setTick((f) => 1 - f), 360);
-    return () => clearInterval(t);
+    const tm = setInterval(() => setTick((f) => 1 - f), 360);
+    return () => clearInterval(tm);
   }, []);
 
   const hit = fx || {};
   const k = hit.kinds || {};
   const col = casting?.color || hit.castColor || '#8fd8a0';
   const playerDefeat = result === 'defeat';
-  const enemyDefeated = result === 'victory';
 
   // player pose: cast anticipation → strike → hurt, back to idle breathing
   let playerImg, playerCls = 'animate-battle-sway';
@@ -41,17 +43,16 @@ export default function BattleScene({ enemy, fx, casting, appearance, biome, res
   else playerImg = sheet.frames.right[tick];
   const playerUrl = canvasURL(playerImg);
 
-  // enemy pose — species sprite reacts: lunging attack / recoil / collapse
-  let enemyCls = '';
-  let enemyStyle = {};
-  let enemyImg = beast.idleA;
-  if (enemyDefeated) { enemyCls = 'animate-battle-defeat'; enemyImg = beast.defeat; }
-  else if (hit.playerDmg) { enemyCls = 'animate-battle-lunge-r'; enemyImg = beast.attack; }
-  else if (hit.enemyDmg) { enemyCls = 'animate-battle-shake'; enemyImg = beast.hurt; enemyStyle = { filter: 'brightness(1.9) saturate(0.6)' }; }
-  else { enemyCls = 'animate-battle-sway'; enemyImg = tick ? beast.idleB : beast.idleA; }
+  // stage order: fast small foes forward, the leader(s) center-back (#47)
+  const list = enemies || [];
+  const leaders = list.filter(e => e.packRole === 'leader' || e.packLeader);
+  const rest = list.filter(e => !(e.packRole === 'leader' || e.packLeader))
+    .sort((a, b) => (b.baseSpeed || 0) - (a.baseSpeed || 0));
+  const stage = [...rest, ...leaders];
+  const spots = LAYOUT[Math.min(4, Math.max(1, stage.length))] || LAYOUT[4];
 
   const isProjectile = k.attack && !k.burn && (casting?.color || hit.castColor);
-  const quake = hit.killer && hit.enemyDmg > 0 && !enemyDefeated;
+  const quake = hit.killer && hit.enemyDmg > 0 && list.some(e => e.hp <= 0);
 
   return (
     <div className={`absolute inset-0 overflow-hidden ${quake ? 'animate-battle-quake' : ''}`} style={{ background: biome.sky }}>
@@ -65,23 +66,18 @@ export default function BattleScene({ enemy, fx, casting, appearance, biome, res
         {t(biome.labelKey)}
       </div>
 
-      {/* ---- ENEMY side (far, upper right) ---- */}
-      <div className="absolute right-[12%] sm:right-[16%] bottom-[34%] sm:bottom-[36%] flex flex-col items-center">
-        <div key={hit.key ? `e${hit.key}` : 'e'} className={`relative w-[92px] h-[92px] sm:w-[150px] sm:h-[150px] ${enemyCls}`} style={enemyStyle}>
-          <img src={enemyImg} className={beast.fit} style={{ imageRendering: 'pixelated' }} alt="" draggable={false} />
-          {hit.enemyDmg ? (
-            <span key={`edmg${hit.key}`} className="absolute -top-4 left-1/2 font-heading text-2xl sm:text-3xl text-amber-300 animate-battle-dmg" style={{ marginLeft: '-18px', textShadow: '2px 2px 0 #000' }}>
-              -{hit.enemyDmg}
-            </span>
-          ) : null}
-          {hit.crit && (
-            <span key={`cr${hit.key}`} className="absolute -top-9 left-1/2 font-heading text-xs sm:text-sm text-rose-300 animate-battle-dmg" style={{ marginLeft: '-40px', textShadow: '2px 2px 0 #000' }}>
-              {t('battle.weakness')}
-            </span>
-          )}
-        </div>
-        <div className="w-24 h-5 sm:w-40 sm:h-7 rounded-[50%] bg-black/45 mt-1" />
-      </div>
+      {/* ---- ENEMY side: every foe in its own formation slot ---- */}
+      {stage.map((e, i) => {
+        const [right, bottom] = spots[i] || spots[spots.length - 1];
+        const flying = visualOf(e.id).kind === 'bird';
+        return (
+          <div key={e.uid} className="absolute flex flex-col items-center"
+            style={{ right: `${right}%`, bottom: `${bottom + (flying ? 8 : 0)}%` }}>
+            <EnemyFigure e={e} combat={combat} fx={hit} castColor={col}
+              sel={e.uid === targetUid && e.hp > 0} onPick={onTarget} />
+          </div>
+        );
+      })}
 
       {/* ---- PLAYER side (near, lower left) ---- */}
       <div className="absolute left-[10%] sm:left-[16%] bottom-[8%] flex flex-col items-center">
@@ -159,50 +155,15 @@ export default function BattleScene({ enemy, fx, casting, appearance, biome, res
         <div key={`sm${hit.key}`} className="absolute left-[24%] sm:left-[28%] bottom-[10%] w-12 h-12 sm:w-20 sm:h-20 animate-battle-cast"
           style={{ background: 'radial-gradient(circle, rgba(60,180,120,0.5), transparent 70%)', boxShadow: 'inset 0 0 12px rgba(60,180,120,0.4)' }} />
       )}
-
-      {/* ---- offensive / control effects on the enemy ---- */}
-      {hit.enemyDmg > 0 && !enemyDefeated && (
-        <div key={`im${hit.key}`} className={`absolute right-[12%] sm:right-[15%] bottom-[38%] w-20 h-20 sm:w-32 sm:h-32 rounded-full border-2 animate-battle-impact ${hit.killer ? 'scale-150' : ''}`}
-          style={{ borderColor: col, background: `radial-gradient(circle, ${col}66, transparent 65%)` }} />
-      )}
-      {k.burn && (
-        <div key={`br${hit.key}`} className="absolute right-[12%] sm:right-[16%] bottom-[34%] w-16 h-16 sm:w-28 sm:h-28 animate-battle-aurarise"
-          style={{ background: 'radial-gradient(ellipse at bottom, rgba(255,120,40,0.55), transparent 70%)' }} />
-      )}
-      {k.control && (
-        <div key={`cb${hit.key}`} className="absolute right-[12%] sm:right-[15%] bottom-[36%] w-[88px] h-[88px] sm:w-[144px] sm:h-[144px] rounded-full border-2 border-dashed border-blue-300/70 animate-battle-bind" />
-      )}
-      {k.paralysis && (
-        <div key={`plz${hit.key}`} className="absolute right-[12%] sm:right-[15%] bottom-[36%] w-[88px] h-[88px] sm:w-[144px] sm:h-[144px] rounded-full border-2 border-yellow-300/80 animate-battle-bind"
-          style={{ background: 'radial-gradient(circle, rgba(255,240,120,0.20), transparent 65%)' }} />
-      )}
-      {k.frozen && (
-        <div key={`frz${hit.key}`} className="absolute right-[12%] sm:right-[16%] bottom-[34%] w-[92px] h-[92px] sm:w-[150px] sm:h-[150px] rounded-lg border-2 border-cyan-200/80 animate-battle-bind"
-          style={{ background: 'linear-gradient(160deg, rgba(190,235,255,0.35), rgba(120,190,255,0.12))', boxShadow: '0 0 22px rgba(150,220,255,0.45)' }} />
-      )}
-      {k.poison && (
-        <div key={`psn${hit.key}`} className="absolute right-[12%] sm:right-[16%] bottom-[34%] w-16 h-16 sm:w-28 sm:h-28 animate-battle-aurarise"
-          style={{ background: 'radial-gradient(ellipse at bottom, rgba(150,230,60,0.5), transparent 70%)' }} />
-      )}
       {k.momentum && (
         <div key={`mom${hit.key}`} className="absolute left-[10%] sm:left-[16%] bottom-[10%] w-[88px] h-[88px] sm:w-[136px] sm:h-[136px] rounded-full border-2 border-teal-200/70 animate-battle-swirl"
           style={{ borderTopColor: 'transparent', borderBottomColor: 'transparent' }} />
-      )}
-      {hit.statusText && (
-        <span key={`stx${hit.key}`} className="absolute right-[13%] sm:right-[17%] bottom-[46%] font-heading text-xs sm:text-sm text-amber-200 animate-battle-dmg whitespace-nowrap pointer-events-none"
-          style={{ textShadow: '2px 2px 0 #000' }}>
-          {hit.statusText}
-        </span>
       )}
       {hit.playerStatusText && (
         <span key={`pst${hit.key}`} className="absolute left-[13%] sm:left-[17%] bottom-[20%] font-heading text-xs sm:text-sm text-teal-200 animate-battle-dmg whitespace-nowrap pointer-events-none"
           style={{ textShadow: '2px 2px 0 #000' }}>
           {hit.playerStatusText}
         </span>
-      )}
-      {k.investigate && (
-        <div key={`iv${hit.key}`} className="absolute right-[12%] sm:right-[15%] bottom-[38%] w-16 h-16 sm:w-28 sm:h-28 rounded-full border-2 border-amber-200/70 animate-battle-bind"
-          style={{ background: 'radial-gradient(circle, rgba(255,240,180,0.14), transparent 65%)' }} />
       )}
 
       {/* ---- Killer Move banner ---- */}

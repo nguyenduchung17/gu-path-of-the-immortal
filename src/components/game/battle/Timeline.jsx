@@ -1,13 +1,15 @@
 import React from 'react';
 import { timelineOf } from '@/game/engine/combat';
 
-// Visible action timeline: who acts next and the ~5 actions after that.
-// Speed buffs, Action Advance and enemy Delay reshape it in real time, so
-// the player can plan around the enemy's coming turns and telegraphs.
+// Visible action timeline: who acts next and the ~5 actions after that —
+// interleaving every pack member's clock (#27). Speed buffs, Action Advance
+// and enemy Delay reshape it in real time so the player can plan ahead.
 export default function Timeline({ combat }) {
   const items = timelineOf(combat, 6);
   if (!items.length) return null;
-  const label = (it) => (it.uid === 'player' ? 'YOU' : combat.enemy.name);
+  const byUid = {};
+  for (const e of combat.enemies || []) byUid[e.uid] = e;
+  const label = (it) => (it.uid === 'player' ? 'YOU' : (byUid[it.uid]?.short || '?'));
   return (
     <div className="absolute top-12 left-1/2 -translate-x-1/2 flex items-center gap-1 px-2 animate-fade-in pointer-events-none max-w-[92vw] overflow-hidden">
       {items.map((it, i) => (

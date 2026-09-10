@@ -22,6 +22,13 @@ export const QUESTS = [
     rewards: { spiritStones: 120, contribution: 35, reputation: { villagers: 1 }, message: '"The valley breathes easier. Take your bounty from the communal vault."' },
   },
   {
+    id: 'q_alpha', name: "The Alpha's Howl", giver: 'guMaster', difficulty: 'Rank 2 · Middle+',
+    description: 'The Ironfang Alpha has led its pack deep into the northern forest. Gu Master Bai asks you to end its howl for good — without the Alpha, the pack scatters.',
+    hint: 'The Ironfang pack dens far to the northwest, past the deep forest. Scout before you strike: where the Alpha walks, the pack follows.',
+    objective: { type: 'hunt', enemy: 'ironfangAlpha', qty: 1 },
+    rewards: { spiritStones: 150, contribution: 40, reputation: { sect: 2 }, message: '"The howl is silenced. The herds will graze in peace. Take this from the sect vault, cultivator."' },
+  },
+  {
     id: 'q_wolves', name: 'Restless Wolves', giver: 'guMaster', difficulty: 'Rank 1 · Middle',
     description: 'Cull 3 Wild Wolves troubling the valley.',
     hint: 'Wolf packs have been seen off the road, in the forest west of the valley.',

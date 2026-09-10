@@ -259,6 +259,57 @@ export const GU = [
     passive: { gatheringBonus: 1 },
     explore: { kind: 'sense', essence: 3, cooldown: 20, duration: 15, radius: 8 },
   },
+  // ---- Pack warfare: explicit attack categories (#15–#25) ----
+  // target.kind: 'single' | 'all' (AoE) | 'cleave' | 'chain' | 'random'.
+  // Single-target hits hardest; AoE spreads the same essence across the pack.
+  {
+    id: 'flameWave', name: 'Flame Wave Gu', rank: 2, type: 'Attack', path: 'fire', element: 'fire', rarity: 'uncommon',
+    description: 'A rolling wave of flame that washes over EVERY enemy — and may leave each one burning.',
+    energyCost: 8, cooldown: 2,
+    effect: { attack: { power: 8, range: [7, 10] }, burn: { power: 3, duration: 2, chance: 30 }, target: { kind: 'all' } },
+  },
+  {
+    id: 'swordArc', name: 'Sword Arc Gu', rank: 2, type: 'Attack', path: 'sword', element: 'metal', rarity: 'uncommon',
+    description: 'A sweeping arc of sword-light: the primary foe takes the full cut, adjacent foes take half.',
+    energyCost: 7, cooldown: 2,
+    effect: { attack: { power: 13, range: [11, 15], crit: 10 }, target: { kind: 'cleave', pct: 50 } },
+  },
+  {
+    id: 'piercingEdge', name: 'Piercing Edge Gu', rank: 2, type: 'Attack', path: 'sword', element: 'metal', rarity: 'rare',
+    description: 'One target, one perfect thrust — heavy damage, high criticals, and it bites straight through armor.',
+    energyCost: 8, cooldown: 2,
+    effect: { attack: { power: 16, range: [14, 19], crit: 12, armorPen: 25 }, stab: 10, target: { kind: 'single' } },
+  },
+  {
+    id: 'chainBolt', name: 'Chain Bolt Gu', rank: 2, type: 'Attack', path: 'lightning', element: 'lightning', rarity: 'uncommon',
+    description: 'A bolt of lightning that leaps foe to foe — each jump bites softer, but the whole pack feels it.',
+    energyCost: 9, cooldown: 2,
+    effect: { attack: { power: 11, range: [9, 12], paralysis: { chance: 15, duration: 1 } }, target: { kind: 'chain', falloff: [1, 0.75, 0.55, 0.4] } },
+  },
+  {
+    id: 'toxicMist', name: 'Toxic Mist Gu', rank: 2, type: 'Attack', path: 'poison', element: 'poison', rarity: 'uncommon',
+    description: 'A creeping mist that lays Poison on every enemy in the fight — weak now, relentless later.',
+    energyCost: 8, cooldown: 3,
+    effect: { attack: { power: 4, range: [2, 5] }, poison: { power: 2, duration: 3 }, target: { kind: 'all' } },
+  },
+  {
+    id: 'galeStorm', name: 'Gale Storm Gu', rank: 2, type: 'Attack', path: 'wind', element: 'wind', rarity: 'rare',
+    description: 'A storm of cutting wind that strikes 3 different foes in one breath — and builds momentum.',
+    energyCost: 8, cooldown: 2,
+    effect: { attack: { power: 6, range: [5, 7] }, self: { momentum: { power: 5, cap: 5 } }, target: { kind: 'random', hits: 3 } },
+  },
+  {
+    id: 'frostField', name: 'Frost Field Gu', rank: 2, type: 'Attack', path: 'ice', element: 'ice', rarity: 'uncommon',
+    description: 'A field of dead-still frost: every enemy is chilled slow, and may freeze outright.',
+    energyCost: 8, cooldown: 3,
+    effect: { attack: { power: 5, range: [4, 7], freeze: { chance: 8, duration: 1 } }, slow: { power: 20, duration: 2 }, target: { kind: 'all' } },
+  },
+  {
+    id: 'earthTremor', name: 'Earth Tremor Gu', rank: 2, type: 'Attack', path: 'earth', element: 'earth', rarity: 'uncommon',
+    description: 'The ground heaves under every enemy — modest damage, heavy GUARD damage, and their actions drag.',
+    energyCost: 9, cooldown: 3,
+    effect: { attack: { power: 7, range: [6, 9] }, stab: 12, delay: { pct: 15 }, target: { kind: 'all' } },
+  },
 ];
 
 export const GU_BY_ID = Object.fromEntries(GU.map(g => [g.id, g]));

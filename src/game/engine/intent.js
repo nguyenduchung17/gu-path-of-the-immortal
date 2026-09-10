@@ -15,6 +15,10 @@ export function planIntent(enemy, eSt) {
   const c = enemy.aiCounters || {};
   const acts = (c.acts || 0) + 1;
   const every = enemy.charge?.every || (enemy.ai === 'brute' ? 3 : 4);
+  // PACK LEADER (#30): the howl is the fight's most important read — once per
+  // battle, committed ahead like any other intent so it can be answered.
+  const isLeader = enemy.packRole === 'leader' || enemy.packLeader;
+  if (isLeader && !c.howled && acts >= 2 && Math.random() < 0.3) return { kind: 'howl' };
   if (acts % every === 0) return { kind: 'heavy', name: enemy.charge ? TL(`charge.${enemy.id}`, enemy.charge.name) : T('cmt.savage'), power: enemy.charge?.power || 1.8 };
   if (enemy.ai === 'brute' && enemy.hp < enemy.maxHp * 0.5 && !has(eSt, 'guard') && Math.random() < 0.4) return { kind: 'guard' };
   if (enemy.ai === 'skirmisher' && enemy.hp < enemy.maxHp * 0.7 && !c.hasted) return { kind: 'buff' };
@@ -28,6 +32,7 @@ const KIND = {
   guard:  { icon: '🛡', labelKey: 'intent.guard', roughKey: 'intent.rough.guard' },
   buff:   { icon: '✨', labelKey: 'intent.buff',   roughKey: 'intent.rough.buff' },
   poison: { icon: '☠', labelKey: 'intent.poison', roughKey: 'intent.rough.poison' },
+  howl:   { icon: '🐺', labelKey: 'intent.howl',  roughKey: 'intent.rough.howl' },
 };
 
 // What the player may see of the committed plan, at their scouting level.

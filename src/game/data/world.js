@@ -173,47 +173,58 @@ export function hazardAt(x, y) { return HAZARD_CELL.get(`${x},${y}`) || null; }
 
 // Visible world enemies — behaviour drives detection radius and aggression.
 // detect: optional per-spawn override of the behaviour default.
-const NORMAL_ENEMIES = [
-  { defId: 'wildBoar', x: 34, y: 31, behavior: 'passive' },
-  { defId: 'wildBoar', x: 49, y: 34, behavior: 'passive' },
-  { defId: 'wildWolf', x: 28, y: 16, behavior: 'aggressive' },
-  { defId: 'wildWolf', x: 36, y: 22, behavior: 'aggressive' },
-  { defId: 'wildWolf', x: 48, y: 18, behavior: 'aggressive' },
-  { defId: 'bloodCrow', x: 33, y: 14, behavior: 'aggressive' },
-  { defId: 'stoneBeast', x: 44, y: 24, behavior: 'territorial' },
-  { defId: 'poisonSpider', x: 8, y: 18, behavior: 'territorial' },
-  { defId: 'poisonSpider', x: 17, y: 28, behavior: 'territorial' },
-  { defId: 'forestSerpent', x: 12, y: 32, behavior: 'predator' },
-  { defId: 'forestSerpent', x: 20, y: 16, behavior: 'predator' },
-  { defId: 'stoneBeast', x: 6, y: 24, behavior: 'territorial' },
-  { defId: 'shadowHound', x: 16, y: 6, behavior: 'predator' },
-  { defId: 'shadowHound', x: 20, y: 9, behavior: 'predator' },
-  { defId: 'mutatedBeast', x: 14, y: 3, behavior: 'territorial' },
-  { defId: 'shadowHound', x: 6, y: 4, behavior: 'predator' },
-  { defId: 'shadowHound', x: 10, y: 7, behavior: 'predator' },
-  { defId: 'ironfangAlpha', x: 7, y: 6, behavior: 'predator' },
-  { defId: 'wildWolf', x: 10, y: 42, behavior: 'aggressive' },
-  { defId: 'wildWolf', x: 22, y: 48, behavior: 'aggressive' },
-  { defId: 'forestSerpent', x: 16, y: 52, behavior: 'predator' },
-  { defId: 'stoneBeast', x: 8, y: 44, behavior: 'territorial' },
-  { defId: 'bloodCrow', x: 57, y: 18, behavior: 'aggressive' },
-  { defId: 'bloodCrow', x: 60, y: 15, behavior: 'aggressive' },
-  { defId: 'wildWolf', x: 58, y: 21, behavior: 'aggressive' },
-  { defId: 'wildBoar', x: 66, y: 30, behavior: 'passive' },
-  { defId: 'wildBoar', x: 74, y: 26, behavior: 'passive' },
-  { defId: 'bandit', x: 70, y: 33, behavior: 'aggressive' },
-  { defId: 'bandit', x: 62, y: 16, behavior: 'guard' },
-  { defId: 'bandit', x: 68, y: 19, behavior: 'guard' },
-  { defId: 'bandit', x: 64, y: 20, behavior: 'guard' },
-  { defId: 'bandit', x: 67, y: 20, behavior: 'guard' },
-  { defId: 'banditChief', x: 65, y: 16, behavior: 'guard' },
-  { defId: 'ancientGuardian', x: 70, y: 40, behavior: 'guard' },
-  { defId: 'ancientGuardian', x: 75, y: 45, behavior: 'guard' },
-  { defId: 'shadowHound', x: 72, y: 44, behavior: 'predator' },
-  { defId: 'mutatedBeast', x: 78, y: 39, behavior: 'territorial' },
-  { defId: 'poisonSpider', x: 58, y: 51, behavior: 'territorial' },
-  { defId: 'poisonSpider', x: 76, y: 52, behavior: 'territorial' },
-  { defId: 'forestSerpent', x: 68, y: 54, behavior: 'predator' },
+//
+// PACKS & HERDS (#1–#6): social species spawn as groups in loose formations
+// (never stacked). `cells` lists the anchor first, then members with spacing;
+// `leader` (optional) heads the pack from the FIRST cell and its packmates
+// share packId / packLeaderId. Group sizes differ per species — wolves 3–4,
+// boars 2–3, spider nests 2–3, bandit patrols 4 + chief, hound trios; large
+// solitary predators (stone beasts, serpents, mutated beasts) walk alone.
+const SPAWN_CELLS = [
+  // wolf packs — forest outskirts
+  { packId: 'pk_wolves_out_a', member: 'wildWolf', behavior: 'aggressive', cells: [[28, 16], [29, 16], [28, 17]] },
+  { packId: 'pk_wolves_out_b', member: 'wildWolf', behavior: 'aggressive', cells: [[36, 22], [37, 22], [35, 23], [36, 23]] },
+  { packId: 'pk_wolves_out_c', member: 'wildWolf', behavior: 'aggressive', cells: [[48, 18], [49, 18], [48, 17]] },
+  // the Ironfang pack — the alpha and its wolves, deep in the north
+  { packId: 'pk_ironfang', member: 'wildWolf', behavior: 'predator', leader: 'ironfangAlpha', cells: [[7, 6], [8, 6], [6, 7], [7, 7]] },
+  // southern wilds wolf packs
+  { packId: 'pk_wolves_s_a', member: 'wildWolf', behavior: 'aggressive', cells: [[10, 42], [11, 42], [10, 43]] },
+  { packId: 'pk_wolves_s_b', member: 'wildWolf', behavior: 'aggressive', cells: [[22, 48], [23, 48], [21, 49]] },
+  // copper hills wolf pack
+  { packId: 'pk_wolves_east', member: 'wildWolf', behavior: 'aggressive', cells: [[58, 21], [59, 21], [58, 20]] },
+  // boar herds — farmland and eastern plains
+  { packId: 'pk_boars_a', member: 'wildBoar', behavior: 'passive', cells: [[34, 31], [35, 31], [34, 32]] },
+  { packId: 'pk_boars_b', member: 'wildBoar', behavior: 'passive', cells: [[49, 34], [49, 35]] },
+  { packId: 'pk_boars_c', member: 'wildBoar', behavior: 'passive', cells: [[66, 30], [67, 30]] },
+  { packId: 'pk_boars_d', member: 'wildBoar', behavior: 'passive', cells: [[74, 26], [75, 26]] },
+  // blood crow flocks
+  { packId: 'pk_crows_a', member: 'bloodCrow', behavior: 'aggressive', cells: [[33, 14], [34, 14]] },
+  { packId: 'pk_crows_b', member: 'bloodCrow', behavior: 'aggressive', cells: [[58, 16], [59, 16], [57, 15]] },
+  // spider nests — wild forest and marsh
+  { packId: 'pk_spiders_a', member: 'poisonSpider', behavior: 'territorial', cells: [[8, 18], [9, 18], [8, 19]] },
+  { packId: 'pk_spiders_b', member: 'poisonSpider', behavior: 'territorial', cells: [[17, 28], [18, 28]] },
+  { packId: 'pk_spiders_marsh', member: 'poisonSpider', behavior: 'territorial', cells: [[58, 52], [59, 52], [58, 53]] },
+  { packId: 'pk_spiders_r', member: 'poisonSpider', behavior: 'territorial', cells: [[76, 52], [77, 52]] },
+  // shadow hound trios — deep forest
+  { packId: 'pk_hounds_a', member: 'shadowHound', behavior: 'predator', cells: [[16, 6], [17, 6], [15, 7]] },
+  { packId: 'pk_hounds_b', member: 'shadowHound', behavior: 'predator', cells: [[8, 5], [9, 4], [7, 6]] },
+  // the bandit patrol — the chief and his men hold the camp
+  { packId: 'pk_bandits', member: 'bandit', behavior: 'guard', leader: 'banditChief', cells: [[65, 16], [62, 17], [68, 19], [64, 21], [67, 20]] },
+  // solitary creatures — large predators need no pack
+  { packId: null, member: 'stoneBeast', behavior: 'territorial', cells: [[44, 24]] },
+  { packId: null, member: 'stoneBeast', behavior: 'territorial', cells: [[6, 24]] },
+  { packId: null, member: 'stoneBeast', behavior: 'territorial', cells: [[8, 44]] },
+  { packId: null, member: 'forestSerpent', behavior: 'predator', cells: [[12, 32]] },
+  { packId: null, member: 'forestSerpent', behavior: 'predator', cells: [[20, 16]] },
+  { packId: null, member: 'forestSerpent', behavior: 'predator', cells: [[16, 52]] },
+  { packId: null, member: 'forestSerpent', behavior: 'predator', cells: [[68, 54]] },
+  { packId: null, member: 'shadowHound', behavior: 'predator', cells: [[20, 9]] },
+  { packId: null, member: 'shadowHound', behavior: 'predator', cells: [[72, 44]] },
+  { packId: null, member: 'mutatedBeast', behavior: 'territorial', cells: [[14, 3]] },
+  { packId: null, member: 'mutatedBeast', behavior: 'territorial', cells: [[78, 39]] },
+  { packId: null, member: 'ancientGuardian', behavior: 'guard', cells: [[70, 40]] },
+  { packId: null, member: 'ancientGuardian', behavior: 'guard', cells: [[75, 45]] },
+  { packId: null, member: 'bandit', behavior: 'aggressive', cells: [[70, 33]] },
 ];
 
 // Elite bosses — ancient horrors rooted in the most dangerous corners of the
@@ -223,22 +234,35 @@ export const BOSS_SPAWNS = [
   { defId: 'ruinWarden', x: 73, y: 41, behavior: 'guard', detect: 6 },
   { defId: 'dreadMatriarch', x: 5, y: 3, behavior: 'guard', detect: 6 },
 ];
-export const INITIAL_ENEMIES = [...NORMAL_ENEMIES, ...BOSS_SPAWNS];
+export const INITIAL_ENEMIES = [
+  ...SPAWN_CELLS.flatMap(s => s.cells.map(([x, y], idx) => ({
+    defId: s.leader && idx === 0 ? s.leader : s.member,
+    x, y, behavior: s.behavior, detect: s.detect,
+  }))),
+  ...BOSS_SPAWNS,
+];
 
 export function initialEnemies() {
-  return INITIAL_ENEMIES.map((e, i) => ({
-    id: `w${i}`,
-    defId: e.defId,
-    x: e.x, y: e.y,
-    home: { x: e.x, y: e.y },
-    behavior: e.behavior,
-    detect: e.detect,
-    hp: ENEMY_BY_ID[e.defId].hp,
-    state: 'idle',
-    alertTicks: 0,
-    dead: false,
-    respawnAt: 0,
-  }));
+  const out = [];
+  let i = 0;
+  const push = (defId, x, y, behavior, detect, packId, packRole, packLeaderId) => out.push({
+    id: `w${i++}`, defId, x, y, home: { x, y }, behavior, detect,
+    packId, packRole, packLeaderId,
+    hp: ENEMY_BY_ID[defId].hp,
+    state: 'idle', alertTicks: 0, dead: false, respawnAt: 0,
+  });
+  for (const s of SPAWN_CELLS) {
+    const leaderId = s.leader ? `w${i}` : null;
+    s.cells.forEach(([x, y], idx) => {
+      const isLeader = !!s.leader && idx === 0;
+      const defId = isLeader ? s.leader : s.member;
+      push(defId, x, y, s.behavior, s.detect, s.packId || null,
+        s.packId ? (isLeader ? 'leader' : 'member') : null,
+        s.leader && !isLeader ? leaderId : null);
+    });
+  }
+  for (const b of BOSS_SPAWNS) push(b.defId, b.x, b.y, b.behavior, b.detect, null, null, null);
+  return out;
 }
 
 // Territory ecology — which species hold each zone. Logged on first entry

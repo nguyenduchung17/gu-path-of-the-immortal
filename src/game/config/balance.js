@@ -93,6 +93,7 @@ export const BALANCE = {
     observe: { essence: 4, focusPct: 10 },    // free recon + Killer-Move focus
     defend: { dmgRedPct: 40, essenceRegenPct: 8 },
     pack: { atkPct: 15, stabPct: 10 },     // packmates in sight embolden a fighter
+    maxPackCombat: 4,                      // the most pack members that may enter ONE battle (#37)
     ambush: { stabLossPct: 35, delayPct: 50 }, // striking the unaware; ambusher species catch travelers
     break: {
       dmgBonusPct: 30,        // a BROKEN enemy takes this much more damage
@@ -115,6 +116,11 @@ export const BALANCE = {
     giveUpDist: 5,                   // losing the player by this margin ends the chase
     activeRadius: 16,                // enemies beyond this distance idle (performance)
     wildGuRespawnMs: 10 * 60 * 1000, // wild Gu returns to its haunt after capture/kill
+    pack: {
+      assistRadius: 12,              // default join-the-fight radius (species overrides in packs.js)
+      cohesion: 3,                   // tiles a member may stray from its pack before drifting back
+      leaderRespawnMul: 3,           // a fallen leader returns far slower than its packmates (#46)
+    },
   },
   inn: { mealItemId: 'simpleMeal' },
   // Food & consumable economy — a food's worth is never price-per-HP alone:

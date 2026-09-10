@@ -16,7 +16,7 @@ import {
   WORLD, zoneAt, isWalkable, DEFAULT_ZONE, LANDMARKS, WORLD_RESOURCES,
   initialEnemies, TERRACE, FORMATION, CAMP_CELLS, INNS, ZONE_FAUNA,
 } from '../data/world';
-import { tickEnemies, regenWorldEnemies } from '../engine/enemies';
+import { tickEnemies, regenWorldEnemies, packPull } from '../engine/enemies';
 import { MISSION_BY_ID } from '../data/missions';
 import { CONTRIBUTION_OFFERS } from '../data/contribution';
 import { ARENA_BY_ID } from '../data/arena';
@@ -25,7 +25,7 @@ import { essenceCapFor, cultivateMulOf, normalizeAptitude, rollAptitudeScore, ro
 import { starterGuOf } from '../data/starterGu';
 import { SPECIES_BY_ID, wildCombatDef, captureChanceOf, initialWildGu } from '../data/wildGu';
 import { revealFog, seedFog, foodOf } from '../engine/guLife';
-import { applyExploreGu, carryIntoCombat, visionRadiusOf, checkHiddenPaths, hazardStep, moveOverride, exploreActive, ambushOf, nearbyPackCount } from '../engine/exploration';
+import { applyExploreGu, carryIntoCombat, visionRadiusOf, checkHiddenPaths, hazardStep, moveOverride, exploreActive, ambushOf } from '../engine/exploration';
 import { startInstability } from '../engine/vitalGu';
 import { QS, acceptQuest, turnInQuest, toggleTrack, abandonQuest, applyQuestEvent, emptyQuests, markDiscovered } from '../engine/questEngine';
 import { PATH_BY_ID } from '../data/paths';
@@ -45,7 +45,7 @@ export function createNewGame(name, gender, age, difficulty, slot, appearance, a
   const essenceCap = essenceCapFor(START_STAGE.maxEssence, apt);
   const starterFood = foodOf(starter);
   return {
-    version: 12,
+    version: 15,
     difficulty: DIFFICULTIES[difficulty] ? difficulty : 'standard',
     slot: slot || 1,
     time: { day: BALANCE.time.startDay, min: BALANCE.time.startMinutes },
@@ -372,21 +372,22 @@ export function gameReducer(state, action) {
       const carry = carryIntoCombat(state, e);
       // ambush: striking an unaware foe (or one you are veiled from) opens its guard
       const amb = ambushOf(state, e, true);
-      const pack = nearbyPackCount(state, e.defId, e.x, e.y, e.id);
+      // the whole nearby pack answers (#1, #2, #36): members within the assist
+      // radius join the battle — capped, never the whole map
+      const extras = packPull(state, e).map(m => ({
+        defId: m.defId, worldId: m.id, hp: m.hp, stability: m.stability,
+        statuses: carryIntoCombat(state, m).statuses,
+        packId: m.packId, packRole: m.packRole, packLeaderId: m.packLeaderId,
+      }));
       const combat = initCombat(e.defId, p, {
         hp: e.hp, stability: e.stability, statuses: carry.statuses, playerStatuses: carry.playerStatuses,
         worldId: e.id, difficulty: state.difficulty, zoneId: zoneAt(p.x, p.y)?.id,
-        ambush: amb.amb, allies: pack, scouted: !!exploreActive(state).vision,
+        ambush: amb.amb, scouted: !!exploreActive(state).vision,
+        packId: e.packId, packRole: e.packRole, packLeaderId: e.packLeaderId,
+        pack: extras,
         intro: amb.amb === 'player' ? T('cmt.ambushIntroPlayer', { enemy: locEnemyName(def) }) : T('cmt.strikeFirst', { enemy: locEnemyName(def) }),
       });
-      // the pack answers: same-species kin nearby converge on the fight
-      let s = { ...state, combat };
-      if (pack) {
-        s = { ...s, worldState: { ...s.worldState, enemies: (s.worldState.enemies || []).map(o =>
-          (!o.dead && o.id !== e.id && o.defId === e.defId && Math.abs(o.x - e.x) <= 3 && Math.abs(o.y - e.y) <= 3)
-            ? { ...o, state: 'chase' } : o) } };
-      }
-      return s;
+      return { ...state, combat };
     }
 
     case 'SLEEP_INN': {
@@ -867,6 +868,11 @@ export function gameReducer(state, action) {
       const intro = amb.amb === 'enemy'
         ? T('rec.ambushInterrupt', { enemy: locEnemyName(def) })
         : T('rec.interrupt', { enemy: locEnemyName(def) });
+      const extras = packPull(state, e).map(m => ({
+        defId: m.defId, worldId: m.id, hp: m.hp, stability: m.stability,
+        statuses: carryIntoCombat(state, m).statuses,
+        packId: m.packId, packRole: m.packRole, packLeaderId: m.packLeaderId,
+      }));
       return {
         ...state,
         recovery: null,
@@ -874,6 +880,8 @@ export function gameReducer(state, action) {
           hp: e.hp, stability: e.stability, statuses: carry.statuses, playerStatuses: carry.playerStatuses,
           worldId: e.id, difficulty: state.difficulty, zoneId: zoneAt(state.player.x, state.player.y)?.id,
           ambush: amb.amb, scouted: !!exploreActive(state).vision, intro,
+          packId: e.packId, packRole: e.packRole, packLeaderId: e.packLeaderId,
+          pack: extras,
         }),
         log: [...state.log, intro],
       };
@@ -956,7 +964,7 @@ export function gameReducer(state, action) {
     // ---------- Combat ----------
     case 'PLAYER_ACTION': {
       if (state.recovery) return state;
-      let s = executeRound(state, { type: action.action, guInstanceId: action.guInstanceId, itemId: action.itemId });
+      let s = executeRound(state, { type: action.action, guInstanceId: action.guInstanceId, itemId: action.itemId, targetUid: action.targetUid });
       // the first clash records the foe in your bestiary
       if (state.combat && !state.combat.seen && ENEMY_BY_ID[state.combat.enemyId]) {
         const b = { ...(state.bestiary || {}) };
@@ -981,9 +989,11 @@ export function gameReducer(state, action) {
       // last-combat time) survives a flee or an interrupted battle; only a kill
       // (respawn timer) or natural regen ever returns a foe to full strength.
       s = persistCombatEnemyState(s, c);
-      // quest events — a valid kill and its loot advance objectives (flees never count)
+      // quest events — a valid kill and its loot advance objectives (flees never
+      // count). Every defeated pack member counts for its own species (#39):
+      // killing a random wolf never counts as the Alpha.
       if (c.result === 'victory') {
-        s = withQuestEvents(s, { type: 'ENEMY_KILLED', id: c.enemyId });
+        for (const id of c.killed || [c.enemyId]) s = withQuestEvents(s, { type: 'ENEMY_KILLED', id });
         for (const [lootId, lootQty] of Object.entries(c.rewards?.items || {})) s = withQuestEvents(s, { type: 'ITEM_COLLECTED', id: lootId, qty: lootQty });
         if (c.arena) s = withQuestEvents(s, { type: 'ARENA_WON' });
       }
