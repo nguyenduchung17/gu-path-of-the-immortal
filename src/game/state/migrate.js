@@ -1,10 +1,11 @@
-// Save migrations: v1 (realm/exp) → v2 (stages/mastery) → v3 (large world).
+// Save migrations: v1 (realm/exp) → v2 (stages/mastery) → v3 (large world)
+//                 → v4 (game clock, difficulty modes, save slots).
 import { CULTIVATION_STAGES } from '../data/cultivation';
 import { GU_BY_ID } from '../data/gu';
 import { initialEnemies } from '../data/world';
 
 export function migrateSave(old) {
-  if (!old || old.version >= 3) return old;
+  if (!old) return old;
   let s = old;
 
   if (s.version < 2) {
@@ -41,19 +42,40 @@ export function migrateSave(old) {
     };
   }
 
-  // v2 → v3: the small portal-connected maps become one large continuous region
-  return {
-    ...s,
-    version: 3,
-    player: { ...s.player, currentArea: 'greenValleyRegion', x: 42, y: 44 },
-    contribution: s.contribution || { greenValley: 0 },
-    missions: { active: [], completed: [] },
-    arena: { wins: 0, losses: 0 },
-    worldState: {
-      gathered: {},
-      discovered: { zones: { greenValleyTown: true }, landmarks: { townGate: true, teleportFormation: true } },
-      enemies: initialEnemies(),
-    },
-    log: [...(s.log || []), 'The world has opened — roads, wilderness, ruins and distant dangers await beyond the town walls.'],
-  };
+  if (s.version < 3) {
+    s = {
+      ...s,
+      version: 3,
+      player: { ...s.player, currentArea: 'greenValleyRegion', x: 42, y: 44 },
+      contribution: s.contribution || { greenValley: 0 },
+      missions: { active: [], completed: [] },
+      arena: { wins: 0, losses: 0 },
+      worldState: {
+        gathered: {},
+        discovered: { zones: { greenValleyTown: true }, landmarks: { townGate: true, teleportFormation: true } },
+        enemies: initialEnemies(),
+      },
+      log: [...(s.log || []), 'The world has opened — roads, wilderness, ruins and distant dangers await beyond the town walls.'],
+    };
+  }
+
+  if (s.version < 4) {
+    const disc = s.worldState?.discovered || {};
+    s = {
+      ...s,
+      version: 4,
+      difficulty: s.difficulty || 'standard',
+      time: s.time || { day: 1, min: 7 * 60 },
+      playtimeSec: s.playtimeSec || 0,
+      deceased: null,
+      sleeping: null,
+      worldState: {
+        ...s.worldState,
+        discovered: { ...disc, inns: { ...(disc.inns || {}), townInn: true } },
+      },
+      log: [...(s.log || []), 'The world breathes — day and night now pass over the Green Valley.'],
+    };
+  }
+
+  return s;
 }

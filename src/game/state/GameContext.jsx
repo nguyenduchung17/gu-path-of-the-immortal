@@ -1,21 +1,39 @@
-import React, { createContext, useContext, useReducer, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, useCallback, useState } from 'react';
 import { gameReducer } from './gameReducer';
 import { migrateSave } from './migrate';
 import { recoveryRatePerSec } from '../config/balance';
 import { ENEMY_BY_ID } from '../data/enemies';
 
 const GameContext = createContext(null);
-const SAVE_KEY = 'gu_path_of_the_immortal_v1';
+export const SLOT_COUNT = 5;
+const LEGACY_KEY = 'gu_path_of_the_immortal_v1';
+const slotKey = (i) => `gu_slot_${i}`;
 
-function loadSave() {
-  try { const r = localStorage.getItem(SAVE_KEY); return r ? JSON.parse(r) : null; } catch { return null; }
+function loadSlotRaw(i) {
+  try { const r = localStorage.getItem(slotKey(i)); return r ? JSON.parse(r) : null; } catch { return null; }
 }
 
-// After a page refresh: clear stale UI state and grant any essence accrued
-// while recovery was running offline (capped at max).
+function saveSlot(i, s) {
+  try { localStorage.setItem(slotKey(i), JSON.stringify({ ...s, toasts: [], breakthrough: null })); } catch {}
+}
+
+// One-time: adopt the old pre-slot single save file (if any) as Save Slot 1.
+function adoptLegacySave() {
+  try {
+    const raw = localStorage.getItem(LEGACY_KEY);
+    if (!raw || loadSlotRaw(1)) return;
+    const s = migrateSave(JSON.parse(raw));
+    saveSlot(1, { ...s, slot: 1 });
+  } catch {}
+}
+if (typeof window !== 'undefined') adoptLegacySave();
+
+// After a page refresh: clear stale UI state, settle any unfinished sleep, and
+// grant essence accrued while recovery was running offline (capped at max).
 function normalize(raw) {
-  let s = raw.version >= 3 ? raw : migrateSave(raw);
+  let s = raw.version >= 4 ? raw : migrateSave(raw);
   s = { ...s, toasts: [], breakthrough: null, dialogue: null, pendingEvent: null, combat: null };
+  if (s.sleeping && (!s.sleeping.wakeAt || Date.now() >= s.sleeping.wakeAt)) s = { ...s, sleeping: null };
   // respawn any world enemies whose timer elapsed while away
   if (s.worldState?.enemies) {
     s = {
@@ -44,21 +62,57 @@ function normalize(raw) {
 }
 
 export function GameProvider({ children }) {
-  const [state, dispatch] = useReducer(gameReducer, null, () => {
-    const s = loadSave();
-    return s ? normalize(s) : { noSave: true };
-  });
+  const [activeSlot, setActiveSlot] = useState(null);
+  const [createSlot, setCreateSlot] = useState(null);
+  const [state, dispatch] = useReducer(gameReducer, null, () => ({ noSave: true }));
 
+  // persist the active slot on every game-state change
   useEffect(() => {
-    if (state && !state.noSave) {
-      try { localStorage.setItem(SAVE_KEY, JSON.stringify({ ...state, toasts: [], breakthrough: null })); } catch {}
+    if (activeSlot != null && state && !state.noSave) saveSlot(activeSlot, state);
+  }, [state, activeSlot]);
+
+  const startSlot = useCallback((i) => {
+    const raw = loadSlotRaw(i);
+    if (!raw || raw.deceased) return false;
+    dispatch({ type: 'LOAD', state: normalize(raw) });
+    setActiveSlot(i);
+    return true;
+  }, []);
+
+  const beginCreate = useCallback((i) => setCreateSlot(i), []);
+  const cancelCreate = useCallback(() => setCreateSlot(null), []);
+  const finishCreate = useCallback((name, gender, age, difficulty) => {
+    const slot = createSlot;
+    dispatch({ type: 'NEW_GAME', name, gender, age, difficulty, slot });
+    setCreateSlot(null);
+    setActiveSlot(slot);
+  }, [createSlot]);
+
+  const deleteSlot = useCallback((i) => {
+    try { localStorage.removeItem(slotKey(i)); } catch {}
+  }, []);
+
+  const exitToSlots = useCallback(() => setActiveSlot(null), []);
+
+  const reset = useCallback(() => {
+    if (activeSlot != null) {
+      try { localStorage.removeItem(slotKey(activeSlot)); } catch {}
     }
-  }, [state]);
+    setActiveSlot(null);
+    dispatch({ type: 'RESET' });
+  }, [activeSlot]);
 
-  const newGame = useCallback((name, gender, age) => dispatch({ type: 'NEW_GAME', name, gender, age }), []);
-  const reset = useCallback(() => { localStorage.removeItem(SAVE_KEY); dispatch({ type: 'RESET' }); }, []);
-
-  return <GameContext.Provider value={{ state, dispatch, newGame, reset }}>{children}</GameContext.Provider>;
+  return (
+    <GameContext.Provider value={{
+      state, dispatch,
+      activeSlot, createSlot,
+      loadSlotRaw, startSlot,
+      beginCreate, cancelCreate, finishCreate,
+      deleteSlot, exitToSlots, reset,
+    }}>
+      {children}
+    </GameContext.Provider>
+  );
 }
 
 export function useGame() {
