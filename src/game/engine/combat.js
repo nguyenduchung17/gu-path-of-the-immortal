@@ -25,6 +25,9 @@ import { weatherOf, weatherModOf, weatherEffectLine } from './weather';
 import { guCondition } from './guLife';
 import { proficiencyOf, recordUse } from './proficiency';
 import { SPECIES_BY_ID } from '../data/wildGu';
+import { ecoOf } from '../data/enemies';
+import { planIntent } from './intent';
+import { terrainModsOf, TERRAIN_LABELS } from '../data/terrain';
 
 const G = () => BALANCE.combat.gauge;
 
@@ -79,37 +82,68 @@ function aiOf(def) {
 export function initCombat(enemyId, player, opts = {}) {
   const def = opts.def || ENEMY_BY_ID[enemyId];
   const d = DIFFICULTIES[opts.difficulty] || DIFFICULTIES.standard;
+  const eco = ecoOf(def.id);
   const maxHp = Math.max(1, Math.round(def.hp * d.enemyHpMul));
   const startHp = Math.min(maxHp, Math.max(1, Math.round((opts.hp ?? def.hp) * d.enemyHpMul)));
   const eBase = enemySpeedOf(def);
   const maxStab = maxStabilityOf(def);
   const statuses = (opts.statuses || []).map(s => ({ ...s }));
+  // pack support: kin within sight embolden the fighter — never a free win
+  const allies = opts.allies || 0;
+  const packAtk = allies ? 1 + (BALANCE.combat.pack.atkPct / 100) : 1;
+  const packStab = allies ? 1 + (BALANCE.combat.pack.stabPct / 100) : 1;
+  // ambush: striking an unaware foe shatters its opening stance
+  const ambush = opts.ambush === 'player' || opts.ambush === 'enemy' ? opts.ambush : null;
+  let stability = opts.stability ?? maxStab;
+  if (ambush === 'player') stability = Math.max(0, Math.round(stability - maxStab * BALANCE.combat.ambush.stabLossPct / 100));
+  const terrain = opts.zoneId ? terrainModsOf(opts.zoneId) : null;
+  const log = [opts.intro || `A ${def.name} blocks your path!`];
+  if (ambush === 'player') log.push(`AMBUSH! You strike from cover — ${def.name}'s guard is thrown into disarray (−${BALANCE.combat.ambush.stabLossPct}% Stability, its action delayed).`);
+  if (ambush === 'enemy') log.push(`AMBUSHED! ${def.name} moves before you can steady yourself — it acts first!`);
+  if (allies) log.push(`${allies} packmate(s) within call — ${def.name} fights emboldened (+${BALANCE.combat.pack.atkPct}% ATK, +${BALANCE.combat.pack.stabPct}% guard).`);
+  if (terrain) log.push(`Terrain — ${TERRAIN_LABELS[opts.zoneId] || 'the land'}: ${Object.entries(terrain).map(([p, m]) => `${PATH_BY_ID[p]?.name || p} ${m > 0 ? '+' : ''}${m}%`).join(' · ')}.`);
+  const enemy = {
+    ...def,
+    activity: eco.activity,
+    stabMul: eco.stabMul,
+    stabWeakness: eco.stabWeakness,
+    ambusher: eco.ambusher,
+    attack: Math.max(1, Math.round(def.attack * d.enemyDmgMul * packAtk)),
+    maxHp, hp: startHp,
+    baseSpeed: eBase,
+    statuses,
+    stability: Math.min(Math.round(maxStab * packStab), Math.round(stability * packStab)),
+    maxStability: Math.round(maxStab * packStab),
+    ai: aiOf(def),
+    aiCounters: {},
+    telegraph: null,          // announced heavy move, executes on its next action
+    planned: null,            // committed NEXT action — the Intent system
+  };
+  enemy.planned = planIntent(enemy, statuses);
+  const pBase = playerSpeedOf(player);
+  const pDelay = actDelay(pBase, opts.playerStatuses || []);
+  const eDelay = actDelay(eBase, statuses);
   return {
     enemyId: def.id,
-    enemy: {
-      ...def,
-      attack: Math.max(1, Math.round(def.attack * d.enemyDmgMul)),
-      maxHp, hp: startHp,
-      baseSpeed: eBase,
-      statuses,
-      stability: opts.stability ?? maxStab,
-      maxStability: maxStab,
-      ai: aiOf(def),
-      aiCounters: {},
-      telegraph: null,          // announced heavy move, executes on its next action
-    },
+    enemy,
     hpScale: d.enemyHpMul,
-    speeds: { player: playerSpeedOf(player) },
-    // action-order clock: each side's next action time; the player opens.
-    nextAct: { player: 0, enemy: actDelay(eBase, statuses) },
+    speeds: { player: pBase },
+    // action-order clock: the player opens — unless ambushed.
+    nextAct: {
+      player: ambush === 'enemy' ? Math.round(pDelay * 0.6) : 0,
+      enemy: ambush === 'player' ? Math.round(eDelay * (1 + BALANCE.combat.ambush.delayPct / 100)) : eDelay,
+    },
     clock: 0,
     worldId: opts.worldId || null,
     wildGuId: opts.wildGuId || null,
     arena: opts.arena || null,
     trial: opts.trial || null,
+    zoneId: opts.zoneId || null,
+    terrain,
+    scouted: !!opts.scouted,  // a scouting Gu's eye carried into battle
     playerStatuses: (opts.playerStatuses || []).map(s => ({ ...s })),
     cooldowns: {},
-    log: [opts.intro || `A ${def.name} blocks your path!`],
+    log,
     revealed: false,
     rounds: 0,
     over: false,
@@ -193,10 +227,16 @@ function damageTakenMul(enemy) {
 }
 
 // Guard damage → BREAK: the payoff target beside HP.
-function applyStabilityDamage(enemy, combat, amount, push) {
+function applyStabilityDamage(enemy, combat, amount, push, path) {
   const cfg = BALANCE.combat.break;
   if (amount <= 0 || hasStatus(enemy.statuses, 'broken')) return;
-  enemy.stability = Math.max(0, (enemy.stability ?? enemy.maxStability) - Math.round(amount));
+  let amt = amount * (enemy.stabMul || 1);
+  // some hides are built to be broken — the right Path finds the flaw
+  if (path && path === enemy.stabWeakness) {
+    amt *= 1.5;
+    push(`The ${PATH_BY_ID[path].name} technique finds the flaw in ${enemy.name}'s stance — guard damage ×1.5!`);
+  }
+  enemy.stability = Math.max(0, (enemy.stability ?? enemy.maxStability) - Math.round(amt));
   if (enemy.stability <= 0) {
     enemy.statuses.push({ type: 'broken', power: 0, duration: cfg.brokenDuration });
     enemy.stability = Math.round(enemy.maxStability * 0.4);
@@ -223,6 +263,12 @@ function applyGu(gu, player, enemy, pSt, eSt, combat, push, fx, syn, weather, mu
         push(`${enemy.name} shrugs off the ${PATH_BY_ID[gu.path].name} essence.`);
       }
       dmg = Math.floor(dmg * (1 + weatherModOf(weather, gu.path) / 100));
+      // the ground lends its essence — battlefield terrain shifts Path power
+      const terr = (combat.terrain || {})[gu.path] || 0;
+      if (terr) {
+        dmg = Math.floor(dmg * (1 + terr / 100));
+        if (h === 0) push(`The ${TERRAIN_LABELS[combat.zoneId] || 'terrain'} lends its essence — ${PATH_BY_ID[gu.path].name} power ${terr > 0 ? '+' : ''}${terr}%.`);
+      }
       dmg = Math.floor(dmg * (1 + (fx.damagePct || 0) / 100));
       if (gu.path === enemy.weakness) {
         dmg = Math.floor(dmg * (1 + BALANCE.combat.weaknessBonusPct / 100));
@@ -281,7 +327,7 @@ function applyGu(gu, player, enemy, pSt, eSt, combat, push, fx, syn, weather, mu
   if (e.expose) { eSt.push({ type: 'weakness', power: e.expose.power, duration: e.expose.duration }); push(`${enemy.name} is left exposed — it will take more damage.`); meaningful = true; }
   if (e.armorBreak) { eSt.push({ type: 'armorBreak', power: e.armorBreak.power, duration: e.armorBreak.duration }); push(`${enemy.name}'s guard is cracked — its defense is weakened.`); meaningful = true; }
   if (e.self?.haste) { pSt.push({ type: 'haste', power: e.self.haste.power, duration: e.self.haste.duration }); push(`${gu.name} quickens your form — your next actions come sooner.`); }
-  if (e.stab) applyStabilityDamage(enemy, combat, e.stab * (mul >= 1 ? 1 : 0.75), push);
+  if (e.stab) applyStabilityDamage(enemy, combat, e.stab * (mul >= 1 ? 1 : 0.75), push, gu.path);
   if (e.summon) {
     const p = Math.max(1, Math.floor(e.summon.power * mul * (1 + (fx.summonPct || 0) / 100) * (syn.has('tamedTides') ? 1.15 : 1)));
     eSt.push({ type: 'summon', power: p, duration: (e.summon.duration || 3) + (fx.summonTurns || 0) });
@@ -302,7 +348,7 @@ function applyGu(gu, player, enemy, pSt, eSt, combat, push, fx, syn, weather, mu
     else { eSt.push({ type: 'control', power: Math.max(1, Math.floor(e.control.power * mul * (1 + (fx.controlPct || 0) / 100))), duration: e.control.duration }); push(`${gu.name} binds ${enemy.name}, weakening its strikes.`); meaningful = true; }
   }
   if (e.buff) { pSt.push({ type: 'buff', element: e.buff.element, power: Math.round(e.buff.power * mul), duration: e.buff.duration }); push(`${gu.name} empowers your ${e.buff.element} Gu.`); }
-  if (e.investigate) { combat.revealed = true; push(`${gu.name} reveals the enemy's intent.`); }
+  if (e.investigate) { combat.revealed = true; combat.scouted = true; push(`${gu.name} reveals the enemy's intent — weakness and stance laid bare.`); }
   return meaningful;
 }
 
@@ -350,24 +396,35 @@ function executeTelegraph(enemy, player, pSt, push) {
   push(`${tg.name} hits you for ${dmg} damage!`);
 }
 
-// Archetype AI: tanks guard when hurt, skirmishers haste, poisoners stack
-// venom, brutes/predators telegraph heavy moves on a rhythm.
+// Archetype AI — now driven by the INTENT system: the enemy commits its next
+// action one beat ahead (see engine/intent.js) and executes exactly that plan,
+// so what the player reads is what the enemy does. Battles begun before the
+// system existed (old saves mid-fight) fall back to deciding on the spot.
 function enemyAI(enemy, player, pSt, eSt, push, windEvasion, thorns) {
   const c = enemy.aiCounters || (enemy.aiCounters = {});
   c.acts = (c.acts || 0) + 1;
-  const def = enemy;
-  if (enemy.ai === 'brute' && enemy.hp < enemy.maxHp * 0.5 && !hasStatus(eSt, 'guard') && Math.random() < 0.4) {
+  let plan = enemy.planned;
+  enemy.planned = null;
+  if (!plan) {
+    const every = enemy.charge?.every || (enemy.ai === 'brute' ? 3 : 4);
+    if (enemy.ai === 'brute' && enemy.hp < enemy.maxHp * 0.5 && !hasStatus(eSt, 'guard') && Math.random() < 0.4) plan = { kind: 'guard' };
+    else if (enemy.ai === 'skirmisher' && enemy.hp < enemy.maxHp * 0.7 && !c.hasted) plan = { kind: 'buff' };
+    else if (enemy.ai === 'poisoner' && Math.random() < 0.6) plan = { kind: 'poison' };
+    else if (c.acts % every === 0) plan = { kind: 'heavy', name: enemy.charge?.name || 'a savage surge', power: enemy.charge?.power || 1.8 };
+    else plan = { kind: 'attack' };
+  }
+  if (plan.kind === 'guard') {
     eSt.push({ type: 'guard', power: 40, duration: 1 });
     push(`${enemy.name} hunkers behind its bulk — its guard is up.`);
     return;
   }
-  if (enemy.ai === 'skirmisher' && enemy.hp < enemy.maxHp * 0.7 && !c.hasted) {
+  if (plan.kind === 'buff') {
     c.hasted = true;
     eSt.push({ type: 'haste', power: 25, duration: 2 });
     push(`${enemy.name} moves like quicksilver — its next actions come faster!`);
     return;
   }
-  if (enemy.ai === 'poisoner' && Math.random() < 0.6) {
+  if (plan.kind === 'poison') {
     let dmg = Math.max(1, Math.round(enemy.attack * 0.6) - effValue(pSt, 'defense'));
     dmg = playerGuardDr(pSt, dmg, push);
     player.hp -= dmg;
@@ -375,10 +432,9 @@ function enemyAI(enemy, player, pSt, eSt, push, windEvasion, thorns) {
     push(`${enemy.name} sinks its fangs in for ${dmg} damage — venom floods your veins!`);
     return;
   }
-  const every = def.charge?.every || (enemy.ai === 'brute' ? 3 : 4);
-  if (!enemy.telegraph && c.acts % every === 0) {
-    enemy.telegraph = { name: def.charge?.name || 'a savage surge', power: def.charge?.power || 1.8 };
-    push(`${enemy.name} gathers monstrous power — ${enemy.telegraph.name} comes next! BRACE YOURSELF!`);
+  if (plan.kind === 'heavy') {
+    enemy.telegraph = { name: plan.name, power: plan.power || 1.8 };
+    push(`${enemy.name} gathers monstrous power — ${plan.name} comes next! BRACE YOURSELF!`);
     return;
   }
   enemyAct(enemy, player, pSt, push, windEvasion, thorns);
@@ -581,6 +637,7 @@ export function executeRound(state, action) {
     // free recon: reveal the foe and steady your Killer-Move focus
     const oc = cfg.observe;
     combat.revealed = true;
+    combat.scouted = true;
     const regen = Math.min(player.maxPrimevalEssence - player.primevalEssence, oc.essence);
     player.primevalEssence += regen;
     pSt.push({ type: 'focus', power: oc.focusPct, duration: 3 });
@@ -676,6 +733,7 @@ export function executeRound(state, action) {
     // a stunned or BROKEN enemy loses any charged attack
     if (enemy.telegraph && (hasStatus(eSt, 'stun') || hasStatus(eSt, 'broken'))) {
       enemy.telegraph = null;
+      enemy.planned = null;
       push(`${enemy.name}'s charged attack is INTERRUPTED!`);
     }
     if (hasStatus(eSt, 'broken')) {
@@ -692,6 +750,8 @@ export function executeRound(state, action) {
         + Math.round(enemy.maxStability * cfg.break.stabRegenPctPerAction / 100));
     }
     combat.nextAct.enemy += actDelay(enemy.baseSpeed, eSt);
+    // commit the NEXT intent one action ahead — the player can read and answer it
+    if (enemy.hp > 0 && !hasStatus(eSt, 'broken') && !hasStatus(eSt, 'stun')) enemy.planned = planIntent(enemy, eSt);
     if (enemy.hp <= 0) break;
   }
 

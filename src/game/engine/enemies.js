@@ -1,11 +1,11 @@
 // Visible-enemy AI. Enemies exist in the world, wander their home area, notice
 // the player ('?'), give chase ('!') and start combat on contact — or when the
 // player attacks them first. No random encounters.
-import { ENEMY_BY_ID } from '../data/enemies';
+import { ENEMY_BY_ID, ecoOf } from '../data/enemies';
 import { isWalkable, zoneAt, DEFAULT_ZONE, WORLD_NPCS } from '../data/world';
 import { initCombat, maxStabilityOf } from './combat';
 import { isNight } from './time';
-import { exploreActive, carryIntoCombat } from './exploration';
+import { exploreActive, carryIntoCombat, ambushOf, nearbyPackCount } from './exploration';
 import { totalGameMin } from './vitalGu';
 import { BALANCE } from '../config/balance';
 
@@ -63,6 +63,19 @@ export function tickEnemies(state) {
   const pfx = exploreActive(state);
   const stealthMul = pfx.stealth ? Math.max(0, 1 - (pfx.stealth.power || 0) / 100) : 1;
   const nowMin = totalGameMin(state.time);
+  // engagement funnel: carry-overs, terrain, ambush and pack support all apply here
+  const engage = (ne, intro) => {
+    const carry = carryIntoCombat(state, ne);
+    const amb = ambushOf(state, ne, false);
+    const ambIntro = amb.amb === 'enemy'
+      ? `AMBUSHED! ${ENEMY_BY_ID[ne.defId].name} lunges from hiding!`
+      : amb.note ? `${intro} ${amb.note}` : intro;
+    return initCombat(ne.defId, p, {
+      hp: ne.hp, stability: ne.stability, statuses: carry.statuses, playerStatuses: carry.playerStatuses,
+      worldId: ne.id, difficulty: state.difficulty, zoneId: pZone.id, scouted: !!pfx.vision,
+      ambush: amb.amb, allies: nearbyPackCount(state, ne.defId, ne.x, ne.y, ne.id), intro: ambIntro,
+    });
+  };
   const canEnemyMove = (ne) => {
     const fx = ne.fx || {};
     if (fx.root && fx.root.until > nowMin) return false;       // rooted in place
@@ -80,7 +93,12 @@ export function tickEnemies(state) {
     if (dist > BALANCE.world.activeRadius) return e;
     const def = ENEMY_BY_ID[e.defId];
     if (!def) return e;
-    const detect = ((e.detect ?? (BALANCE.world.detect[e.behavior] ?? 4)) + (isNight(state.time) ? BALANCE.time.nightDetectBonus : 0)) * stealthMul;
+    // daily rhythm: nocturnal hunters sharpen after dark, day creatures dull
+    const eco = ecoOf(e.defId);
+    const night = isNight(state.time);
+    const actAdj = eco.activity === 'nocturnal' ? (night ? 1 : -1)
+      : eco.activity === 'diurnal' ? (night ? -1 : 0) : 0;
+    const detect = ((e.detect ?? (BALANCE.world.detect[e.behavior] ?? 4)) + (night ? BALANCE.time.nightDetectBonus : 0) + actAdj) * stealthMul;
     const homeDist = cheb(e.x, e.y, e.home.x, e.home.y);
     let ne = { ...e };
 
@@ -109,15 +127,13 @@ export function tickEnemies(state) {
       if (dist > detect + BALANCE.world.giveUpDist || homeDist > BALANCE.world.leash) {
         ne.state = 'idle';
       } else if (manhattan(ne.x, ne.y, p.x, p.y) === 1) {
-        const carry = carryIntoCombat(state, ne);
-        combat = initCombat(e.defId, p, { hp: ne.hp, stability: ne.stability, statuses: carry.statuses, playerStatuses: carry.playerStatuses, worldId: e.id, difficulty: state.difficulty, intro: `${def.name} catches you!` });
+        combat = engage(ne, `${def.name} catches you!`);
         return ne;
       } else if (canEnemyMove(ne)) {
         const st = stepToward(ne, p.x, p.y, enemies, p);
         if (st) { ne.x = st.x; ne.y = st.y; }
         if (manhattan(ne.x, ne.y, p.x, p.y) === 1) {
-          const carry = carryIntoCombat(state, ne);
-          combat = initCombat(e.defId, p, { hp: ne.hp, stability: ne.stability, statuses: carry.statuses, playerStatuses: carry.playerStatuses, worldId: e.id, difficulty: state.difficulty, intro: `${def.name} closes in!` });
+          combat = engage(ne, `${def.name} closes in!`);
         }
       }
       return ne;
@@ -130,7 +146,10 @@ export function tickEnemies(state) {
       return ne;
     }
     if (ne.state === 'alert') ne.state = 'idle';
-    if (e.behavior !== 'guard' && Math.random() < 0.15 && canEnemyMove(ne)) {
+    const wanderRate = e.behavior === 'guard' ? 0
+      : 0.15 + (eco.activity === 'nocturnal' ? (night ? 0.10 : -0.07)
+        : eco.activity === 'diurnal' ? (night ? -0.08 : 0.05) : 0);
+    if (Math.random() < Math.max(0, wanderRate) && canEnemyMove(ne)) {
       const st = homeDist > 2 ? stepToward(ne, ne.home.x, ne.home.y, enemies, p) : wander(ne, enemies, p);
       if (st) { ne.x = st.x; ne.y = st.y; }
     }

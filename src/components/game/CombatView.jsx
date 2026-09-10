@@ -13,6 +13,7 @@ import BattleScene from './battle/BattleScene';
 import BattleCommandMenu from './battle/BattleCommandMenu';
 import Timeline from './battle/Timeline';
 import { biomeOf } from './battle/biomes';
+import IntentPanel from './battle/IntentPanel';
 import { weatherOf } from '@/game/engine/weather';
 import PortraitFrame from './PortraitFrame';
 import { sfx } from '@/game/audio/sfx';
@@ -236,6 +237,7 @@ export default function CombatView() {
               {t('battle.resists')}: {enemy.resists.map(p => PATH_BY_ID[p]?.name || p).join(' · ')}
             </div>
           )}
+          {!c.over && <IntentPanel combat={c} enemy={enemy} />}
           <StatusChips statuses={enemy.statuses} />
         </div>
 
@@ -277,6 +279,15 @@ export default function CombatView() {
         {!c.over && enemy.telegraph && (
           <div className="absolute top-[76px] left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-amber-950/80 border border-amber-500/60 text-[10px] text-amber-200 font-heading tracking-wide animate-pulse whitespace-nowrap pointer-events-none">
             ⚠ {enemy.name} prepares {enemy.telegraph.name} — brace yourself!
+          </div>
+        )}
+
+        {/* battlefield terrain — Gu power shifts with the ground */}
+        {c.terrain && !c.over && (
+          <div className="absolute top-12 right-3 px-3 py-1.5 rounded-full bg-black/55 backdrop-blur border border-emerald-800/60 text-[10px] text-stone-300 whitespace-nowrap animate-pop pointer-events-none">
+            ⛰ {t('intent.terrain')} · <span className="text-emerald-200/80">
+              {Object.entries(c.terrain).map(([p, m]) => `${PATH_BY_ID[p]?.name || p} ${m > 0 ? '+' : ''}${m}%`).join(' · ')}
+            </span>
           </div>
         )}
 

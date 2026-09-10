@@ -14,7 +14,7 @@ import { BALANCE, DIFFICULTIES, diffOf, shopPrice, recoveryCosts } from '../conf
 import { RECIPE_BY_ID } from '../data/recipes';
 import {
   WORLD, zoneAt, isWalkable, DEFAULT_ZONE, LANDMARKS, WORLD_RESOURCES,
-  initialEnemies, TERRACE, FORMATION, CAMP_CELLS, INNS,
+  initialEnemies, TERRACE, FORMATION, CAMP_CELLS, INNS, ZONE_FAUNA,
 } from '../data/world';
 import { tickEnemies, regenWorldEnemies } from '../engine/enemies';
 import { MISSION_BY_ID } from '../data/missions';
@@ -25,7 +25,7 @@ import { essenceCapFor, cultivateMulOf, normalizeAptitude, rollAptitudeScore, ro
 import { starterGuOf } from '../data/starterGu';
 import { SPECIES_BY_ID, wildCombatDef, captureChanceOf, initialWildGu } from '../data/wildGu';
 import { revealFog, seedFog, foodOf } from '../engine/guLife';
-import { applyExploreGu, carryIntoCombat, visionRadiusOf, checkHiddenPaths, hazardStep, moveOverride, exploreActive } from '../engine/exploration';
+import { applyExploreGu, carryIntoCombat, visionRadiusOf, checkHiddenPaths, hazardStep, moveOverride, exploreActive, ambushOf, nearbyPackCount } from '../engine/exploration';
 import { startInstability } from '../engine/vitalGu';
 import { QS, acceptQuest, turnInQuest, toggleTrack, abandonQuest, applyQuestEvent, emptyQuests, markDiscovered } from '../engine/questEngine';
 
@@ -282,6 +282,9 @@ export function gameReducer(state, action) {
       if (!zonesFound[zone.id]) {
         zonesFound[zone.id] = true;
         logAdd.push(`Entered ${zone.name} — ${zone.dangerLabel.toLowerCase()}.`);
+        // territory knowledge — learning what haunts a land is itself a reward
+        const fauna = ZONE_FAUNA[zone.id];
+        if (fauna?.length) logAdd.push(`Territory — ${fauna.map(id => ENEMY_BY_ID[id]?.name || id).join(', ')} ${fauna.length > 1 ? 'haunt' : 'haunts'} these lands.`);
       }
       const lms = ws.discovered?.landmarks || {};
       let newLm = null;
@@ -353,7 +356,23 @@ export function gameReducer(state, action) {
       if (!e) return state;
       const def = ENEMY_BY_ID[e.defId];
       const carry = carryIntoCombat(state, e);
-      return { ...state, combat: initCombat(e.defId, p, { hp: e.hp, stability: e.stability, statuses: carry.statuses, playerStatuses: carry.playerStatuses, worldId: e.id, difficulty: state.difficulty, intro: `You strike first — the ${def.name} turns on you!` }) };
+      // ambush: striking an unaware foe (or one you are veiled from) opens its guard
+      const amb = ambushOf(state, e, true);
+      const pack = nearbyPackCount(state, e.defId, e.x, e.y, e.id);
+      const combat = initCombat(e.defId, p, {
+        hp: e.hp, stability: e.stability, statuses: carry.statuses, playerStatuses: carry.playerStatuses,
+        worldId: e.id, difficulty: state.difficulty, zoneId: zoneAt(p.x, p.y)?.id,
+        ambush: amb.amb, allies: pack, scouted: !!exploreActive(state).vision,
+        intro: amb.amb === 'player' ? `AMBUSH! You strike from cover — the ${def.name} reels!` : `You strike first — the ${def.name} turns on you!`,
+      });
+      // the pack answers: same-species kin nearby converge on the fight
+      let s = { ...state, combat };
+      if (pack) {
+        s = { ...s, worldState: { ...s.worldState, enemies: (s.worldState.enemies || []).map(o =>
+          (!o.dead && o.id !== e.id && o.defId === e.defId && Math.abs(o.x - e.x) <= 3 && Math.abs(o.y - e.y) <= 3)
+            ? { ...o, state: 'chase' } : o) } };
+      }
+      return s;
     }
 
     case 'SLEEP_INN': {
@@ -816,11 +835,19 @@ export function gameReducer(state, action) {
       if (!e) return { ...state, recovery: null };
       const def = ENEMY_BY_ID[e.defId];
       const carry = carryIntoCombat(state, e);
+      const amb = ambushOf(state, e, false);
+      const intro = amb.amb === 'enemy'
+        ? `Your meditation shatters — AMBUSHED! The ${def.name} found you!`
+        : `Your meditation shatters — the ${def.name} found you!`;
       return {
         ...state,
         recovery: null,
-        combat: initCombat(e.defId, state.player, { hp: e.hp, stability: e.stability, statuses: carry.statuses, playerStatuses: carry.playerStatuses, worldId: e.id, difficulty: state.difficulty, intro: `Your meditation shatters — the ${def.name} found you!` }),
-        log: [...state.log, `Your meditation shatters — the ${def.name} found you!`],
+        combat: initCombat(e.defId, state.player, {
+          hp: e.hp, stability: e.stability, statuses: carry.statuses, playerStatuses: carry.playerStatuses,
+          worldId: e.id, difficulty: state.difficulty, zoneId: zoneAt(state.player.x, state.player.y)?.id,
+          ambush: amb.amb, scouted: !!exploreActive(state).vision, intro,
+        }),
+        log: [...state.log, intro],
       };
     }
     case 'CANCEL_RECOVERY':
