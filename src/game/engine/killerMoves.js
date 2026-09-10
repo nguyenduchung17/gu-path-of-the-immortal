@@ -49,6 +49,8 @@ export function kmResearchAvailable(state) {
 // UI alias — the GameScreen notification dot asks "can this player research?"
 export const kmCanResearch = kmResearchAvailable;
 
+// LoadoutTab references this under its older name.
+export const kmSlots = kmSlotsOf;
 export function kmSlotsOf(state) {
   const cfg = BALANCE.killerMoves;
   return (state.player?.rank || 0) >= cfg.slotsAtRank ? cfg.slotsBase + 1 : cfg.slotsBase;
