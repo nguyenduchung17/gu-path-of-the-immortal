@@ -38,7 +38,10 @@ export const NPCS = [
     greeting: 'You wish to walk the Gu path? My cases hold low-rank Gu, today\u2019s rare specimen, and the recipes to refine your own.',
     look: { body: 'male', hair: 'topknot', hairColor: '#141414', skin: '#c99767', eyes: '#2a5a8a', outfit: 'robe', outfitPrimary: '#6b4a8a', outfitSecondary: '#d9b45b', accessory: 'ornament' },
     shop: {
-      sells: [],
+      sells: [
+        { itemId: 'sealingJar', price: 20 }, { itemId: 'bindingVessel', price: 80 },
+        { itemId: 'restorationPellet', price: 60 },
+      ],
       buys: ['beastCore', 'fireEssence', 'shadowSilk', 'ore', 'ironOre', 'moonPetal', 'beastBlood', 'serpentGland', 'windCrystal', 'mistSilk'],
       hours: { open: 6 * 60, close: 20 * 60 },
       gu: [{ guId: 'ironSkin', price: 60 }],                                     // low-rank Gu, ready-bound
@@ -105,7 +108,12 @@ export const NPCS = [
     greeting: 'Fresh off the mist-forest trails — a bound Gu or two, today\u2019s rare catch, and recipes straight from my pack. Stones only, friend.',
     look: { body: 'male', hair: 'long', hairColor: '#5a4a2a', skin: '#c99767', eyes: '#7a3a3a', outfit: 'tunic', outfitPrimary: '#7a3a5a', outfitSecondary: '#8a6a43', accessory: 'scarf' },
     shop: {
-      sells: [],
+      sells: [
+        { itemId: 'sealingJar', price: 25 },
+        { itemId: 'flameGrass', price: 5 }, { itemId: 'spiritWater', price: 5 },
+        { itemId: 'mineralEssence', price: 5 }, { itemId: 'venomSac', price: 7 },
+        { itemId: 'beastMeat', price: 4 },
+      ],
       buys: ['beastCore', 'beastBlood', 'moonPetal', 'windCrystal', 'shadowSilk', 'mistSilk', 'serpentGland', 'fireEssence', 'ironOre', 'ore'],
       hours: { open: 6 * 60, close: 20 * 60 },
       gu: [{ guId: 'insightEye', price: 45 }],
@@ -130,6 +138,7 @@ const MASTER_SHOPS = {
   elderMo: {
     sells: [
       { itemId: 'medicine', price: 15 },
+      { itemId: 'restorationPellet', price: 55 },
       { itemId: 'beastCore', price: 10 }, { itemId: 'fireEssence', price: 14 },
       { itemId: 'shadowSilk', price: 12 }, { itemId: 'serpentGland', price: 30 },
     ],

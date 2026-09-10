@@ -2,6 +2,7 @@
 // (1 real second = 1 game minute) and every per-action cost live in
 // BALANCE.time, so the whole game's pace can be tuned from one place.
 import { BALANCE } from '../config/balance';
+import { tickGuLife } from './guLife';
 
 export const MIN_PER_DAY = 24 * 60;
 const norm = (min) => ((min % MIN_PER_DAY) + MIN_PER_DAY) % MIN_PER_DAY;
@@ -49,7 +50,9 @@ export function advanceTime(state, mins) {
   if (!mins) return state;
   const t = state.time || { day: BALANCE.time.startDay, min: BALANCE.time.startMinutes };
   const total = t.min + Math.round(mins);
-  return { ...state, time: { day: t.day + Math.floor(total / MIN_PER_DAY), min: total % MIN_PER_DAY } };
+  // the clock is the single choke point for everything time-driven:
+  // Gu hunger, auto-feed, starvation, injury recovery, wild-Gu respawns
+  return tickGuLife({ ...state, time: { day: t.day + Math.floor(total / MIN_PER_DAY), min: total % MIN_PER_DAY } }, mins);
 }
 
 // Market-style shops keep daytime hours; inns and the black market never close.

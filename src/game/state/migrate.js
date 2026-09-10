@@ -5,7 +5,9 @@
 import { CULTIVATION_STAGES } from '../data/cultivation';
 import { GU_BY_ID } from '../data/gu';
 import { ENEMY_BY_ID } from '../data/enemies';
-import { initialEnemies, BOSS_SPAWNS } from '../data/world';
+import { initialEnemies, BOSS_SPAWNS, LANDMARKS } from '../data/world';
+import { initialWildGu } from '../data/wildGu';
+import { seedFog } from '../engine/guLife';
 import { normalizeAptitude, essenceCapFor } from '../config/aptitude';
 
 // v4 aptitudes were flat strings — map them onto the v5 numeric scale.
@@ -125,6 +127,27 @@ export function migrateSave(old) {
       version: 7,
       worldState: { ...s.worldState, enemies: [...enemies, ...bosses] },
       log: [...(s.log || []), 'Rumor spreads of ancient horrors stirring in the deepest wilds — elite beasts whose spoils forge legendary Gu.'],
+    };
+  }
+
+  // v8: living Gu — hunger & feeding, wild Gu haunts, Vital Gu, fog of war.
+  if (s.version < 8) {
+    const p = s.player || {};
+    const fog = new Set(seedFog(p.x ?? 42, p.y ?? 44, 6));
+    for (const lm of LANDMARKS) {
+      if (s.worldState?.discovered?.landmarks?.[lm.id]) seedFog(lm.x, lm.y, 3).forEach(k => fog.add(k));
+    }
+    s = {
+      ...s,
+      version: 8,
+      inventory: { guFood: {}, guGear: {}, ...(s.inventory || {}) },
+      settings: { autoFeed: false, ...(s.settings || {}) },
+      vitalGu: s.vitalGu || null,
+      vitalSwitchDay: s.vitalSwitchDay ?? -99,
+      player: { ...p, vitalUnstableMin: 0 },
+      ownedGu: (s.ownedGu || []).map(g => ({ satiety: 100, injuredUntilDay: 0, ...g })),
+      worldState: { ...s.worldState, wildGu: initialWildGu(), fog: [...fog] },
+      log: [...(s.log || []), 'The wilds stir — wild Gu haunt the deep places, hunger gnaws at unfed companions, and the map remembers only where you have walked.'],
     };
   }
 

@@ -2,6 +2,8 @@
 // components). Narrative game content (dialogue, quests, log lines) stays in
 // English for now; adding a language means adding one table here.
 
+import { DICT_EXTRA } from './extra';
+
 export const LANGUAGES = [
   { id: 'en', label: 'English' },
   { id: 'vi', label: 'Tiếng Việt' },
@@ -605,3 +607,7 @@ export const DICT = {
     'master.trialDamage': 'Thí đấu với {name}: gây {n} sát thương trong {t} lượt.',
   },
 };
+
+// v8 systems — wild Gu, hunger, Vital Gu, risky refinement, fog of war
+DICT.en = { ...DICT.en, ...DICT_EXTRA.en };
+DICT.vi = { ...DICT.vi, ...DICT_EXTRA.vi };

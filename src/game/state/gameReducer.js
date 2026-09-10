@@ -23,6 +23,8 @@ import { ARENA_BY_ID } from '../data/arena';
 import { DEFAULT_APPEARANCE } from '../data/appearance';
 import { essenceCapFor, cultivateMulOf, normalizeAptitude, rollAptitudeScore, rollConstitution } from '../config/aptitude';
 import { starterGuOf } from '../data/starterGu';
+import { SPECIES_BY_ID, wildCombatDef, captureChanceOf, initialWildGu } from '../data/wildGu';
+import { revealFog, seedFog, foodOf } from '../engine/guLife';
 
 const START_STAGE = CULTIVATION_STAGES[0];
 
@@ -32,8 +34,9 @@ export function createNewGame(name, gender, age, difficulty, slot, appearance, a
     aptitude && typeof aptitude.score === 'number' ? aptitude : { score: rollAptitudeScore(), constitution: rollConstitution() }
   );
   const essenceCap = essenceCapFor(START_STAGE.maxEssence, apt);
+  const starterFood = foodOf(starter);
   return {
-    version: 7,
+    version: 8,
     difficulty: DIFFICULTIES[difficulty] ? difficulty : 'standard',
     slot: slot || 1,
     time: { day: BALANCE.time.startDay, min: BALANCE.time.startMinutes },
@@ -53,13 +56,18 @@ export function createNewGame(name, gender, age, difficulty, slot, appearance, a
       appearance: appearance || DEFAULT_APPEARANCE,
     },
     ownedGu: [{ instanceId: 'g_start', guId: starter.id, rank: starter.rank }],
-    inventory: { materials: { herb: 3 }, medicine: { medicine: 1 }, food: { ration: 2 }, questItems: {} },
+    inventory: { materials: { herb: 3 }, medicine: { medicine: 1 }, food: { ration: 2 }, guFood: starterFood ? { [starterFood]: 2 } : {}, guGear: { sealingJar: 1 }, questItems: {} },
+    settings: { autoFeed: false },
+    vitalGu: null,
+    vitalSwitchDay: -99,
     quests: { active: [], completed: [], kills: {}, flags: {} },
     reputation: { villagers: 0, merchants: 0, sect: 0, blackMarket: 0 },
     worldState: {
       gathered: {},
       discovered: { zones: { greenValleyTown: true }, landmarks: { townGate: true, teleportFormation: true }, inns: { townInn: true } },
       enemies: initialEnemies(),
+      wildGu: initialWildGu(),
+      fog: seedFog(42, 44, 6),
     },
     mastery: {}, masteryStats: {},
     knownPaths: [starter.path], knownRecipes: [],
@@ -160,7 +168,61 @@ export function refineChecklist(state, recipeId) {
   };
 }
 
-const busy = (state) => !!(state.combat || state.recovery || state.pendingEvent || state.dialogue || state.sleeping);
+// Rank-up refinement checklist — ✓/✗ lines with a live success chance and
+// the exact failure risks. All tuning lives in BALANCE.guRefine.
+export function refineGuChecklist(state, inst) {
+  const cfg = BALANCE.guRefine;
+  const gu = GU_BY_ID[inst.guId];
+  const cur = inst.rank || gu.rank;
+  const target = cur + 1;
+  const vital = state.vitalGu === inst.instanceId;
+  const day = state.time?.day || 1;
+  const p = state.player;
+  const refFx = bonusOf(state, 'refinement');
+  const food = foodOf(gu);
+  const materials = { ...(food ? { [food]: cfg.foodPerRank * target } : {}), beastCore: cfg.corePerRank * target };
+  const stonesCost = cfg.stonesPerRank * target;
+  const essenceCost = Math.max(1, Math.ceil(cfg.essencePerRank * target * (1 - (refFx.refineEssencePct || 0) / 100)));
+  const chance = Math.max(5, Math.min(95, Math.round(
+    cfg.baseSuccess + p.intelligence * cfg.perInt + Math.floor(p.luck * cfg.perLuck)
+    + (state.mastery?.refinement?.level || 1) * cfg.refineMasteryPerLevel
+    - (target - 1) * cfg.rankPenalty + (refFx.successPct || 0) + diffOf(state).refinePct)));
+  const injured = (inst.injuredUntilDay || 0) > day;
+  const blocked = (inst.refineBlockedUntilDay || 0) > day;
+  const matEntries = Object.entries(materials);
+  const checks = [
+    { key: 'max', met: cur < cfg.maxRank, text: `Rank below ${cfg.maxRank}` },
+    { key: 'rank', met: p.rank >= target - 1, text: `Your cultivation: needs Rank ${target - 1}+ (you are Rank ${p.rank})` },
+    { key: 'injury', met: !injured && !blocked, text: injured ? `Injured — recovers Day ${inst.injuredUntilDay}` : blocked ? `Cannot refine again until Day ${inst.refineBlockedUntilDay}` : 'Not injured or recovering' },
+    ...matEntries.map(([id, q]) => ({ key: `item-${id}`, met: (state.inventory[ITEM_BY_ID[id].category]?.[id] || 0) >= q, text: `${ITEM_BY_ID[id]?.name || id}: ${state.inventory[ITEM_BY_ID[id].category]?.[id] || 0}/${q}` })),
+    { key: 'essence', met: p.primevalEssence >= essenceCost, text: `Essence: ${Math.floor(p.primevalEssence)}/${essenceCost}` },
+    { key: 'stones', met: p.spiritStones >= stonesCost, text: `Primordial Stones: ${p.spiritStones}/${stonesCost}` },
+  ];
+  return {
+    ok: checks.every(c => c.met), cur, target, vital, chance, stonesCost, essenceCost, materials,
+    injuryChance: cfg.injuryChance, deathChance: vital ? 0 : cfg.deathChance, checks,
+  };
+}
+
+const busy = (state) => !!(state.combat || state.recovery || state.pendingEvent || state.dialogue || state.sleeping || state.wildEncounter);
+
+// Wild-Gu bookkeeping: after a successful capture or kill the haunt empties
+// until the (slow) respawn timer elapses.
+function wildGuAfterEncounter(state, worldId, gone) {
+  if (!gone) return state;
+  return {
+    ...state,
+    worldState: {
+      ...state.worldState,
+      wildGu: (state.worldState.wildGu || []).map(w => w.id !== worldId ? w : {
+        ...w, gone: true,
+        respawnAt: Date.now() + BALANCE.world.wildGuRespawnMs,
+        hp: SPECIES_BY_ID[w.speciesId].hp,
+        x: w.home.x, y: w.home.y,
+      }),
+    },
+  };
+}
 
 export function gameReducer(state, action) {
   // a deceased (True Cultivation) character can no longer act — only leave or reset
@@ -180,7 +242,7 @@ export function gameReducer(state, action) {
       const nx = p.x + action.dx, ny = p.y + action.dy;
       if (!isWalkable(nx, ny)) return state;
       const facing = action.dx === 1 ? 'right' : action.dx === -1 ? 'left' : action.dy === 1 ? 'down' : 'up';
-      let s = advanceTime({ ...state, player: { ...p, x: nx, y: ny, facing } }, BALANCE.time.moveMinutes);
+      let s = revealFog(advanceTime({ ...state, player: { ...p, x: nx, y: ny, facing } }, BALANCE.time.moveMinutes), nx, ny);
 
       const zone = zoneAt(nx, ny) || DEFAULT_ZONE;
       const ws = s.worldState;
@@ -656,6 +718,15 @@ export function gameReducer(state, action) {
       const c = state.combat;
       if (!c) return state;
       let s = { ...state, combat: null };
+      // wild Gu bookkeeping: killed → the haunt empties until respawn;
+      // a surviving wild Gu keeps the damage you dealt (weakened = easier capture)
+      if (c.wildGuId && s.worldState.wildGu) {
+        if (c.result === 'victory') {
+          s = wildGuAfterEncounter(s, c.wildGuId, true);
+        } else {
+          s = { ...s, worldState: { ...s.worldState, wildGu: s.worldState.wildGu.map(w => w.id !== c.wildGuId ? w : { ...w, hp: Math.max(1, Math.round(c.enemy.hp / (c.hpScale || 1))) }) } };
+        }
+      }
       // world enemy bookkeeping: dead → respawn timer; surviving → keep damage dealt
       if (c.worldId && s.worldState.enemies) {
         s = {
@@ -724,6 +795,131 @@ export function gameReducer(state, action) {
     }
     case 'CLOSE_EVENT':
       return { ...state, pendingEvent: null };
+
+    // ---------- Wild Gu encounters ----------
+    case 'ENCOUNTER_WILD_GU': {
+      if (state.wildEncounter) return state;
+      const wg = (state.worldState.wildGu || []).find(w => w.id === action.worldId && !w.gone);
+      if (!wg) return state;
+      return advanceTime({ ...state, wildEncounter: { worldId: wg.id, observed: false } }, BALANCE.time.talkMinutes);
+    }
+    case 'ENCOUNTER_OBSERVE': {
+      const e = state.wildEncounter;
+      if (!e || e.observed) return state;
+      return advanceTime({ ...state, wildEncounter: { ...e, observed: true } }, 5);
+    }
+    case 'ENCOUNTER_LEAVE':
+      return { ...state, wildEncounter: null };
+    case 'ENCOUNTER_CAPTURE': {
+      const e = state.wildEncounter;
+      if (!e) return state;
+      const wg = (state.worldState.wildGu || []).find(w => w.id === e.worldId && !w.gone);
+      if (!wg) return { ...state, wildEncounter: null };
+      const sp = SPECIES_BY_ID[wg.speciesId];
+      if (action.itemId) {
+        const jar = ITEM_BY_ID[action.itemId];
+        if (!jar || (state.inventory[jar.category]?.[jar.id] || 0) <= 0) return state;
+      }
+      const chance = captureChanceOf(state, wg, e, action.itemId);
+      let s = action.itemId ? applyEffects(state, { removeItems: { [action.itemId]: 1 } }) : state;
+      if (Math.random() * 100 < chance) {
+        s = applyEffects(s, { giveGu: sp.guId, message: `Capture succeeds — ${sp.name} settles into your keeping. It will need to be fed.` });
+        s = wildGuAfterEncounter(s, wg.id, true);
+        s = pushToast(s, { icon: '🐉', title: 'WILD GU CAPTURED', lines: [`${sp.name} joins you.`, `Feeds on: ${ITEM_BY_ID[sp.foodType]?.name || sp.foodType}.`] });
+        return advanceTime({ ...s, wildEncounter: null }, BALANCE.capture.attemptMinutes);
+      }
+      if (sp.behavior === 'passive' && Math.random() * 100 < BALANCE.capture.fleeChance) {
+        s = wildGuAfterEncounter(s, wg.id, true);
+        s = { ...s, log: [...s.log, `The ${sp.name} slips away into the wilds — the capture failed.`] };
+        return advanceTime({ ...s, wildEncounter: null }, BALANCE.capture.attemptMinutes);
+      }
+      return advanceTime({ ...s, wildEncounter: null, combat: initCombat(null, s.player, { def: wildCombatDef(sp), difficulty: s.difficulty, wildGuId: wg.id, hp: wg.hp, intro: `The ${sp.name} breaks free of the seal — it turns on you!` }) }, BALANCE.capture.attemptMinutes);
+    }
+    case 'ENCOUNTER_ATTACK': {
+      const e = state.wildEncounter;
+      if (!e) return state;
+      const wg = (state.worldState.wildGu || []).find(w => w.id === e.worldId && !w.gone);
+      if (!wg) return { ...state, wildEncounter: null };
+      const sp = SPECIES_BY_ID[wg.speciesId];
+      return { ...state, wildEncounter: null, combat: initCombat(null, state.player, { def: wildCombatDef(sp), difficulty: state.difficulty, wildGuId: wg.id, hp: wg.hp, intro: `You strike at the ${sp.name}!` }) };
+    }
+
+    // ---------- Gu feeding & care ----------
+    case 'FEED_GU': {
+      const inst = state.ownedGu.find(g => g.instanceId === action.instanceId);
+      const it = ITEM_BY_ID[action.itemId];
+      if (!inst || !it || action.itemId !== foodOf(GU_BY_ID[inst.guId])) return state;
+      if ((state.inventory[it.category]?.[it.id] || 0) <= 0) return state;
+      let s = applyEffects(state, { removeItems: { [it.id]: 1 }, message: `You feed ${GU_BY_ID[inst.guId].name} — it settles contentedly.` });
+      s = { ...s, ownedGu: s.ownedGu.map(g => g.instanceId === inst.instanceId ? { ...g, satiety: BALANCE.hunger.maxSatiety, criticalSinceDay: null, warnDay: null } : g) };
+      return advanceTime(s, BALANCE.time.talkMinutes);
+    }
+    case 'TOGGLE_AUTO_FEED': {
+      const autoFeed = !(state.settings?.autoFeed);
+      return { ...state, settings: { ...(state.settings || {}), autoFeed }, log: [...state.log, `Auto Feed ${autoFeed ? 'enabled' : 'disabled'}.`] };
+    }
+    case 'CURE_GU': {
+      const inst = state.ownedGu.find(g => g.instanceId === action.instanceId);
+      if (!inst || (state.inventory.guGear?.restorationPellet || 0) <= 0) return state;
+      let s = applyEffects(state, { removeItems: { restorationPellet: 1 }, message: `You feed ${GU_BY_ID[inst.guId].name} a Spirit Restoration Pellet — its injuries mend.` });
+      s = { ...s, ownedGu: s.ownedGu.map(g => g.instanceId === inst.instanceId ? { ...g, injuredUntilDay: 0, injurySeverity: null, refineBlockedUntilDay: 0 } : g) };
+      return advanceTime(s, BALANCE.time.talkMinutes);
+    }
+
+    // ---------- Vital Gu (Cổ Bản Mệnh) ----------
+    case 'SET_VITAL_GU': {
+      const inst = state.ownedGu.find(g => g.instanceId === action.instanceId);
+      if (!inst || state.vitalGu === inst.instanceId) return state;
+      const cfg = BALANCE.vital;
+      const day = state.time?.day || 1;
+      const cooldownEnd = (state.vitalSwitchDay ?? -99) + cfg.switchCooldownDays;
+      if (day < cooldownEnd) {
+        return { ...state, log: [...state.log, `Your aperture has not settled — you cannot bind a new Vital Gu for ${cooldownEnd - day} more day(s).`] };
+      }
+      const gu = GU_BY_ID[inst.guId];
+      const prev = state.vitalGu ? state.ownedGu.find(g => g.instanceId === state.vitalGu) : null;
+      let s = { ...state, vitalGu: inst.instanceId, vitalSwitchDay: day, player: { ...state.player, vitalUnstableMin: (state.player.vitalUnstableMin || 0) + cfg.switchPenaltyDays * 24 * 60 } };
+      s = pushToast(s, { icon: '🩸', title: 'CỔ BẢN MỆNH — VITAL GU', lines: [`${gu.name} is bound as your Vital Gu.`, ...(prev ? [`The bond with ${GU_BY_ID[prev.guId].name} is released.`] : []), `Essence recovery −${cfg.switchPenaltyPct}% for ${cfg.switchPenaltyDays} day(s).`] });
+      s = { ...s, log: [...s.log, `${gu.name} becomes your Vital Gu (Cổ Bản Mệnh) — it never needs feeding, and refinement can never destroy it. Essence recovery −${cfg.switchPenaltyPct}% for ${cfg.switchPenaltyDays} day(s).`] };
+      return advanceTime(s, BALANCE.time.talkMinutes);
+    }
+
+    // ---------- Gu rank-up refinement (risky) ----------
+    case 'REFINE_GU': {
+      const inst = state.ownedGu.find(g => g.instanceId === action.instanceId);
+      if (!inst) return state;
+      const gu = GU_BY_ID[inst.guId];
+      const cfg = BALANCE.guRefine;
+      const list = refineGuChecklist(state, inst);
+      if (!list.ok) return { ...state, log: [...state.log, 'Refinement refused — requirements are unmet.'] };
+      const day = state.time?.day || 1;
+      let s = applyEffects(state, { essence: -list.essenceCost, spiritStones: -list.stonesCost, removeItems: list.materials });
+      if (Math.random() * 100 < list.chance) {
+        s = { ...s, ownedGu: s.ownedGu.map(g => g.instanceId === inst.instanceId ? { ...g, rank: list.target } : g) };
+        s = grantMastery(s, 'refinement', BALANCE.mastery.xpRefineSuccess, 'refined');
+        s = pushToast(s, { icon: '✦', title: 'GU REFINED', lines: [`${gu.name} rises to Rank ${list.target}.`, `Effect power +${cfg.rankPowerStep}%`] });
+        s = { ...s, log: [...s.log, `Refinement succeeds — ${gu.name} rises to Rank ${list.target}!`] };
+      } else {
+        s = grantMastery(s, 'refinement', BALANCE.mastery.xpRefineFail, 'refined');
+        if (Math.random() * 100 >= cfg.injuryChance) {
+          s = { ...s, log: [...s.log, `Refinement fails — the essence scatters. ${gu.name} survives unharmed, but the materials are lost.`] };
+        } else if (list.vital) {
+          // the bond shields the Vital Gu: never death — a severe weakening instead
+          s = { ...s, ownedGu: s.ownedGu.map(g => g.instanceId === inst.instanceId ? { ...g, injuredUntilDay: day + cfg.severeInjuryDays, injurySeverity: 'severe', refineBlockedUntilDay: day + cfg.refineBlockDays } : g) };
+          s = pushToast(s, { icon: '🩹', title: 'VITAL GU WEAKENED', lines: [`${gu.name} — power ${cfg.severeEffPct}%`, `Cannot refine again for ${cfg.refineBlockDays} day(s).`, 'Recover by waiting, or use a Spirit Restoration Pellet.'] });
+          s = { ...s, log: [...s.log, `Refinement fails catastrophically — ${gu.name} (Vital Gu) is severely weakened, but the bond shields it from death.`] };
+        } else if (Math.random() * 100 < cfg.deathChance) {
+          s = { ...s, ownedGu: s.ownedGu.filter(g => g.instanceId !== inst.instanceId), player: { ...s.player, equippedGu: s.player.equippedGu.filter(id => id !== inst.instanceId) } };
+          s = pushToast(s, { icon: '☠', title: 'GU DESTROYED', lines: [`${gu.name} could not withstand the refinement.`, 'It is gone from your collection.'] });
+          s = { ...s, log: [...s.log, `CRITICAL FAILURE — ${gu.name} is destroyed in the refinement furnace!`] };
+        } else {
+          s = { ...s, ownedGu: s.ownedGu.map(g => g.instanceId === inst.instanceId ? { ...g, injuredUntilDay: day + cfg.injuryDays, injurySeverity: 'minor', refineBlockedUntilDay: day + cfg.injuryDays } : g) };
+          s = pushToast(s, { icon: '🩹', title: 'GU INJURED', lines: [`${gu.name} — power ${cfg.injuryEffPct}%`, 'Cannot refine again until it recovers.'] });
+          s = { ...s, log: [...s.log, `Refinement fails violently — ${gu.name} is injured (power ${cfg.injuryEffPct}% for ${cfg.injuryDays} day(s)).`] };
+        }
+      }
+      return advanceTime(s, BALANCE.time.refineMinutes);
+    }
 
     case 'APPLY_EFFECTS': {
       if (state.recovery) return state;

@@ -2,6 +2,7 @@
 // The player walks seamlessly between zones; only the town's teleportation
 // formation hints at distant regional travel (reserved for future regions).
 import { ENEMY_BY_ID } from './enemies';
+import { WILD_GU_SPAWNS } from './wildGu';
 
 export const W = 84;
 export const H = 57;
@@ -265,6 +266,7 @@ function buildTiles() {
   };
   RESOURCES.forEach(r => protect(r.x, r.y));
   INITIAL_ENEMIES.forEach(e => protect(e.x, e.y));
+  WILD_GU_SPAWNS.forEach(w => protect(w.x, w.y));
   // never scatter trees over hidden masters' spots
   Object.values(NPC_POSITIONS).forEach(([x, y]) => protect(x, y));
   const rng = mulberry32(20260910);

@@ -7,6 +7,7 @@ import { grantMastery, bonusOf } from './mastery';
 import { BALANCE, DIFFICULTIES } from '../config/balance';
 import { applyDeath } from './death';
 import { weatherOf, weatherModOf, weatherEffectLine } from './weather';
+import { guCondition } from './guLife';
 
 export function initCombat(enemyId, player, opts = {}) {
   const def = opts.def || ENEMY_BY_ID[enemyId];
@@ -39,7 +40,9 @@ export function activationChanceOf(gu, inst, state, combat) {
   const cfg = BALANCE.combat.killerActivation;
   const level = state?.mastery?.[gu.path]?.level || 1;
   const uses = inst && combat ? (combat.masteryUses?.[inst.instanceId] || 0) : 0;
-  return Math.max(cfg.min, Math.min(cfg.max, cfg.base + (level - 1) * cfg.perMasteryLevel - uses * cfg.repeatPenalty));
+  // hunger, injury and the Vital-Gu bond all sway Killer-Move stability
+  const cond = inst && state ? guCondition(state, inst) : null;
+  return Math.max(cfg.min, Math.min(cfg.max, cfg.base + (level - 1) * cfg.perMasteryLevel - uses * cfg.repeatPenalty + (cond?.stability || 0)));
 }
 
 const effValue = (statuses, type) => statuses.filter(s => s.type === type).reduce((a, s) => a + (s.power || 0), 0);
@@ -51,10 +54,16 @@ function elementBuffMul(playerStatuses, element) {
   return m;
 }
 
-// Essence cost after the Gu's path mastery discounts.
-export function effectiveCost(gu, state) {
+// Essence cost after path-mastery discounts; hunger makes a Gu hungrier
+// for essence (costs live in BALANCE.hunger.penalties).
+export function effectiveCost(gu, state, inst = null) {
   const fx = bonusOf(state, gu.path);
-  return Math.max(0, Math.ceil(gu.energyCost * (1 - (fx.costPct || 0) / 100)));
+  let cost = Math.max(0, Math.ceil(gu.energyCost * (1 - (fx.costPct || 0) / 100)));
+  if (inst) {
+    const cond = guCondition(state, inst);
+    cost = Math.ceil(cost * (1 + cond.costPct / 100));
+  }
+  return cost;
 }
 
 function activeSynergies(state) {
@@ -65,13 +74,16 @@ function activeSynergies(state) {
   return new Set(SYNERGIES.filter(sy => sy.paths.every(p => equipped.has(p))).map(sy => sy.id));
 }
 
-function applyGu(gu, player, enemy, pSt, eSt, combat, push, fx, syn, weather) {
+// mul: the Gu's living condition — hunger, injury, Vital-Gu bond and refined
+// rank all scale its effect powers. It multiplies only the Gu's contribution,
+// never the player's own strength.
+function applyGu(gu, player, enemy, pSt, eSt, combat, push, fx, syn, weather, mul = 1) {
   const e = gu.effect;
   let meaningful = false;
   if (e.attack) {
     const hits = e.attack.hits || 1;
     for (let h = 0; h < hits; h++) {
-      let dmg = e.attack.power + Math.floor(player.strength * 0.5);
+      let dmg = Math.floor(e.attack.power * mul) + Math.floor(player.strength * 0.5);
       dmg = Math.floor(dmg * elementBuffMul(pSt, gu.element));
       // elite bosses shrug off their resisted Paths — plan around it
       if (enemy.resists?.includes(gu.path)) {
@@ -97,30 +109,30 @@ function applyGu(gu, player, enemy, pSt, eSt, combat, push, fx, syn, weather) {
     }
   }
   if (e.burn) {
-    eSt.push({ type: 'burn', power: e.burn.power, duration: e.burn.duration + (fx.burnTurns || 0) });
+    eSt.push({ type: 'burn', power: Math.max(1, Math.round(e.burn.power * mul)), duration: e.burn.duration + (fx.burnTurns || 0) });
     push(`${enemy.name} is set ablaze!`);
     meaningful = true;
   }
   if (e.summon) {
-    const p = Math.floor(e.summon.power * (1 + (fx.summonPct || 0) / 100) * (syn.has('tamedTides') ? 1.15 : 1));
+    const p = Math.max(1, Math.floor(e.summon.power * mul * (1 + (fx.summonPct || 0) / 100) * (syn.has('tamedTides') ? 1.15 : 1)));
     eSt.push({ type: 'summon', power: p, duration: (e.summon.duration || 3) + (fx.summonTurns || 0) });
     push(`Your enslaved beast answers the pact — it will strike for ${p} each turn.`);
     meaningful = true;
   }
-  if (e.defense) { pSt.push({ type: 'defense', power: Math.floor(e.defense.power * (1 + (fx.defensePct || 0) / 100)), duration: e.defense.duration }); push(`${gu.name} hardens your defense.`); }
-  if (e.evasion) { pSt.push({ type: 'evasion', power: Math.floor(e.evasion.power * (1 + (fx.evasionPct || 0) / 100)), duration: e.evasion.duration }); push(`${gu.name} blurs your form.`); }
+  if (e.defense) { pSt.push({ type: 'defense', power: Math.max(1, Math.floor(e.defense.power * mul * (1 + (fx.defensePct || 0) / 100))), duration: e.defense.duration }); push(`${gu.name} hardens your defense.`); }
+  if (e.evasion) { pSt.push({ type: 'evasion', power: Math.max(1, Math.floor(e.evasion.power * mul * (1 + (fx.evasionPct || 0) / 100))), duration: e.evasion.duration }); push(`${gu.name} blurs your form.`); }
   if (e.barrier) {
-    const power = Math.floor(e.barrier.power * (1 + (fx.barrierPct || 0) / 100) * (syn.has('mountainSpring') ? 1.15 : 1));
+    const power = Math.max(1, Math.floor(e.barrier.power * mul * (1 + (fx.barrierPct || 0) / 100) * (syn.has('mountainSpring') ? 1.15 : 1)));
     pSt.push({ type: 'barrier', power, duration: e.barrier.duration });
     push(`${gu.name} raises a barrier of ${power} strength.`);
   }
-  if (e.heal) { const h = Math.floor(e.heal.power * (1 + (fx.healPct || 0) / 100)); player.hp = Math.min(player.maxHp, player.hp + h); push(`${gu.name} restores ${h} HP.`); }
-  if (e.essence) { const r = e.essence.power; player.primevalEssence = Math.min(player.maxPrimevalEssence, player.primevalEssence + r); push(`${gu.name} restores ${r} essence.`); }
+  if (e.heal) { const h = Math.max(1, Math.floor(e.heal.power * mul * (1 + (fx.healPct || 0) / 100))); player.hp = Math.min(player.maxHp, player.hp + h); push(`${gu.name} restores ${h} HP.`); }
+  if (e.essence) { const r = Math.max(1, Math.round(e.essence.power * mul)); player.primevalEssence = Math.min(player.maxPrimevalEssence, player.primevalEssence + r); push(`${gu.name} restores ${r} essence.`); }
   if (e.control) {
     if (enemy.immune?.includes('control')) push(`${enemy.name} breaks the binding — its mind is not its own to seize.`);
-    else { eSt.push({ type: 'control', power: Math.floor(e.control.power * (1 + (fx.controlPct || 0) / 100)), duration: e.control.duration }); push(`${gu.name} binds ${enemy.name}, weakening its strikes.`); meaningful = true; }
+    else { eSt.push({ type: 'control', power: Math.max(1, Math.floor(e.control.power * mul * (1 + (fx.controlPct || 0) / 100))), duration: e.control.duration }); push(`${gu.name} binds ${enemy.name}, weakening its strikes.`); meaningful = true; }
   }
-  if (e.buff) { pSt.push({ type: 'buff', element: e.buff.element, power: e.buff.power, duration: e.buff.duration }); push(`${gu.name} empowers your ${e.buff.element} Gu.`); }
+  if (e.buff) { pSt.push({ type: 'buff', element: e.buff.element, power: Math.round(e.buff.power * mul), duration: e.buff.duration }); push(`${gu.name} empowers your ${e.buff.element} Gu.`); }
   if (e.investigate) { combat.revealed = true; push(`${gu.name} reveals the enemy's intent.`); }
   return meaningful;
 }
@@ -267,7 +279,8 @@ export function executeRound(state, action) {
     const inst = state.ownedGu.find(g => g.instanceId === action.guInstanceId);
     if (!inst) return state;
     const gu = GU_BY_ID[inst.guId];
-    const cost = effectiveCost(gu, state);
+    const cond = guCondition(state, inst);
+    const cost = effectiveCost(gu, state, inst);
     if (player.primevalEssence < cost) { push('Not enough primeval essence!'); return { ...state, combat: { ...combat, log } }; }
     if ((cooldowns[inst.instanceId] || 0) > 0) { push(`${gu.name} is on cooldown.`); return { ...state, combat: { ...combat, log } }; }
     player.primevalEssence -= cost;
@@ -281,7 +294,7 @@ export function executeRound(state, action) {
       }
     }
     const fx = bonusOf(state, gu.path);
-    const meaningful = applyGu(gu, player, enemy, pSt, eSt, combat, push, fx, syn, weather);
+    const meaningful = applyGu(gu, player, enemy, pSt, eSt, combat, push, fx, syn, weather, cond.effMul);
     if (meaningful) {
       combat.contributed[gu.path] = true;
       const uses = (combat.masteryUses[inst.instanceId] || 0) + 1;

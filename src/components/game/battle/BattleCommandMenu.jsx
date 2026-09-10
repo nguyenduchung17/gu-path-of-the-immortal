@@ -29,7 +29,7 @@ function GuOption({ inst, state, combat, killer, onClick }) {
   const gu = GU_BY_ID[inst.guId];
   const path = PATH_BY_ID[gu.path];
   const cd = combat.cooldowns[inst.instanceId] || 0;
-  const cost = effectiveCost(gu, state);
+  const cost = effectiveCost(gu, state, inst);
   const chance = activationChanceOf(gu, inst, state, combat);
   const noEssence = state.player.primevalEssence < cost;
   const disabled = cd > 0 || noEssence;
