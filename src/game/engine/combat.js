@@ -28,7 +28,6 @@
 // PERSISTENCE: a fleeing (or interrupted) battle never resets a foe — see
 // persistCombatEnemyState; HP only returns via natural regen or respawn.
 import { GU_BY_ID, isKillerMove } from '../data/gu';
-import { kmMissing, kmName, kmPseudoGu } from './killerMoves';
 import { ENEMY_BY_ID } from '../data/enemies';
 import { ITEM_BY_ID } from '../data/items';
 import { PATH_BY_ID, SYNERGIES } from '../data/paths';
@@ -1093,52 +1092,6 @@ function executeRoundInner(state, action, hpBefore) {
         if (xp > 0) {
           push(T('cmt.masteryGain', { icon: PATH_BY_ID[gu.path].icon, path: locPathName(PATH_BY_ID[gu.path]), xp }));
           pending.push({ pathId: gu.path, xp });
-        }
-      }
-    }
-  } else if (action.type === 'km') {
-    // a FORGED Killer Move (#17): only known, equipped, complete moves fire
-    const kmRec = (state.killerMoves?.known || []).find(k => k.id === action.killerMoveId);
-    if (!kmRec || !(state.killerMoves?.equipped || []).includes(kmRec.id)) return state;
-    const miss = kmMissing(state, kmRec);
-    if (miss.length) { push(T('cmt.kmIncomplete', { move: kmName(kmRec), miss: miss.join(', ') })); return { ...state, combat: { ...combat, log } }; }
-    if (player.primevalEssence < kmRec.essence) { push(T('cmt.noEssence')); return { ...state, combat: { ...combat, log } }; }
-    if ((cooldowns[kmRec.id] || 0) > 0) { push(T('cmt.cd', { gu: kmName(kmRec) })); return { ...state, combat: { ...combat, log } }; }
-    player.primevalEssence -= kmRec.essence;
-    cooldowns[kmRec.id] = kmRec.cooldown;
-    actAdvancePct = kmRec.synth.advance?.pct || 0;
-    if (actAdvancePct) push(T('cmt.advance', { p: actAdvancePct }));
-    // activation roll — Focus steadies the fusion
-    const focus = pSt.filter(s => s.type === 'focus').reduce((a, s) => a + (s.power || 0), 0);
-    let activated = true;
-    if (Math.random() * 100 > Math.max(10, Math.min(95, kmRec.activation + focus))) {
-      activated = false;
-      push(T('cmt.killerFail', { gu: kmName(kmRec) }));
-    }
-    if (activated) {
-      const pseudo = kmPseudoGu(kmRec);
-      const fx = bonusOf(state, pseudo.path);
-      const coreInst = state.ownedGu.find(g => g.instanceId === kmRec.coreInstanceId);
-      const prof = coreInst ? proficiencyOf(coreInst) : { powerPct: 0 };
-      const tlist = resolveTargets(combat, pseudo, target.uid);
-      let meaningful = false;
-      tlist.forEach((t, i) => {
-        const foe = enemies.find(e => e.uid === t.e.uid);
-        if (!foe || foe.hp <= 0) return;
-        const m = applyGu(pseudo, player, foe, pSt, foe.statuses, combat, push, fx, syn, weather,
-          (1 + prof.powerPct / 100) * t.mul, { selfFx: i === 0, procMul: t.sec ? 0.6 : 1 });
-        if (m) meaningful = true;
-      });
-      if (meaningful) {
-        combat.contributed[pseudo.path] = true;
-        guUsedName = pseudo.name;
-        const uses = (combat.masteryUses[kmRec.id] || 0) + 1;
-        combat.masteryUses[kmRec.id] = uses;
-        const decay = BALANCE.mastery.repeatDecay[Math.min(uses - 1, BALANCE.mastery.repeatDecay.length - 1)];
-        const xp = Math.round(BALANCE.mastery.xpCombatUse * decay);
-        if (xp > 0) {
-          push(T('cmt.masteryGain', { icon: PATH_BY_ID[pseudo.path].icon, path: locPathName(PATH_BY_ID[pseudo.path]), xp }));
-          pending.push({ pathId: pseudo.path, xp });
         }
       }
     }

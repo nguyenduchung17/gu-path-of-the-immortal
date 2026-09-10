@@ -39,6 +39,7 @@ import { TUTORIAL_STEPS, TUTORIAL_SUPPLIES, TUTORIAL_STONES } from '../data/tuto
 import { tutorialObserve } from '../engine/tutorial';
 import { kmAction } from '../engine/killerMoves';
 import { createNewGame, globalStage } from './createGame';
+export { globalStage } from './createGame';
 
 // createNewGame and globalStage live in ./createGame — imported below.
 
