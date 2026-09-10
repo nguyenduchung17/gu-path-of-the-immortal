@@ -191,6 +191,15 @@ export const BALANCE = {
     hazardDmg: 3,                    // HP per unprotected step through miasma
     hazardSlowMinutes: { miasma: 2, unstable: 3 }, // extra game minutes per unprotected step
   },
+  // Gu proficiency — the bond with one specific Gu instance deepens with
+  // meaningful use: combat power and exploration duration improve together.
+  // Independent of Dao-path mastery (which tracks the path, not the companion).
+  proficiency: {
+    usesPerLevel: 10,       // meaningful uses per proficiency level
+    maxLevel: 5,
+    powerPerLevel: 5,       // +5% combat effect power per level above 1
+    durationPerLevel: 10,   // +10% exploration-effect duration per level above 1
+  },
   // The accelerated game clock. Baseline: 1 real second = 1 in-game minute.
   time: {
     tickMs: 1000,             // real-time heartbeat of the clock

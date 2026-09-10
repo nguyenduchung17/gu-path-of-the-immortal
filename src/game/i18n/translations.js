@@ -114,6 +114,17 @@ export const DICT = {
     'creation.needAptitude': 'Accept your aptitude result to continue',
     'creation.needStarter': 'Choose your starter Gu to begin',
 
+    // ---- Gu proficiency & mini-map ----
+    'prof.title': 'Proficiency',
+    'prof.max': 'MAX',
+    'prof.combat': '+{p}% effect power',
+    'prof.wild': '+{d}% wilds duration',
+    'minimap.title': 'Region',
+    'minimap.you': 'You',
+    'minimap.resource': 'Resources',
+    'minimap.hazard': 'Hazards',
+    'minimap.secret': 'Secret Paths',
+
     // ---- aptitude ----
     'apt.title': 'CULTIVATION APTITUDE',
     'apt.desc': 'Your aptitude shapes how much essence your aperture can hold, how fast it recovers, and how efficiently you cultivate.',
@@ -426,6 +437,17 @@ export const DICT = {
     'creation.stepOf': 'Bước {n} / 4',
     'creation.needAptitude': 'Hãy chấp nhận kết quả tư chất để tiếp tục',
     'creation.needStarter': 'Hãy chọn Cổ Trùng đầu tiên để bắt đầu',
+
+    // ---- Thuần thục Cổ Trùng & bản đồ nhỏ ----
+    'prof.title': 'Thuần thục',
+    'prof.max': 'TỐI ĐA',
+    'prof.combat': '+{p}% sức mạnh hiệu ứng',
+    'prof.wild': '+{d}% thời gian dã ngoại',
+    'minimap.title': 'Khu vực',
+    'minimap.you': 'Bạn',
+    'minimap.resource': 'Tài nguyên',
+    'minimap.hazard': 'Hiểm họa',
+    'minimap.secret': 'Đường bí mật',
 
     // ---- aptitude ----
     'apt.title': 'TƯ CHẤT TU LUYỆN',

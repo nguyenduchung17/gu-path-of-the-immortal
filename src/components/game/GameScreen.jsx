@@ -35,6 +35,7 @@ import QuestTracker from './hud/QuestTracker';
 import ExploreBar from './hud/ExploreBar';
 import ScoutReport from './hud/ScoutReport';
 import HazardBadge from './hud/HazardBadge';
+import MiniMap from './hud/MiniMap';
 import DashboardScreen from './DashboardScreen';
 
 const PANEL_META = {
@@ -116,6 +117,7 @@ export default function GameScreen() {
       {!inputLocked && <ExploreBar />}
       <ScoutReport />
       <HazardBadge />
+      <MiniMap />
       <Hotbar active={panel} onSelect={(id) => (id === 'dashboard' ? setDashOpen(true) : setPanel(id))} onPause={() => setPaused(true)} />
 
       {/* in-game panel overlays (world stays visible underneath) */}

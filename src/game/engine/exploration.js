@@ -9,6 +9,7 @@ import { BALANCE } from '../config/balance';
 import { totalGameMin } from './vitalGu';
 import { advanceTime } from './time';
 import { grantMastery } from './mastery';
+import { proficiencyOf, recordUse } from './proficiency';
 import { revealFog } from './guLife';
 import { WORLD_RESOURCES, WORLD, HIDDEN_PATHS, HAZARDS, hazardAt, LANDMARKS } from '../data/world';
 
@@ -165,18 +166,24 @@ export function applyExploreGu(state, inst) {
   if (cdLeft > 0) return { state, ok: false, reason: `${gu.name} is recovering — ${Math.ceil(cdLeft)} min.` };
   if (p.primevalEssence < ex.essence) return { state, ok: false, reason: 'Not enough essence.' };
 
-  const spend = (s, fxPatch, toast) => ({
-    state: {
-      ...s,
-      player: { ...s.player, primevalEssence: s.player.primevalEssence - ex.essence },
-      exploreFx: { ...(s.exploreFx || {}), ...fxPatch },
-      exploreCd: { ...(s.exploreCd || {}), [inst.instanceId]: now + ex.cooldown },
-    },
-    ok: true,
-    toast,
-  });
+  // a practiced companion works the wilds longer — proficiency extends the effect
+  const prof = proficiencyOf(inst);
+  const dur = Math.max(1, Math.round(ex.duration * (1 + prof.durationPct / 100)));
+  const until = now + dur;
 
-  const until = now + ex.duration;
+  const spend = (s, fxPatch, toast) => {
+    const rec = recordUse(s, inst.instanceId);
+    return {
+      state: {
+        ...rec.state,
+        player: { ...rec.state.player, primevalEssence: rec.state.player.primevalEssence - ex.essence },
+        exploreFx: { ...(rec.state.exploreFx || {}), ...fxPatch },
+        exploreCd: { ...(rec.state.exploreCd || {}), [inst.instanceId]: now + ex.cooldown },
+      },
+      ok: true,
+      toast: rec.leveledTo ? { ...toast, lines: [...toast.lines, `${gu.name} reaches Proficiency Lv.${rec.leveledTo}!`] } : toast,
+    };
+  };
 
   // ---- control: root / slow the nearest enemy in range (partial resist on elites/bosses) ----
   if (ex.kind === 'root' || ex.kind === 'slow') {
@@ -190,14 +197,14 @@ export function applyExploreGu(state, inst) {
       let s = grantMastery(state, gu.path, BALANCE.exploration.masteryXp, 'guUsed', 'guUse');
       return spend(s, { waterwalk: { until } }, {
         icon: '⛓️', title: 'WATERS BOUND',
-        lines: [`${gu.name} grips the torrent — the rapids calm for ${ex.duration} min.`, 'Cross while the binding holds!'],
+        lines: [`${gu.name} grips the torrent — the rapids calm for ${dur} min.`, 'Cross while the binding holds!'],
       });
     }
     const def = ENEMY_BY_ID[e.defId];
-    const dur = Math.max(1, Math.round(ex.duration * resistFactor(def)));
+    const effDur = Math.max(1, Math.round(dur * resistFactor(def)));
     const enemies = (state.worldState.enemies || []).map(x => x.id !== e.id ? x : {
       ...x,
-      fx: { ...(x.fx || {}), [ex.kind]: { power: ex.power || 0, until: now + dur, pulse: false } },
+      fx: { ...(x.fx || {}), [ex.kind]: { power: ex.power || 0, until: now + effDur, pulse: false } },
     });
     let s = { ...state, worldState: { ...state.worldState, enemies } };
     s = grantMastery(s, gu.path, BALANCE.exploration.masteryXp, 'guUsed', 'guUse');
@@ -205,8 +212,8 @@ export function applyExploreGu(state, inst) {
       icon: ex.kind === 'root' ? '⛓️' : '🕸️',
       title: resistFactor(def) < 1 ? 'PARTIALLY RESISTED' : (ex.kind === 'root' ? 'ENEMY ROOTED' : 'ENEMY SLOWED'),
       lines: [ex.kind === 'root'
-        ? `${gu.name} lashes out — ${def.name} cannot move for ${dur} min.`
-        : `${gu.name} coils about ${def.name} — it moves at half pace for ${dur} min.`],
+        ? `${gu.name} lashes out — ${def.name} cannot move for ${effDur} min.`
+        : `${gu.name} coils about ${def.name} — it moves at half pace for ${effDur} min.`],
     });
   }
 
@@ -261,7 +268,7 @@ export function applyExploreGu(state, inst) {
     if (foes.length) s = grantMastery(s, gu.path, BALANCE.exploration.masteryXp, 'guUsed', 'guUse');
     return spend(s, { stealth: { until, power } }, {
       icon: '🌫️', title: 'VEILED',
-      lines: [`Enemy detection −${power}% for ${ex.duration} min.`, ...(foes.length ? ['You slip past unaware eyes.'] : [])],
+      lines: [`Enemy detection −${power}% for ${dur} min.`, ...(foes.length ? ['You slip past unaware eyes.'] : [])],
     });
   }
 
@@ -272,7 +279,7 @@ export function applyExploreGu(state, inst) {
     if (pursued) s = grantMastery(s, gu.path, BALANCE.exploration.masteryXp, 'guUsed', 'guUse');
     return spend(s, { haste: { until } }, {
       icon: '💨', title: 'WIND STEP',
-      lines: [`Your stride outpaces the wilds for ${ex.duration} min.`, ...(pursued ? ['You pull ahead of the pursuit!'] : [])],
+      lines: [`Your stride outpaces the wilds for ${dur} min.`, ...(pursued ? ['You pull ahead of the pursuit!'] : [])],
     });
   }
 
@@ -283,7 +290,7 @@ export function applyExploreGu(state, inst) {
     if (near) s = grantMastery(s, gu.path, BALANCE.exploration.masteryXp, 'guUsed', 'guUse');
     return spend(s, { steady: { until } }, {
       icon: '⛰️', title: 'SURE-FOOTED',
-      lines: [`${gu.name} anchors your steps for ${ex.duration} min.`, ...(near ? ['The shifting ground cannot slow you.'] : [])],
+      lines: [`${gu.name} anchors your steps for ${dur} min.`, ...(near ? ['The shifting ground cannot slow you.'] : [])],
     });
   }
 

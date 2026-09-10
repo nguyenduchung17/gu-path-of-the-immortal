@@ -23,6 +23,7 @@ import { BALANCE, DIFFICULTIES } from '../config/balance';
 import { applyDeath } from './death';
 import { weatherOf, weatherModOf, weatherEffectLine } from './weather';
 import { guCondition } from './guLife';
+import { proficiencyOf, recordUse } from './proficiency';
 import { SPECIES_BY_ID } from '../data/wildGu';
 
 const G = () => BALANCE.combat.gauge;
@@ -522,6 +523,7 @@ export function executeRound(state, action) {
   const windFx = bonusOf(state, 'wind');
   const earthFx = bonusOf(state, 'earth');
   const pending = [];
+  let guUsedName = null;   // a meaningfully-used Gu → proficiency practice
   const weather = weatherOf(state.time);
   if (!combat.weatherNoted) {
     combat.weatherNoted = true;
@@ -594,6 +596,7 @@ export function executeRound(state, action) {
     if (!inst) return state;
     const gu = GU_BY_ID[inst.guId];
     const cond = guCondition(state, inst);
+    const prof = proficiencyOf(inst); // a practiced Gu strikes harder
     const cost = effectiveCost(gu, state, inst);
     if (player.primevalEssence < cost) { push('Not enough primeval essence!'); return { ...state, combat: { ...combat, log } }; }
     if ((cooldowns[inst.instanceId] || 0) > 0) { push(`${gu.name} is on cooldown.`); return { ...state, combat: { ...combat, log } }; }
@@ -613,9 +616,10 @@ export function executeRound(state, action) {
     }
     if (activated) {
       const fx = bonusOf(state, gu.path);
-      const meaningful = applyGu(gu, player, enemy, pSt, eSt, combat, push, fx, syn, weather, cond.effMul);
+      const meaningful = applyGu(gu, player, enemy, pSt, eSt, combat, push, fx, syn, weather, cond.effMul * (1 + prof.powerPct / 100));
       if (meaningful) {
         combat.contributed[gu.path] = true;
+        guUsedName = gu.name;
         const uses = (combat.masteryUses[inst.instanceId] || 0) + 1;
         combat.masteryUses[inst.instanceId] = uses;
         const decay = BALANCE.mastery.repeatDecay[Math.min(uses - 1, BALANCE.mastery.repeatDecay.length - 1)];
@@ -626,6 +630,13 @@ export function executeRound(state, action) {
         }
       }
     }
+  }
+
+  // a meaningful use deepens the cultivator's bond with this specific Gu
+  if (guUsedName) {
+    const res = recordUse(state, action.guInstanceId);
+    state = res.state;
+    if (res.leveledTo) push(`${guUsedName} grows practiced — Proficiency Lv.${res.leveledTo}! (effect power +${(res.leveledTo - 1) * BALANCE.proficiency.powerPerLevel}%)`);
   }
 
   // cooldowns tick per OWNER action — the player's own actions

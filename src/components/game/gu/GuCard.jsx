@@ -7,6 +7,7 @@ import { ROLES, rolesOf } from '@/game/data/roles';
 import { ITEM_BY_ID } from '@/game/data/items';
 import { BALANCE } from '@/game/config/balance';
 import { effectiveCost } from '@/game/engine/combat';
+import { proficiencyOf } from '@/game/engine/proficiency';
 import { HUNGER_META, foodOf, foodCount, feedingEstimate, guCondition } from '@/game/engine/guLife';
 import { effectSummary } from '../battle/BattleCommandMenu';
 import { sfx } from '@/game/audio/sfx';
@@ -26,6 +27,7 @@ export default function GuCard({ inst, equipped, onEquip, onUnequip, onRefine })
   const pellets = state.inventory.guGear?.restorationPellet || 0;
   const rank = inst.rank || gu.rank;
   const est = feedingEstimate(state, inst);
+  const prof = proficiencyOf(inst);
   const [armVital, setArmVital] = useState(false);
 
   const setVital = () => {
@@ -93,6 +95,22 @@ export default function GuCard({ inst, equipped, onEquip, onUnequip, onRefine })
               <div className={`h-full rounded-full transition-all duration-700 ${meta.bar}`} style={{ width: `${satPct}%` }} />
             </div>
           </>
+        )}
+      </div>
+
+      {/* proficiency — practice with this companion sharpens it */}
+      <div className="mt-2">
+        <div className="flex justify-between items-center text-[10px] mb-0.5">
+          <span className="text-sky-300/90">✎ {t('prof.title')} <span className="text-sky-200 font-semibold">Lv.{prof.level}</span></span>
+          <span className="text-stone-500">{prof.maxed ? t('prof.max') : `${prof.uses}/${prof.nextAt}`}</span>
+        </div>
+        <div className="h-1.5 rounded-full bg-black/50 overflow-hidden">
+          <div className="h-full rounded-full bg-gradient-to-r from-sky-700 to-cyan-300 transition-all duration-700" style={{ width: `${prof.pct}%` }} />
+        </div>
+        {prof.level > 1 && (
+          <div className="text-[9px] text-sky-300/70 mt-0.5">
+            ✦ {t('prof.combat', { p: prof.powerPct })}{gu.explore ? ` · ${t('prof.wild', { d: prof.durationPct })}` : ''}
+          </div>
         )}
       </div>
 
