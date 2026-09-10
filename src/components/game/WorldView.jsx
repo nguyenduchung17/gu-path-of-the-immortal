@@ -28,7 +28,9 @@ export default function WorldView({ paused, inputLocked }) {
   const camRef = useRef(null);
   const animRef = useRef({ toX: null, toY: null, fromX: null, fromY: null, t0: 0 });
   const keysRef = useRef(new Set());
-  const lastMoveRef = useRef(0);
+  // delta-time movement accumulator: a step fires once enough time has
+  // accumulated for the current step's LENGTH (see the movement loop below)
+  const stepRef = useRef({ prev: null, acc: 0 });
 
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -117,8 +119,8 @@ export default function WorldView({ paused, inputLocked }) {
         e.preventDefault();
         keysRef.current.add(k);
         // a fresh press moves on the very next frame — a quick tap shorter
-        // than the 170ms hold-gate must not be swallowed silently
-        if (!e.repeat) lastMoveRef.current = 0;
+        // than the hold-gate must not be swallowed silently
+        if (!e.repeat) stepRef.current.acc = Infinity;
       }
       else if ((k === 'e' || k === ' ' || k === 'enter') && !e.repeat) { e.preventDefault(); interactRef.current(); }
     };
@@ -147,17 +149,32 @@ export default function WorldView({ paused, inputLocked }) {
       if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
       const tile = w < 640 ? 24 : w < 1024 ? 30 : 36;
 
-      // held-key movement
+      // held-key movement — normalized input over delta time:
+      // a diagonal step covers √2 tiles, so it must wait √2 × STEP_MS; total
+      // travel speed is identical in all 8 directions (~1 tile / STEP_MS).
+      const STEP_MS = 170;
       const locked = propsRef.current.inputLocked || propsRef.current.paused
         || s.combat || s.pendingEvent || s.dialogue || s.recovery || s.sleeping || s.deceased || s.wildEncounter;
+      const step = stepRef.current;
+      if (step.prev == null) step.prev = t;
+      const dtMs = Math.min(100, t - step.prev); // cap gaps (tab switches) so no burst of steps
+      step.prev = t;
       if (!locked) {
         const keys = keysRef.current;
-        const nowMs = performance.now();
-        if (nowMs - lastMoveRef.current > 170) {
-          const dx = (keys.has('d') || keys.has('arrowright') ? 1 : 0) - (keys.has('a') || keys.has('arrowleft') ? 1 : 0);
-          const dy = (keys.has('s') || keys.has('arrowdown') ? 1 : 0) - (keys.has('w') || keys.has('arrowup') ? 1 : 0);
-          if (dx || dy) { lastMoveRef.current = nowMs; dispatchRef.current({ type: 'MOVE', dx, dy }); }
+        const dx = (keys.has('d') || keys.has('arrowright') ? 1 : 0) - (keys.has('a') || keys.has('arrowleft') ? 1 : 0);
+        const dy = (keys.has('s') || keys.has('arrowdown') ? 1 : 0) - (keys.has('w') || keys.has('arrowup') ? 1 : 0);
+        if (dx || dy) {
+          step.acc += dtMs;
+          const interval = STEP_MS * (dx && dy ? Math.SQRT2 : 1);
+          if (step.acc >= interval) {
+            step.acc = 0;
+            dispatchRef.current({ type: 'MOVE', dx, dy });
+          }
+        } else {
+          step.acc = 0; // idle: no half-accumulated time carries into the next press
         }
+      } else {
+        step.acc = 0;
       }
 
       // animate the player between cells (no grid snapping)
@@ -175,7 +192,10 @@ export default function WorldView({ paused, inputLocked }) {
           footstep(inBounds ? WORLD.tiles[p2.y][p2.x] : '.');
         }
       }
-      const k = Math.min(1, (t - (anim.t0 || t)) / 150);
+      // tween time scales with step length — a diagonal eases over √2 × 150ms,
+      // so on-screen speed (and walk-animation feel) is equal in every direction
+      const stepLen = Math.hypot(anim.toX - (anim.fromX ?? anim.toX), anim.toY - (anim.fromY ?? anim.toY)) || 1;
+      const k = Math.min(1, (t - (anim.t0 || t)) / (150 * stepLen));
       const pX = anim.fromX + (anim.toX - anim.fromX) * k;
       const pY = anim.fromY + (anim.toY - anim.fromY) * k;
 
