@@ -6,7 +6,7 @@ import { ITEM_BY_ID } from '@/game/data/items';
 import { guCondition, HUNGER_META } from '@/game/engine/guLife';
 import { ROLES, rolesOf } from '@/game/data/roles';
 import { useT } from '@/game/i18n/LangContext';
-import LoadoutRoles from './inventory/LoadoutRoles';
+import LoadoutRoles from './LoadoutRoles';
 import { sfx } from '@/game/audio/sfx';
 
 const EQUIP_MAX = 6;
