@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useGame } from '@/game/state/GameContext';
 import { NPC_BY_ID } from '@/game/data/npcs';
 import { ENEMY_BY_ID } from '@/game/data/enemies';
+import { SPECIES_BY_ID, wildGuActive } from '@/game/data/wildGu';
 import { BALANCE } from '@/game/config/balance';
 import { WORLD, zoneAt, DEFAULT_ZONE, WORLD_NPCS, WORLD_RESOURCES, CAMP_CELLS, TERRACE, FORMATION } from '@/game/data/world';
 import { phaseOf } from '@/game/engine/time';
@@ -61,12 +62,15 @@ export default function WorldView({ paused, inputLocked }) {
   const interactable = (() => {
     const enemies = state.worldState.enemies || [];
     const npc = WORLD_NPCS.find(n => Math.abs(n.x - p.x) <= 1 && Math.abs(n.y - p.y) <= 1 && !(n.x === p.x && n.y === p.y));
+    const wgu = (state.worldState.wildGu || []).find(w => !w.gone && wildGuActive(w, state.time)
+      && Math.abs(w.x - p.x) <= 1 && Math.abs(w.y - p.y) <= 1 && !(w.x === p.x && w.y === p.y));
     const node = WORLD_RESOURCES.find(r => Math.abs(r.x - p.x) + Math.abs(r.y - p.y) <= 1 && now - (state.worldState.gathered[r.id] || 0) >= BALANCE.world.gatherRespawnMs);
     const camp = CAMP_CELLS.some(([cx, cy]) => Math.abs(cx - p.x) + Math.abs(cy - p.y) <= 1);
     const terrace = p.x === TERRACE[0] && p.y === TERRACE[1];
     const formation = Math.abs(FORMATION[0] - p.x) + Math.abs(FORMATION[1] - p.y) <= 1;
     const enemy = enemies.find(e => !e.dead && Math.abs(e.x - p.x) + Math.abs(e.y - p.y) === 1);
     if (npc) return { type: 'npc', npc };
+    if (wgu) return { type: 'wildgu', wgu };
     if (node) return { type: 'resource', node };
     if (camp) return { type: 'camp' };
     if (terrace) return { type: 'cultivate' };
@@ -83,12 +87,15 @@ export default function WorldView({ paused, inputLocked }) {
     const t = now;
     const enemies = s.worldState.enemies || [];
     const npc = WORLD_NPCS.find(n => Math.abs(n.x - p2.x) <= 1 && Math.abs(n.y - p2.y) <= 1 && !(n.x === p2.x && n.y === p2.y));
+    const wgu = (s.worldState.wildGu || []).find(w => !w.gone && wildGuActive(w, s.time)
+      && Math.abs(w.x - p2.x) <= 1 && Math.abs(w.y - p2.y) <= 1 && !(w.x === p2.x && w.y === p2.y));
     const node = WORLD_RESOURCES.find(r => Math.abs(r.x - p2.x) + Math.abs(r.y - p2.y) <= 1 && t - (s.worldState.gathered[r.id] || 0) >= BALANCE.world.gatherRespawnMs);
     const camp = CAMP_CELLS.some(([cx, cy]) => Math.abs(cx - p2.x) + Math.abs(cy - p2.y) <= 1);
     const terrace = p2.x === TERRACE[0] && p2.y === TERRACE[1];
     const formation = Math.abs(FORMATION[0] - p2.x) + Math.abs(FORMATION[1] - p2.y) <= 1;
     const enemy = enemies.find(e => !e.dead && Math.abs(e.x - p2.x) + Math.abs(e.y - p2.y) === 1);
     if (npc) { sfx('open'); dispatchRef.current({ type: 'TALK_NPC', npcId: npc.id }); }
+    else if (wgu) { sfx('open'); dispatchRef.current({ type: 'ENCOUNTER_WILD_GU', worldId: wgu.id }); }
     else if (node) { sfx('ui'); dispatchRef.current({ type: 'INTERACT_RESOURCE', nodeId: node.id }); }
     else if (camp) { sfx('open'); dispatchRef.current({ type: 'REST_CAMP' }); }
     else if (terrace) dispatchRef.current({ type: 'CULTIVATE' });
@@ -136,7 +143,7 @@ export default function WorldView({ paused, inputLocked }) {
 
       // held-key movement
       const locked = propsRef.current.inputLocked || propsRef.current.paused
-        || s.combat || s.pendingEvent || s.dialogue || s.recovery || s.sleeping || s.deceased;
+        || s.combat || s.pendingEvent || s.dialogue || s.recovery || s.sleeping || s.deceased || s.wildEncounter;
       if (!locked) {
         const keys = keysRef.current;
         const nowMs = performance.now();
@@ -207,6 +214,7 @@ export default function WorldView({ paused, inputLocked }) {
             const name = n.master && !state.masters?.[n.id]?.found ? '???' : n.name;
             return <><b>[E]</b> Talk — {name}</>;
           })()}
+          {interactable.type === 'wildgu' && <><b>[E]</b> Wild Gu — {SPECIES_BY_ID[interactable.wgu.speciesId].name}</>}
           {interactable.type === 'resource' && <><b>[E]</b> Gather — {interactable.node.name}</>}
           {interactable.type === 'camp' && <><b>[E]</b> Rest at the campsite</>}
           {interactable.type === 'cultivate' && <><b>[E]</b> Cultivate at the terrace (×1.5)</>}

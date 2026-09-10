@@ -51,7 +51,6 @@ export default function WildGuEncounterModal() {
 
   if (!e || !wg) return null;
   const sp = SPECIES_BY_ID[wg.speciesId];
-  const gu = ITEM_BY_ID ? null : null; // placeholder removed
   const frac = CONDITION_FRAC(wg);
   const chance = captureChanceOf(state, wg, e, jarId);
   const jars = Object.keys(BALANCE.capture.jarBonus).map(id => ({ id, count: state.inventory.guGear?.[id] || 0 }));

@@ -147,3 +147,11 @@
 .animate-battle-quake { animation: battleQuake 0.45s ease-out; }
 @keyframes battleProjectileFar { 0% { transform: translateX(0); opacity: 1; } 100% { transform: translateX(34vw); opacity: 0.35; } }
 .animate-battle-projectile-far { animation: battleProjectileFar 0.5s ease-out forwards; }
+
+/* cultivation aperture (essence sphere) */
+@keyframes apertureRise { 0% { transform: translateY(0) scale(1); opacity: 0; } 15% { opacity: 1; } 100% { transform: translateY(-72px) scale(0.6); opacity: 0; } }
+.animate-aperture-rise { animation: apertureRise 1.4s ease-out forwards; }
+@keyframes apertureGlow { 0%, 100% { box-shadow: 0 0 16px rgba(250, 204, 21, 0.25); } 50% { box-shadow: 0 0 38px rgba(250, 204, 21, 0.6); } }
+.animate-aperture-glow { animation: apertureGlow 1.5s ease-in-out infinite; }
+@keyframes apertureBreathe { 0%, 100% { opacity: 0.93; } 50% { opacity: 1; } }
+.animate-aperture-breathe { animation: apertureBreathe 3.2s ease-in-out infinite; }

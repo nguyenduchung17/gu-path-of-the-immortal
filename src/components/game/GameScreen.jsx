@@ -18,6 +18,7 @@ import MapPanel from './MapPanel';
 import BestiaryPanel from './BestiaryPanel';
 import CombatView from './CombatView';
 import EventModal from './EventModal';
+import WildGuEncounterModal from './WildGuEncounterModal';
 import DialogueModal from './DialogueModal';
 import ShopPanel from './ShopPanel';
 import MissionBoard from './MissionBoard';
@@ -67,7 +68,7 @@ export default function GameScreen() {
   const escRef = useRef({});
   escRef.current = {
     panel, paused, shop, service, inn, recoveryOpen,
-    busy: !!(state.combat || state.pendingEvent || state.dialogue || state.sleeping || state.deceased || state.breakthrough),
+    busy: !!(state.combat || state.pendingEvent || state.dialogue || state.sleeping || state.deceased || state.breakthrough || state.wildEncounter),
   };
   useEffect(() => {
     const onKey = (e) => {
@@ -124,6 +125,7 @@ export default function GameScreen() {
       {/* dialogue / encounter overlays — layered over the world */}
       {state.combat && <CombatView />}
       {state.pendingEvent && <EventModal />}
+      {state.wildEncounter && <WildGuEncounterModal />}
       {state.dialogue && <DialogueModal onShop={setShop} onService={setService} onInn={setInn} />}
       {shop && <ShopPanel npcId={shop} onClose={() => setShop(null)} />}
       {service === 'missions' && <MissionBoard onClose={() => setService(null)} />}

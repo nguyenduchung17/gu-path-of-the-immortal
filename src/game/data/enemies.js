@@ -131,6 +131,12 @@ export const ENEMY_VISUALS = {
   mistDevourer:     { kind: 'devourer', rank: 'Rank 3 · Peak Stage', danger: 5, pace: 180 },
   ruinWarden:       { kind: 'warden', rank: 'Rank 3 · Peak Stage', danger: 5, pace: 320 },
   dreadMatriarch:   { kind: 'matriarch', rank: 'Rank 3 · Peak Stage', danger: 5, pace: 150 },
+  // wild Gu (world encounters — captured or hunted)
+  flameBeetle:  { kind: 'spider', rank: 'Rank 1 · Wild Gu', danger: 1, pace: 280 },
+  mistCarp:     { kind: 'snake',   rank: 'Rank 1 · Wild Gu', danger: 1, pace: 320 },
+  stoneScarab:  { kind: 'stone',   rank: 'Rank 1 · Wild Gu', danger: 1, pace: 380 },
+  galeSparrow:  { kind: 'bird',    rank: 'Rank 1 · Wild Gu', danger: 1, pace: 160 },
+  jadeCicada:   { kind: 'bird',    rank: 'Rank 2 · Wild Gu', danger: 2, pace: 260 },
   };
 
 export const DANGER_LABEL = { 1: 'Danger: Low', 2: 'Danger: Moderate', 3: 'Danger: High', 4: 'Danger: Severe', 5: 'Danger: Deadly' };

@@ -10,6 +10,8 @@ import { darknessOf, warmthOf } from '../engine/time';
 import { buildTiles, buildTrees } from './tiles';
 import { makeResourceIcon } from './sprites';
 import { getBeastSheet } from './beastSprites';
+import { getWildGuSheet } from './wildGuSprites';
+import { SPECIES_BY_ID, wildGuActive } from '../data/wildGu';
 import { getCharacterSheet, npcAppearance } from './characterSprites';
 import { appearanceOf } from '../data/appearance';
 import { hash2, makeCanvas, rect, px } from './pixel';
@@ -283,6 +285,11 @@ export function drawWorld(display, state, view) {
     if (e.dead || e.x < x0 - 1 || e.x > x0 + cols || e.y < y0 - 1 || e.y > y0 + rows) continue;
     ents.push({ y: e.y, kind: 'enemy', ref: e });
   }
+  for (const w of state.worldState.wildGu || []) {
+    if (w.gone || !wildGuActive(w, state.time)) continue;
+    if (w.x < x0 - 1 || w.x > x0 + cols || w.y < y0 - 1 || w.y > y0 + rows) continue;
+    ents.push({ y: w.y, kind: 'wildgu', ref: w });
+  }
   ents.push({ y: view.pY, kind: 'player' });
   ents.sort((a, b) => a.y - b.y);
 
@@ -319,6 +326,22 @@ export function drawWorld(display, state, view) {
       }
       if (state.dialogue?.npcId === n.id) { // talking
         g.fillStyle = '#f0c95a'; g.fillRect(sx + 6, sy - 16, 1, 2); g.fillRect(sx + 8, sy - 18, 1, 2); g.fillRect(sx + 10, sy - 15, 1, 1);
+      }
+    } else if (ent.kind === 'wildgu') {
+      // a wild Gu at its haunt — small animated creature in a faint Gu-aura
+      const w = ent.ref;
+      const sp = SPECIES_BY_ID[w.speciesId];
+      const sheet = getWildGuSheet(w.speciesId);
+      const sx = (w.x - x0) * 16, sy = (w.y - y0) * 16;
+      const f = Math.floor(t / sheet.pace) % 2;
+      const hover = sheet.move === 'hover' ? -2 + (f ? -1 : 0) : sheet.move === 'flutter' ? -4 + Math.round(Math.sin(t / 260) * 2) : 0;
+      const wig = (sp.sprite === 'beetle' || sp.sprite === 'scarab') ? (f ? 1 : -1) : 0;
+      shadow(sx + 8, sy + 13);
+      g.drawImage(sheet.frames[f], sx + wig, sy - 4 + hover);
+      glows.push({ x: sx + 8, y: sy + 6, r: 15, col: sp.glow, a: 0.32 + 0.16 * Math.sin(t / 420) });
+      if (w.hp < sp.hp) { // weakened by a fight: mini HP bar
+        g.fillStyle = '#000'; g.fillRect(sx + 3, sy - 6, 10, 2);
+        g.fillStyle = '#e04a3a'; g.fillRect(sx + 3, sy - 6, Math.max(1, Math.round(10 * Math.max(0, w.hp) / sp.hp)), 2);
       }
     } else {
       const e = ent.ref;

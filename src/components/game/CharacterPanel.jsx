@@ -2,10 +2,11 @@ import React from 'react';
 import { useGame } from '@/game/state/GameContext';
 import { useT } from '@/game/i18n/LangContext';
 import { CULTIVATION_STAGES, BREAKTHROUGH_REQS } from '@/game/data/cultivation';
-import { BALANCE } from '@/game/config/balance';
+import { BALANCE, recoveryRatePerSec } from '@/game/config/balance';
 import { breakthroughChecklist } from '@/game/state/gameReducer';
 import { TERRACE } from '@/game/data/world';
 import { tierOf, scoreOf, constitutionName } from '@/game/config/aptitude';
+import EssenceSphere from './EssenceSphere';
 
 function Stat({ label, value }) {
   return (
@@ -24,6 +25,9 @@ function ReqLine({ met, text }) {
   );
 }
 
+// The Cultivation menu. Essence lives in the aperture — a translucent spherical
+// vessel whose liquid level IS the player's essence; it rises and falls
+// smoothly, breathes during recovery and glows when a breakthrough is ready.
 export default function CharacterPanel({ onRecover }) {
   const { state, dispatch } = useGame();
   const { t, lang } = useT();
@@ -39,6 +43,8 @@ export default function CharacterPanel({ onRecover }) {
   const atSect = p.x === TERRACE[0] && p.y === TERRACE[1];
   const checklist = peak ? null : breakthroughChecklist(state);
   const ready = checklist?.ok;
+  const breakthroughReady = !peak && p.cultivationProgress >= 100;
+  const recoveryRate = (recoveryRatePerSec(p, state.recovery?.mode || 'normal') * 60).toFixed(1);
 
   return (
     <div className="pt-3 space-y-4 animate-fade-in">
@@ -47,7 +53,7 @@ export default function CharacterPanel({ onRecover }) {
         <div>
           <h2 className="text-xl font-semibold text-emerald-100">{p.name}</h2>
           <div className="text-xs text-stone-400">{t('ui.years', { n: p.age })} · {p.gender}</div>
-          <div className="text-sm text-emerald-200 font-medium mt-0.5">{stage.name}</div>
+          <div className="text-sm text-emerald-200 font-medium mt-0.5">RANK {p.rank + 1} · {stage.name.split('·').pop().trim().toUpperCase()}</div>
           <div className="text-[11px] text-amber-200/80">
             {t('ui.aptitude')}: {t(`apt.tier.${aptTier.id}`)} ({scoreOf(p.aptitude).toFixed(1)}/10)
           </div>
@@ -55,43 +61,68 @@ export default function CharacterPanel({ onRecover }) {
         </div>
       </div>
 
-      <div className="rounded-xl border border-stone-800 bg-black/20 p-4">
-        <h3 className="text-sm font-semibold text-stone-300 mb-2">{t('ui.cultivationProgress')}</h3>
-        <div className="flex justify-between text-xs text-stone-400 mb-1">
-          <span>{peak ? 'Peak of known cultivation' : `Toward ${req.target.name}`}</span>
-          <span>{Math.floor(p.cultivationProgress)}%</span>
-        </div>
-        <div className="h-3 rounded-full bg-black/40 overflow-hidden mb-2">
-          <div className="h-full bg-gradient-to-r from-emerald-500 to-emerald-300 transition-all duration-500" style={{ width: `${p.cultivationProgress}%` }} />
-        </div>
-        <div className="grid grid-cols-2 gap-2 mb-3">
-          <button onClick={() => dispatch({ type: 'CULTIVATE' })} disabled={state.recovery || state.combat}
-            className={`py-2.5 rounded-lg text-white text-sm font-medium transition ${(state.recovery || state.combat || p.primevalEssence < cost) ? 'bg-stone-800 text-stone-500 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-500'}`}>
-            🧘 {t('ui.cultivate')} ({cost} {t('ui.essence')}{atSect ? ' · sect ×1.5' : ''})
-          </button>
-          <button onClick={onRecover} disabled={state.combat}
-            className={`py-2.5 rounded-lg text-sm font-medium transition border border-sky-700/50 bg-sky-900/20 text-sky-200 hover:bg-sky-800/30 ${state.combat ? 'opacity-40 cursor-not-allowed' : ''}`}>
-            {state.recovery ? `💧 ${t('ui.viewRecovery')}` : `💧 ${t('ui.recoverEssence')}`}
-          </button>
+      <div className="grid md:grid-cols-[auto_1fr] gap-4 items-start">
+        {/* ---- the aperture: a living vessel of essence ---- */}
+        <div className="rounded-xl border border-sky-800/40 bg-gradient-to-b from-sky-900/15 to-transparent p-4 flex flex-col items-center gap-2 mx-auto">
+          <div className="text-[10px] uppercase tracking-[0.25em] text-sky-300/80">Cultivation Aperture</div>
+          <EssenceSphere
+            value={p.primevalEssence}
+            max={p.maxPrimevalEssence}
+            size={150}
+            glow={breakthroughReady}
+            breathing={!!state.recovery}
+          />
+          <div className="text-xs text-sky-100">{Math.floor(p.primevalEssence)} / {p.maxPrimevalEssence} {t('ui.essence')}</div>
+          <div className="text-[11px] text-stone-400">
+            {t('sp.recovery')}: <span className="text-sky-300">{t('sp.perMin', { n: recoveryRate })}</span>
+          </div>
+          <div className="text-[11px] text-stone-400">{t('ui.stones')}: <span className="text-amber-300">💎 {p.spiritStones}</span></div>
+          {p.vitalUnstableMin > 0 && (
+            <div className="text-[10px] text-rose-300/80 text-center">
+              {t('vit.unstable', { p: BALANCE.vital.switchPenaltyPct, d: Math.ceil(p.vitalUnstableMin / (24 * 60)) })}
+            </div>
+          )}
         </div>
 
-        {!peak && p.cultivationProgress >= 100 && (
-          <div className="rounded-lg border border-amber-800/40 bg-amber-900/10 p-3">
-            <div className="text-xs font-semibold text-amber-200 mb-1.5">
-              {req.major ? '⚡ Major Breakthrough available' : 'Breakthrough available'} — to {req.target.name}
-            </div>
-            <div className="space-y-0.5 mb-2">
-              {checklist.checks.map(c => <ReqLine key={c.key} met={c.met} text={c.text} />)}
-            </div>
-            <button onClick={() => dispatch({ type: 'BREAKTHROUGH' })} disabled={!ready}
-              className={`w-full py-2.5 rounded-lg text-sm font-semibold transition ${ready ? 'bg-amber-500 hover:bg-amber-400 text-black animate-pulse' : 'bg-stone-800 text-stone-500 cursor-not-allowed'}`}>
-              ✦ Break Through
+        {/* ---- progress + actions ---- */}
+        <div className="rounded-xl border border-stone-800 bg-black/20 p-4">
+          <h3 className="text-sm font-semibold text-stone-300 mb-2">{t('ui.cultivationProgress')}</h3>
+          <div className="flex justify-between text-xs text-stone-400 mb-1">
+            <span>{peak ? 'Peak of known cultivation' : `Toward ${req.target.name}`}</span>
+            <span>{Math.floor(p.cultivationProgress)}%</span>
+          </div>
+          <div className="h-3 rounded-full bg-black/40 overflow-hidden mb-2">
+            <div className="h-full bg-gradient-to-r from-emerald-500 to-emerald-300 transition-all duration-500" style={{ width: `${p.cultivationProgress}%` }} />
+          </div>
+          <div className="grid grid-cols-2 gap-2 mb-3">
+            <button onClick={() => dispatch({ type: 'CULTIVATE' })} disabled={state.recovery || state.combat}
+              className={`py-2.5 rounded-lg text-white text-sm font-medium transition ${(state.recovery || state.combat || p.primevalEssence < cost) ? 'bg-stone-800 text-stone-500 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-500'}`}>
+              🧘 {t('ui.cultivate')} ({cost} {t('ui.essence')}{atSect ? ' · sect ×1.5' : ''})
+            </button>
+            <button onClick={onRecover} disabled={state.combat}
+              className={`py-2.5 rounded-lg text-sm font-medium transition border border-sky-700/50 bg-sky-900/20 text-sky-200 hover:bg-sky-800/30 ${state.combat ? 'opacity-40 cursor-not-allowed' : ''}`}>
+              {state.recovery ? `💧 ${t('ui.viewRecovery')}` : `💧 ${t('ui.recoverEssence')}`}
             </button>
           </div>
-        )}
-        <p className="text-[10px] text-stone-500 mt-2">
-          Cultivate at the ✦ terrace in town for ×1.5 progress. Essence never regenerates on its own — recover it deliberately, at inns or campsites when far afield.
-        </p>
+
+          {breakthroughReady && (
+            <div className="rounded-lg border border-amber-800/40 bg-amber-900/10 p-3">
+              <div className="text-xs font-semibold text-amber-200 mb-1.5">
+                {req.major ? '⚡ Major Breakthrough available' : 'Breakthrough available'} — to {req.target.name}
+              </div>
+              <div className="space-y-0.5 mb-2">
+                {checklist.checks.map(c => <ReqLine key={c.key} met={c.met} text={c.text} />)}
+              </div>
+              <button onClick={() => dispatch({ type: 'BREAKTHROUGH' })} disabled={!ready}
+                className={`w-full py-2.5 rounded-lg text-sm font-semibold transition ${ready ? 'bg-amber-500 hover:bg-amber-400 text-black animate-pulse' : 'bg-stone-800 text-stone-500 cursor-not-allowed'}`}>
+                ✦ Break Through
+              </button>
+            </div>
+          )}
+          <p className="text-[10px] text-stone-500 mt-2">
+            Cultivate at the ✦ terrace in town for ×1.5 progress. Essence never regenerates on its own — recover it deliberately, at inns or campsites when far afield.
+          </p>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
