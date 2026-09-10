@@ -18,6 +18,7 @@ export function initCombat(enemyId, player, opts = {}) {
     hpScale: d.enemyHpMul,
     worldId: opts.worldId || null,
     arena: opts.arena || null,
+    trial: opts.trial || null,
     playerStatuses: [],
     cooldowns: {},
     log: [opts.intro || `A ${def.name} blocks your path!`],
@@ -175,6 +176,11 @@ function finishVictory(state, combat, player, pending) {
   return s;
 }
 
+// A master's trial duel ends without loot or kills — only the trial outcome.
+function finishTrial(state, combat, player) {
+  return { ...state, player, combat: { ...combat, over: true, result: 'trial', rewards: null } };
+}
+
 function finishDefeat(state, combat, player) {
   if (combat.arena) {
     const ap = { ...player, hp: Math.max(1, Math.floor(player.maxHp * 0.3)) };
@@ -252,7 +258,12 @@ export function executeRound(state, action) {
     }
   }
 
-  if (enemy.hp <= 0) { push(`${enemy.name} is defeated!`); return finishVictory(state, { ...combat, enemy, playerStatuses: pSt, cooldowns, log, revealed: combat.revealed }, player, pending); }
+  if (enemy.hp <= 0) {
+    push(`${enemy.name} is defeated!`);
+    const done = { ...combat, enemy, playerStatuses: pSt, cooldowns, log, revealed: combat.revealed };
+    if (combat.trial) return finishTrial(state, done, player);
+    return finishVictory(state, done, player, pending);
+  }
 
   if (hasStatus(eSt, 'stun')) { push(`${enemy.name} is stunned and cannot move!`); }
   else { enemyAct(enemy, player, pSt, push, windFx.evasionPct || 0, earthFx.thorns || 0); }
@@ -264,7 +275,21 @@ export function executeRound(state, action) {
   combat.rounds++;
 
   if (player.hp <= 0) { push('You have been defeated...'); return finishDefeat(state, { ...combat, enemy, playerStatuses: pSt, cooldowns, log, revealed: combat.revealed }, player); }
-  if (enemy.hp <= 0) { push(`${enemy.name} is defeated!`); return finishVictory(state, { ...combat, enemy, playerStatuses: pSt, cooldowns, log, revealed: combat.revealed }, player, pending); }
+  // a master's trial: survive N turns, or land a set amount of damage
+  if (combat.trial && player.hp > 0) {
+    const tr = combat.trial;
+    const passed = tr.type === 'survive' ? combat.rounds >= tr.turns : (enemy.maxHp - enemy.hp) >= (tr.amount || 0);
+    if (passed) {
+      push('The master raises a hand — the trial is complete.');
+      return finishTrial(state, { ...combat, enemy: { ...enemy, statuses: eSt }, playerStatuses: pSt, cooldowns, log, revealed: combat.revealed }, player);
+    }
+  }
+  if (enemy.hp <= 0) {
+    push(`${enemy.name} is defeated!`);
+    const done = { ...combat, enemy, playerStatuses: pSt, cooldowns, log, revealed: combat.revealed };
+    if (combat.trial) return finishTrial(state, done, player);
+    return finishVictory(state, done, player, pending);
+  }
 
   let s = { ...state, combat: { ...combat, enemy: { ...enemy, statuses: eSt }, playerStatuses: pSt, cooldowns, log, revealed: combat.revealed }, player };
   s = applyPendingMastery(s, pending);

@@ -78,6 +78,7 @@ export const BUILDINGS = [
 export const NPC_POSITIONS = {
   innkeeper: [35, 42],
   guMaster: [48, 42],
+  elderMo: [46, 42],           // refinement master, by the Gu district
   merchant: [39, 43],
   herbalist: [40, 43],
   questOfficer: [35, 49],
@@ -88,6 +89,9 @@ export const NPC_POSITIONS = {
   guPeddler: [57, 44],
   blackMarketMerchant: [58, 43],
   mysteriousTraveler: [59, 42],
+  masterJian: [23, 24],        // hidden sword master by the river falls
+  hermitSpring: [13, 25],      // hermit at the spirit spring
+  drunkenFang: [56, 17],       // wandering fist master in the copper hills
 };
 export const WORLD_NPCS = Object.entries(NPC_POSITIONS).map(([id, [x, y]]) => ({ id, x, y }));
 
@@ -248,6 +252,8 @@ function buildTiles() {
   };
   RESOURCES.forEach(r => protect(r.x, r.y));
   INITIAL_ENEMIES.forEach(e => protect(e.x, e.y));
+  // never scatter trees over hidden masters' spots
+  Object.values(NPC_POSITIONS).forEach(([x, y]) => protect(x, y));
   const rng = mulberry32(20260910);
   for (let y = 0; y < H; y++) {
     for (let x = 0; x < W; x++) {

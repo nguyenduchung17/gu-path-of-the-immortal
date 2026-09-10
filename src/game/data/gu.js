@@ -157,6 +157,19 @@ export const GU = [
     energyCost: 5, cooldown: 3,
     effect: { summon: { power: 4, duration: 3 } },
   },
+  // ---- Sword (unlocked only by Master Jian) ----
+  {
+    id: 'flyingSword', name: 'Flying Sword Gu', rank: 2, type: 'Attack', path: 'sword', element: 'metal', rarity: 'rare',
+    description: 'A spirit blade that leaves your hand, strikes and returns — the signature of the Sword Path.',
+    energyCost: 8, cooldown: 2,
+    effect: { attack: { power: 16 } },
+  },
+  {
+    id: 'swordRain', name: 'Sword Rain Gu', rank: 3, type: 'Attack', path: 'sword', element: 'metal', rarity: 'legendary',
+    description: 'The fabled Sword Rain — a storm of flying blades few ever live to see twice. A Killer Move of Master Jian\u2019s lineage.',
+    energyCost: 13, cooldown: 3,
+    effect: { attack: { power: 12, hits: 3 } },
+  },
   // ---- Refinement-adjacent ----
   {
     id: 'insightEye', name: 'Insight Eye Gu', rank: 1, type: 'Investigation', path: 'refinement', element: 'none', rarity: 'common',

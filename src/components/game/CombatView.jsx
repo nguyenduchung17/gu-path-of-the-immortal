@@ -3,6 +3,7 @@ import { useGame } from '@/game/state/GameContext';
 import { useT } from '@/game/i18n/LangContext';
 import { GU_BY_ID, isKillerMove } from '@/game/data/gu';
 import { ITEM_BY_ID } from '@/game/data/items';
+import { visualOf, DANGER_LABEL } from '@/game/data/enemies';
 import { PATH_BY_ID } from '@/game/data/paths';
 import { CULTIVATION_STAGES } from '@/game/data/cultivation';
 import { tierOf } from '@/game/config/aptitude';
@@ -18,6 +19,7 @@ const PATH_COLORS = {
   fire: '#ff8a4a', water: '#4aa8ff', wind: '#9fe8b0', earth: '#d9a04a',
   lightning: '#ffe95a', ice: '#a8e0ff', poison: '#b0e04a',
   darkness: '#a88ad8', blood: '#e06a6a', metal: '#c8ccd8', wood: '#8fc86a',
+  sword: '#dfe4f8',
 };
 
 const STATUS_META = {
@@ -180,6 +182,9 @@ export default function CombatView() {
             <div className="text-sm font-semibold text-rose-100 truncate">{enemy.name}</div>
             <div className="text-[10px] text-stone-400 shrink-0">ATK {enemy.attack} · DEF {enemy.defense}</div>
           </div>
+          <div className="text-[9px] text-stone-400 -mt-1 mb-1">
+            {visualOf(enemy.id).rank}{!c.arena && !c.trial ? ` · ${DANGER_LABEL[visualOf(enemy.id).danger] || ''}` : ''}
+          </div>
           <Bar value={enemy.hp} max={enemy.maxHp} from="#9f1239" to="#fb7185" label={t('ui.hp')} />
           {c.revealed && (
             <div className="text-[10px] text-amber-300/80 mt-1">
@@ -231,7 +236,7 @@ export default function CombatView() {
           <div className="absolute inset-0 flex items-center justify-center p-4 bg-black/40">
             <div className="max-w-sm w-full rounded-xl border-2 border-emerald-800/60 bg-[#0d1410]/95 p-4 animate-pop">
               <h2 className="text-xl font-heading font-semibold text-center text-emerald-100 mb-2">
-                {c.result === 'victory' ? t('battle.victory') : c.result === 'flee' ? t('battle.escaped') : t('battle.defeat')}
+                {c.result === 'victory' ? t('battle.victory') : c.result === 'trial' ? t('battle.trial') : c.result === 'flee' ? t('battle.escaped') : t('battle.defeat')}
               </h2>
               <div className="text-xs text-stone-400 space-y-1 mb-3 max-h-32 overflow-y-auto scrollbar-thin text-center">
                 {c.log.slice(-6).map((l, i) => <div key={i}>{l}</div>)}

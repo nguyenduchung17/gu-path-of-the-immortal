@@ -63,7 +63,7 @@ export const ENEMIES = [
   {
     id: 'banditChief', name: 'Bandit Chief', hp: 80, attack: 12, defense: 5, speed: 6,
     abilities: [], weakness: 'wind',
-    drops: [{ itemId: 'beastCore', chance: 60, qty: 1 }, { itemId: 'moonPetal', chance: 50, qty: 1 }],
+    drops: [{ itemId: 'beastCore', chance: 60, qty: 1 }, { itemId: 'moonPetal', chance: 50, qty: 1 }, { itemId: 'brokenSwordFragment', chance: 100, qty: 1 }],
     description: 'Scarred and shrewd, the leader of the northeast camp. Guards his plunder personally.',
   },
   {
@@ -75,3 +75,29 @@ export const ENEMIES = [
 ];
 
 export const ENEMY_BY_ID = Object.fromEntries(ENEMIES.map(e => [e.id, e]));
+
+// Monster visual identity — species kind (distinct silhouette in beastSprites),
+// cultivation rank label and danger rating for the proximity nameplate.
+// pace: world animation speed per species (ms per frame).
+export const ENEMY_VISUALS = {
+  wildWolf:        { kind: 'wolf',     rank: 'Rank 1 · Middle Stage', danger: 1, pace: 140 },
+  shadowHound:     { kind: 'hound',    rank: 'Rank 2 · Middle Stage', danger: 3, pace: 130 },
+  ironfangAlpha:   { kind: 'alpha',    rank: 'Rank 3 · Middle Stage', danger: 5, pace: 150 },
+  wildBoar:        { kind: 'boar',     rank: 'Rank 1 · Early Stage',  danger: 1, pace: 240 },
+  stoneBeast:      { kind: 'stone',    rank: 'Rank 2 · Early Stage',  danger: 2, pace: 300 },
+  mutatedBeast:    { kind: 'mutant',   rank: 'Rank 2 · Late Stage',   danger: 4, pace: 220 },
+  bloodCrow:       { kind: 'bird',     rank: 'Rank 1 · Early Stage',  danger: 1, pace: 120 },
+  forestSerpent:   { kind: 'snake',    rank: 'Rank 1 · Late Stage',   danger: 2, pace: 200 },
+  poisonSpider:    { kind: 'spider',   rank: 'Rank 1 · Middle Stage', danger: 2, pace: 200 },
+  ancientGuardian: { kind: 'guardian', rank: 'Rank 3 · Early Stage',  danger: 4, pace: 400 },
+  bandit:          { kind: 'bandit',   rank: 'Rank 1 · Late Stage',   danger: 2, pace: 160 },
+  banditChief:     { kind: 'chief',    rank: 'Rank 2 · Early Stage',  danger: 3, pace: 170 },
+  // master trial opponents (fought only in mentor trials)
+  trial_jian:      { kind: 'chief',    rank: 'Rank 5 · Peak Stage',   danger: 5, pace: 170 },
+  trial_hound:     { kind: 'hound',    rank: 'Rank 3 · Late Stage',   danger: 3, pace: 130 },
+  trial_fang:      { kind: 'bandit',   rank: 'Rank 4 · Late Stage',   danger: 4, pace: 160 },
+};
+
+export const DANGER_LABEL = { 1: 'Danger: Low', 2: 'Danger: Moderate', 3: 'Danger: High', 4: 'Danger: Severe', 5: 'Danger: Deadly' };
+export const DANGER_COLOR = { 1: '#6ee7a0', 2: '#f0c95a', 3: '#fb923c', 4: '#f87171', 5: '#ff4a5a' };
+export const visualOf = (defId) => ENEMY_VISUALS[defId] || { kind: 'wolf', rank: 'Rank 1 · Early Stage', danger: 1, pace: 200 };

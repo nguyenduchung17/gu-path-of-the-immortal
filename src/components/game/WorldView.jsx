@@ -4,9 +4,10 @@ import { NPC_BY_ID } from '@/game/data/npcs';
 import { ENEMY_BY_ID } from '@/game/data/enemies';
 import { BALANCE } from '@/game/config/balance';
 import { WORLD, zoneAt, DEFAULT_ZONE, WORLD_NPCS, WORLD_RESOURCES, CAMP_CELLS, TERRACE, FORMATION } from '@/game/data/world';
-import { darknessOf, phaseOf } from '@/game/engine/time';
+import { phaseOf } from '@/game/engine/time';
 import { drawWorld } from '@/game/gfx/worldRenderer';
-import { sfx, setAmbience, primeAudio } from '@/game/audio/sfx';
+import { sfx, primeAudio } from '@/game/audio/sfx';
+import { setEnvironment, updateAudioPosition, footstep } from '@/game/audio/ambience';
 
 const DANGER_CHIP = {
   0: 'border-emerald-600/50 bg-emerald-900/30 text-emerald-300',
@@ -49,11 +50,11 @@ export default function WorldView({ paused, inputLocked }) {
     }
   }, [zone.id, zone.name, zone.dangerLabel, zone.danger]);
 
-  // ambience bed follows the environment
+  // layered ambience follows the environment + time of day
   useEffect(() => {
-    const night = darknessOf(state.time?.min) > 0.5;
-    setAmbience(zone.safe ? 'town' : night ? 'night' : 'forest');
-  }, [zone.safe, phaseOf(state.time?.min)]);
+    const night = phaseOf(state.time?.min) === 'night';
+    setEnvironment({ zoneId: zone.id, night });
+  }, [zone.id, phaseOf(state.time?.min)]);
 
   // interaction target for the [E] prompt
   const now = Date.now();
@@ -156,11 +157,17 @@ export default function WorldView({ paused, inputLocked }) {
         anim.toX = p2.x;
         anim.toY = p2.y;
         anim.t0 = t;
-        if (had && (anim.fromX !== p2.x || anim.fromY !== p2.y)) sfx('step');
+        if (had && (anim.fromX !== p2.x || anim.fromY !== p2.y)) {
+          const inBounds = p2.y >= 0 && p2.y < WORLD.h && p2.x >= 0 && p2.x < WORLD.w;
+          footstep(inBounds ? WORLD.tiles[p2.y][p2.x] : '.');
+        }
       }
       const k = Math.min(1, (t - (anim.t0 || t)) / 150);
       const pX = anim.fromX + (anim.toX - anim.fromX) * k;
       const pY = anim.fromY + (anim.toY - anim.fromY) * k;
+
+      // positional ambience (river / market / beasts) — throttled internally
+      updateAudioPosition({ x: p2.x, y: p2.y, enemies: s.worldState?.enemies || [] });
 
       // smooth camera follows the animated player
       const cols = Math.ceil(w / tile), rows = Math.ceil(h / tile);
@@ -195,7 +202,11 @@ export default function WorldView({ paused, inputLocked }) {
       {/* interaction prompt */}
       {interactable && !inputLocked && !paused && (
         <div className="absolute bottom-[72px] left-1/2 -translate-x-1/2 z-10 text-[11px] sm:text-xs text-emerald-100 bg-black/55 backdrop-blur border border-emerald-700/50 rounded-full px-3 py-1.5 animate-fade-in whitespace-nowrap">
-          {interactable.type === 'npc' && <><b>[E]</b> Talk — {NPC_BY_ID[interactable.npc.id].name}</>}
+          {interactable.type === 'npc' && (() => {
+            const n = NPC_BY_ID[interactable.npc.id];
+            const name = n.master && !state.masters?.[n.id]?.found ? '???' : n.name;
+            return <><b>[E]</b> Talk — {name}</>;
+          })()}
           {interactable.type === 'resource' && <><b>[E]</b> Gather — {interactable.node.name}</>}
           {interactable.type === 'camp' && <><b>[E]</b> Rest at the campsite</>}
           {interactable.type === 'cultivate' && <><b>[E]</b> Cultivate at the terrace (×1.5)</>}

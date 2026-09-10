@@ -1,6 +1,6 @@
 import { GU_BY_ID } from '../data/gu';
 import { ITEM_BY_ID } from '../data/items';
-import { grantMastery, learnRecipe } from './mastery';
+import { grantMastery, learnRecipe, discoverPath } from './mastery';
 
 let _idc = 0;
 const newInstanceId = () => 'g' + Date.now().toString(36) + (_idc++).toString(36);
@@ -57,6 +57,7 @@ export function applyEffects(state, effects) {
   let next = { ...state, player, inventory, ownedGu, reputation, quests, worldState, contribution, log };
   if (effects.mastery) for (const [pid, xp] of Object.entries(effects.mastery)) next = grantMastery(next, pid, xp);
   if (effects.recipes) for (const id of effects.recipes) next = learnRecipe(next, id);
+  if (effects.unlockPath) next = discoverPath(next, effects.unlockPath);
   if (pendingCombat) next._pendingCombat = pendingCombat;
   return next;
 }

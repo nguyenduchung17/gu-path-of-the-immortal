@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useGame } from '@/game/state/GameContext';
-import { NPC_BY_ID } from '@/game/data/npcs';
+import { useT } from '@/game/i18n/LangContext';
+import { NPC_BY_ID, npcAvailable } from '@/game/data/npcs';
 import { QUESTS } from '@/game/data/quests';
 import { objectiveMet } from '@/game/state/gameReducer';
 import { diffOf } from '@/game/config/balance';
@@ -9,17 +10,30 @@ import { INNS } from '@/game/data/world';
 import { npcAppearance } from '@/game/gfx/characterSprites';
 import { appearanceOf } from '@/game/data/appearance';
 import PortraitFrame from './PortraitFrame';
+import MentorPanel from './MentorPanel';
 
 // Game-style dialogue: the world stays visible behind, the NPC (who turned to
 // face you) gets a pixel portrait, and the player's own portrait joins in.
 export default function DialogueModal({ onShop, onService, onInn }) {
   const { state, dispatch } = useGame();
+  const { t } = useT();
   const npc = NPC_BY_ID[state.dialogue.npcId];
   const [view, setView] = useState('main');
   if (!npc) return null;
 
   const npcQuests = QUESTS.filter(q => q.giver === npc.id);
   const close = () => dispatch({ type: 'CLOSE_DIALOGUE' });
+
+  // hidden masters get the mentor dialogue instead of a shop menu
+  if (npc.mentor) {
+    return (
+      <div className="fixed inset-0 z-20 bg-black/25 flex items-end justify-center p-3 pb-20 sm:pb-8 pointer-events-none">
+        <div className="max-w-md w-full rounded-2xl border border-cyan-800/50 bg-[#0d1410]/95 backdrop-blur p-4 animate-pop pointer-events-auto shadow-2xl">
+          <MentorPanel npc={npc} onShop={onShop} onClose={close} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-20 bg-black/25 flex items-end justify-center p-3 pb-20 sm:pb-8 pointer-events-none">
@@ -28,6 +42,7 @@ export default function DialogueModal({ onShop, onService, onInn }) {
           <PortraitFrame appearance={npcAppearance(npc.id)} size={52} />
           <div className="flex-1 min-w-0">
             <div className="text-sm font-semibold text-emerald-100">{npc.name}</div>
+            {npc.role && <div className="text-[10px] text-amber-300/80">{t(`role.${npc.role}`)}</div>}
             <p className="text-[11px] text-stone-400 italic">"{npc.greeting}"</p>
           </div>
           <div className="flex flex-col items-center gap-1">
@@ -51,9 +66,15 @@ export default function DialogueModal({ onShop, onService, onInn }) {
                 </button>
               );
             })()}
-            {npc.service === 'missions' && <button onClick={() => { onService('missions'); close(); }} className="w-full text-left px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-sm">📋 Mission Board</button>}
-            {npc.service === 'contribution' && <button onClick={() => { onService('contribution'); close(); }} className="w-full text-left px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-sm">🏛️ Contribution Exchange</button>}
-            {npc.service === 'arena' && <button onClick={() => { onService('arena'); close(); }} className="w-full text-left px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-sm">⚔️ Arena Challenges</button>}
+            {npc.service === 'missions' && (npcAvailable(npc, state.time)
+              ? <button onClick={() => { onService('missions'); close(); }} className="w-full text-left px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-sm">📋 Mission Board</button>
+              : <div className="w-full px-3 py-2 rounded-lg bg-white/5 text-sm text-stone-500">📋 Mission Board — the hall keeps daytime hours {t('np.closed')}</div>)}
+            {npc.service === 'contribution' && (npcAvailable(npc, state.time)
+              ? <button onClick={() => { onService('contribution'); close(); }} className="w-full text-left px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-sm">🏛️ Contribution Exchange</button>
+              : <div className="w-full px-3 py-2 rounded-lg bg-white/5 text-sm text-stone-500">🏛️ Contribution Exchange {t('np.closed')}</div>)}
+            {npc.service === 'arena' && (npcAvailable(npc, state.time)
+              ? <button onClick={() => { onService('arena'); close(); }} className="w-full text-left px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-sm">⚔️ Arena Challenges</button>
+              : <div className="w-full px-3 py-2 rounded-lg bg-white/5 text-sm text-stone-500">⚔️ Arena Challenges {t('np.closed')}</div>)}
             {npcQuests.length > 0 && <button onClick={() => setView('quests')} className="w-full text-left px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-sm">📜 Quests ({npcQuests.length})</button>}
             {npc.id === 'sectElder' && <p className="text-[11px] text-stone-400 px-3">Cultivate at the ✦ terrace by the training ground for ×1.5 cultivation progress.</p>}
             <button onClick={close} className="w-full text-left px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-sm text-stone-400">Leave</button>

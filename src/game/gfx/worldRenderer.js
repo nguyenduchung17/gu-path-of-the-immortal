@@ -3,14 +3,16 @@
 // then blits it scaled to the viewport. All game logic stays in the reducer.
 import { WORLD, zoneAt, DEFAULT_ZONE, WORLD_NPCS, WORLD_RESOURCES, CAMP_CELLS, TERRACE, FORMATION, BUILDING_AT, BUILDING_LABELS } from '../data/world';
 import { NPC_BY_ID } from '../data/npcs';
-import { ENEMY_BY_ID } from '../data/enemies';
+import { ENEMY_BY_ID, DANGER_LABEL, DANGER_COLOR, visualOf } from '../data/enemies';
+import { MASTER_BY_ID } from '../data/masters';
 import { BALANCE } from '../config/balance';
 import { darknessOf, warmthOf } from '../engine/time';
 import { buildTiles, buildTrees } from './tiles';
-import { makeBeastSheet, makeResourceIcon, beastPalette } from './sprites';
+import { makeResourceIcon } from './sprites';
+import { getBeastSheet } from './beastSprites';
 import { getCharacterSheet, npcAppearance } from './characterSprites';
 import { appearanceOf } from '../data/appearance';
-import { hash2, makeCanvas } from './pixel';
+import { hash2, makeCanvas, rect, px } from './pixel';
 
 let TILES = null, TREES = null;
 const npcSheets = new Map();
@@ -30,8 +32,41 @@ function npcSheet(id) {
 }
 
 function beastSheet(defId) {
-  if (!beastSheets.has(defId)) beastSheets.set(defId, makeBeastSheet(beastPalette(defId)));
+  if (!beastSheets.has(defId)) beastSheets.set(defId, getBeastSheet(defId));
   return beastSheets.get(defId);
+}
+
+// role props: a small marker of each trade, drawn beside the NPC
+function drawRoleProp(sx, sy, role, t, glows) {
+  if (!role) return;
+  switch (role) {
+    case 'food': rect(g, sx + 12, sy + 9, 3, 3, '#8a6a43'); rect(g, sx + 12, sy + 8, 3, 1, '#d9b45b'); px(g, sx + 13, sy + 8, '#f0e8d8'); break;
+    case 'material': rect(g, sx + 11, sy + 9, 4, 4, '#6b4a2f'); rect(g, sx + 11, sy + 9, 4, 1, '#8d6a43'); px(g, sx + 12, sy + 11, '#7fd8e8'); break;
+    case 'gu':
+      rect(g, sx + 11, sy + 10, 4, 3, '#3a2f4a'); px(g, sx + 12, sy + 8, '#b088ff');
+      glows.push({ x: sx + 13, y: sy + 9, r: 10, col: '176,136,255', a: 0.35 + 0.15 * Math.sin(t / 400) });
+      break;
+    case 'refiner':
+      rect(g, sx + 11, sy + 7, 4, 6, '#5a5148'); rect(g, sx + 12, sy + 9, 2, 2, '#e07a2a');
+      glows.push({ x: sx + 13, y: sy + 10, r: 12, col: '240,160,60', a: 0.4 + 0.1 * Math.sin(t / 300) });
+      break;
+    case 'quest': rect(g, sx + 11, sy + 6, 4, 6, '#4a3018'); rect(g, sx + 12, sy + 7, 2, 3, '#e8e4d8'); break;
+    case 'inn': rect(g, sx + 11, sy + 10, 4, 1, '#8a6a43'); px(g, sx + 12, sy + 9, '#f0e8d8'); break;
+    case 'arena': rect(g, sx + 11, sy + 7, 1, 6, '#4a3018'); rect(g, sx + 12, sy + 7, 3, 2, '#9f1239'); break;
+    case 'general': rect(g, sx + 11, sy + 10, 4, 3, '#a8895a'); px(g, sx + 12, sy + 9, '#8a6a43'); break;
+    case 'blackmarket': rect(g, sx + 11, sy + 9, 4, 4, '#2a2a32'); px(g, sx + 12, sy + 10, '#5a5a6a'); break;
+    default: break;
+  }
+}
+
+function roundRectPath(c, x, y, w, h, r) {
+  c.beginPath();
+  c.moveTo(x + r, y);
+  c.arcTo(x + w, y, x + w, y + h, r);
+  c.arcTo(x + w, y + h, x, y + h, r);
+  c.arcTo(x, y + h, x, y, r);
+  c.arcTo(x, y, x + w, y, r);
+  c.closePath();
 }
 
 function resIcon(type) {
@@ -264,32 +299,48 @@ export function drawWorld(display, state, view) {
       const h = hash2(n.x, n.y, 3);
       const sx = (n.x - x0) * 16, sy = (n.y - y0) * 16;
       const bob = Math.round(Math.sin(t / 750 + h * 8) * 0.5);
+      const npcDef = NPC_BY_ID[n.id];
+      const isMaster = !!npcDef?.master;
       // face the player when close (interaction behavior)
       let dir = 'down';
       const dx = view.pX - n.x, dy = view.pY - n.y;
       if (Math.abs(dx) <= 2 && Math.abs(dy) <= 2) dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
       else dir = ['down', 'left', 'right', 'up'][(h * 4) | 0];
       shadow(sx + 8, sy + 13);
-      g.drawImage(npcSheet(n.id).frames[dir][0], sx, sy - 8 - bob);
-      label(NPC_BY_ID[n.id].name.split(' ').slice(-1)[0], sx + 8, sy + 16, 5);
+      if (isMaster) {
+        // hidden masters meditate, wrapped in a pale aura
+        g.drawImage(npcSheet(n.id).cast.down[0], sx, sy - 8 - bob);
+        glows.push({ x: sx + 8, y: sy, r: 28, col: MASTER_BY_ID[n.id]?.aura || '150,200,255', a: 0.45 + 0.18 * Math.sin(t / 500 + n.x) });
+        label((state.masters?.[n.id]?.found) ? npcDef.name.split(' ').slice(-1)[0] : '???', sx + 8, sy + 16, 5, '#a8e8ff');
+      } else {
+        g.drawImage(npcSheet(n.id).frames[dir][0], sx, sy - 8 - bob);
+        label(npcDef?.name?.split(' ').slice(-1)[0] || '', sx + 8, sy + 16, 5);
+        drawRoleProp(sx, sy, npcDef?.role, t, glows);
+      }
       if (state.dialogue?.npcId === n.id) { // talking
         g.fillStyle = '#f0c95a'; g.fillRect(sx + 6, sy - 16, 1, 2); g.fillRect(sx + 8, sy - 18, 1, 2); g.fillRect(sx + 10, sy - 15, 1, 1);
       }
     } else {
       const e = ent.ref;
       const def = ENEMY_BY_ID[e.defId];
+      const vis = visualOf(e.defId);
       const sx = (e.x - x0) * 16, sy = (e.y - y0) * 16;
       const chase = e.state === 'chase';
-      const f = Math.floor(t / (chase ? 150 : 320)) % 2;
+      const alert = e.state === 'alert';
+      const pace = vis.pace || 220;
+      const f = Math.floor(t / (chase ? pace * 0.55 : pace)) % 2;
       const bob = Math.round(Math.sin(t / (chase ? 160 : 500) + e.x) * 0.5);
+      const sheet = beastSheet(e.defId);
+      const off = sheet.h > 16 ? 8 : 4; // humanoid enemies stand taller in frame
+      const hover = vis.kind === 'bird' ? 3 + (f ? 1 : 0) : 0;
       shadow(sx + 8, sy + 13);
-      g.drawImage(beastSheet(e.defId)[f], sx, sy - 4 - bob);
-      if (chase) label('!', sx + 8, sy - 8, 8, '#ff5a4a');
-      else if ((e.detect ?? 4) > 0 && Math.max(Math.abs(e.x - view.pX), Math.abs(e.y - view.pY)) <= (e.detect ?? 4) + 2) label('?', sx + 8, sy - 8, 8, '#f0c95a');
-      if (Math.max(Math.abs(e.x - view.pX), Math.abs(e.y - view.pY)) <= 6) label(def.name.split(' ').slice(-1)[0], sx + 8, sy + 16, 5, '#f2b8b0');
+      g.drawImage(alert ? sheet.alert : (chase ? sheet.move[f] : sheet.idle[f]), sx, sy - off - bob - hover);
+      if (chase) label('!', sx + 8, sy - off - 6, 8, '#ff5a4a');
+      else if (alert) label('?', sx + 8, sy - off - 6, 8, '#f0c95a');
       if (def && e.hp < def.hp) { // wounded: mini HP bar
-        g.fillStyle = '#000'; g.fillRect(sx + 3, sy - 8, 10, 2);
-        g.fillStyle = '#e04a3a'; g.fillRect(sx + 3, sy - 8, Math.max(1, Math.round(10 * Math.max(0, e.hp) / def.hp)), 2);
+        const hbY = sy - off - 2;
+        g.fillStyle = '#000'; g.fillRect(sx + 3, hbY, 10, 2);
+        g.fillStyle = '#e04a3a'; g.fillRect(sx + 3, hbY, Math.max(1, Math.round(10 * Math.max(0, e.hp) / def.hp)), 2);
       }
     }
   }
@@ -359,5 +410,26 @@ export function drawWorld(display, state, view) {
       ctx.fillStyle = 'rgba(30,40,30,0.5)';
       ctx.fillRect(ix, iy, 2, 1);
     }
+  }
+
+  // proximity nameplates (screen-space, crisp) — only for beasts within ~4 tiles
+  for (const e of state.worldState.enemies || []) {
+    if (e.dead) continue;
+    if (Math.max(Math.abs(e.x - p.x), Math.abs(e.y - p.y)) > 4) continue;
+    const vis = visualOf(e.defId);
+    const ex = (e.x - view.camX) * tile + tile / 2;
+    const ey = (e.y - view.camY) * tile;
+    const w = 132, h = 44, bx = Math.round(ex - w / 2), by = Math.round(ey - 52);
+    ctx.fillStyle = 'rgba(10,14,12,0.88)';
+    roundRectPath(ctx, bx, by, w, h, 6); ctx.fill();
+    ctx.strokeStyle = DANGER_COLOR[vis.danger] || '#f0c95a'; ctx.lineWidth = 1.5;
+    roundRectPath(ctx, bx, by, w, h, 6); ctx.stroke();
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#f2d5d0'; ctx.font = `bold ${Math.max(10, Math.round(tile / 3))}px monospace`;
+    ctx.fillText(ENEMY_BY_ID[e.defId]?.name || '', ex, by + 15);
+    ctx.fillStyle = '#b8c0b8'; ctx.font = `${Math.max(8, Math.round(tile / 4))}px monospace`;
+    ctx.fillText(vis.rank || '', ex, by + 28);
+    ctx.fillStyle = DANGER_COLOR[vis.danger] || '#f0c95a';
+    ctx.fillText(DANGER_LABEL[vis.danger] || 'Danger: ?', ex, by + 40);
   }
 }

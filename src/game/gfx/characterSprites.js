@@ -3,6 +3,7 @@
 // cached by appearance so each save's cultivator renders cheaply.
 import { makeCanvas, rect, px, hashStr } from './pixel';
 import { DEFAULT_APPEARANCE } from '../data/appearance';
+import { NPC_BY_ID } from '../data/npcs';
 
 const DIRS = ['down', 'up', 'left', 'right'];
 
@@ -211,16 +212,17 @@ const NPC_ACC = ['none', 'scarf', 'belt', 'shoulderCloth', 'headband'];
 
 export function npcAppearance(id) {
   const pick = (arr, salt) => arr[Math.floor(hashStr(`${id}:${salt}`) * arr.length) % arr.length];
+  const look = NPC_BY_ID[id]?.look || {}; // role-specific looks override the picks
   return {
-    body: pick(['male', 'female'], 'b'),
-    hair: pick(NPC_HAIR, 'h'),
-    hairColor: pick(NPC_HAIRCOL, 'hc'),
-    skin: pick(NPC_SKIN, 's'),
-    eyes: pick(['#3a2a18', '#2a5a8a', '#7a3a3a'], 'e'),
-    outfit: pick(['robe', 'tunic', 'martial'], 'o'),
-    outfitPrimary: pick(NPC_ROBE, 'p'),
-    outfitSecondary: pick(['#c9a45a', '#d9b45b', '#8a6a43', '#3a3a44', '#a8b8c8'], 'sec'),
-    accessory: pick(NPC_ACC, 'a'),
+    body: look.body || pick(['male', 'female'], 'b'),
+    hair: look.hair || pick(NPC_HAIR, 'h'),
+    hairColor: look.hairColor || pick(NPC_HAIRCOL, 'hc'),
+    skin: look.skin || pick(NPC_SKIN, 's'),
+    eyes: look.eyes || pick(['#3a2a18', '#2a5a8a', '#7a3a3a'], 'e'),
+    outfit: look.outfit || pick(['robe', 'tunic', 'martial'], 'o'),
+    outfitPrimary: look.outfitPrimary || pick(NPC_ROBE, 'p'),
+    outfitSecondary: look.outfitSecondary || pick(['#c9a45a', '#d9b45b', '#8a6a43', '#3a3a44', '#a8b8c8'], 'sec'),
+    accessory: look.accessory || pick(NPC_ACC, 'a'),
   };
 }
 

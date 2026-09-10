@@ -1,7 +1,8 @@
 import { GU_BY_ID } from '../data/gu';
 import { ITEM_BY_ID } from '../data/items';
 import { QUEST_BY_ID } from '../data/quests';
-import { NPC_BY_ID } from '../data/npcs';
+import { NPC_BY_ID, guOfferOf } from '../data/npcs';
+import { MASTERS, MASTER_BY_ID, reqChecks, syncMasterSteps } from '../data/masters';
 import { EVENT_BY_ID } from '../data/events';
 import { ENEMY_BY_ID } from '../data/enemies';
 import { initCombat, executeRound } from '../engine/combat';
@@ -32,7 +33,7 @@ export function createNewGame(name, gender, age, difficulty, slot, appearance, a
   );
   const essenceCap = essenceCapFor(START_STAGE.maxEssence, apt);
   return {
-    version: 5,
+    version: 6,
     difficulty: DIFFICULTIES[difficulty] ? difficulty : 'standard',
     slot: slot || 1,
     time: { day: BALANCE.time.startDay, min: BALANCE.time.startMinutes },
@@ -63,6 +64,7 @@ export function createNewGame(name, gender, age, difficulty, slot, appearance, a
     mastery: {}, masteryStats: {},
     knownPaths: [starter.path], knownRecipes: [],
     contribution: { greenValley: 0 },
+    masters: {},
     missions: { active: [], completed: [] },
     arena: { wins: 0, losses: 0 },
     recovery: null, breakthrough: null, toasts: [],
@@ -201,6 +203,20 @@ export function gameReducer(state, action) {
       }
       if (logAdd.length) s = { ...s, log: [...s.log, ...logAdd] };
 
+      // hidden masters reveal themselves when you come near — no map markers
+      let masterFound = null;
+      for (const m of MASTERS) {
+        if ((s.masters || {})[m.id]?.found) continue;
+        if (Math.abs(m.x - nx) <= m.discoverRadius && Math.abs(m.y - ny) <= m.discoverRadius) { masterFound = m; break; }
+      }
+      if (masterFound) {
+        s = {
+          ...s,
+          masters: { ...(s.masters || {}), [masterFound.id]: { found: true, step: 0, duels: {} } },
+        };
+        s = pushToast(s, { icon: '👁️', title: 'An Extraordinary Presence', lines: [masterFound.sense] });
+      }
+
       // occasional world events in the wilderness (rare, never in safe zones)
       if (zone.eventRate && Math.random() * 100 < zone.eventRate) {
         const evs = ['strangeHerb', 'injuredCultivator', 'hiddenCave', 'spiritSpring', 'wanderingMerchant'];
@@ -282,7 +298,7 @@ export function gameReducer(state, action) {
 
     case 'TALK_NPC':
       if (state.combat || state.recovery) return state;
-      return advanceTime({ ...state, dialogue: { npcId: action.npcId } }, BALANCE.time.talkMinutes);
+      return advanceTime(syncMasterSteps({ ...state, dialogue: { npcId: action.npcId } }), BALANCE.time.talkMinutes);
     case 'CLOSE_DIALOGUE':
       return { ...state, dialogue: null };
 
@@ -379,6 +395,56 @@ export function gameReducer(state, action) {
         }),
       };
       return advanceTime(s, BALANCE.time.arenaMinutes);
+    }
+
+    // ---------- Mentors / masters ----------
+    case 'MASTER_CLAIM': {
+      if (busy(state)) return state;
+      const m = MASTER_BY_ID[action.masterId];
+      const ms = (state.masters || {})[m?.id];
+      if (!m || !ms?.found) return state;
+      const step = m.steps[ms.step];
+      if (!step || step.kind !== 'req') return state;
+      const list = reqChecks(state, step.req);
+      if (!list.ok) return { ...state, log: [...state.log, 'You do not yet meet the master\u2019s requirements.'] };
+      let s = applyEffects(state, step.grants || {});
+      s = syncMasterSteps({ ...s, masters: { ...s.masters, [m.id]: { ...ms, step: ms.step + 1 } } });
+      return advanceTime(s, BALANCE.time.talkMinutes);
+    }
+    case 'MASTER_DUEL': {
+      if (busy(state)) return state;
+      const m = MASTER_BY_ID[action.masterId];
+      const ms = (state.masters || {})[m?.id];
+      if (!m || !ms?.found) return state;
+      const step = m.steps[ms.step];
+      if (!step || step.kind !== 'duel') return state;
+      const tr = step.trial;
+      return {
+        ...state,
+        combat: initCombat(null, state.player, {
+          def: tr.def,
+          difficulty: state.difficulty,
+          trial: { masterId: m.id, stepIndex: ms.step, type: tr.type, turns: tr.turns, amount: tr.amount },
+          intro: tr.intro,
+        }),
+        log: [...state.log, tr.intro || `${tr.def.name} awaits your trial.`],
+      };
+    }
+    case 'BUY_GU': {
+      if (state.combat || state.recovery) return state;
+      const npc = NPC_BY_ID[action.npcId];
+      if (!npc?.shop) return state;
+      const offers = [...(npc.shop.gu || [])];
+      const rot = guOfferOf(npc, state);
+      if (rot) offers.push(rot);
+      const offer = offers.find(o => o.guId === action.guId);
+      if (!offer) return state;
+      if (state.ownedGu.some(g => g.guId === offer.guId)) return state; // one of each
+      const total = shopPrice(offer.price, state);
+      if (state.player.spiritStones < total) return state;
+      let s = { ...state, player: { ...state.player, spiritStones: state.player.spiritStones - total } };
+      s = applyEffects(s, { giveGu: offer.guId });
+      return advanceTime(s, BALANCE.time.tradeMinutes);
     }
 
     // ---------- Gu ----------
@@ -615,6 +681,24 @@ export function gameReducer(state, action) {
             arena: { ...s.arena, losses: (s.arena.losses || 0) + 1 },
             log: [...s.log, c.result === 'defeat' ? 'Defeated in the arena — your stake is forfeit.' : 'You forfeit the duel and your stake.'],
           };
+        }
+      }
+      // master trial resolution — pass (survive / damage objective) grants the teaching
+      if (c.trial) {
+        const m = MASTER_BY_ID[c.trial.masterId];
+        const ms = (s.masters || {})[c.trial.masterId];
+        if (m && ms && (c.result === 'trial' || c.result === 'victory')) {
+          const step = m.steps[c.trial.stepIndex];
+          s = applyEffects(s, step.grants || {});
+          s = syncMasterSteps({
+            ...s,
+            masters: {
+              ...s.masters,
+              [m.id]: { ...ms, duels: { ...(ms.duels || {}), [c.trial.stepIndex]: true }, step: (ms.step || 0) + 1 },
+            },
+          });
+        } else {
+          s = { ...s, log: [...s.log, 'The trial ends in failure. The master waits — you may try again.'] };
         }
       }
       return s;

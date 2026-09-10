@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { getCharacterSheet, canvasURL } from '@/game/gfx/characterSprites';
 import { appearanceOf } from '@/game/data/appearance';
-import { makeBeastSheet, beastPalette } from '@/game/gfx/sprites';
+import { getBeastSheet } from '@/game/gfx/beastSprites';
 import { useT } from '@/game/i18n/LangContext';
 
 // Fullscreen pixel-art battle stage: location-based backdrops, staged combatants
@@ -12,8 +12,12 @@ export default function BattleScene({ enemy, fx, casting, appearance, biome, res
   const { t } = useT();
   const sheet = getCharacterSheet(appearanceOf({ appearance }));
   const beast = useMemo(() => {
-    const bs = makeBeastSheet(beastPalette(enemy.id));
-    return { a: canvasURL(bs[0]), b: canvasURL(bs[1]) };
+    const bs = getBeastSheet(enemy.id);
+    return {
+      fit: bs.h > 16 ? 'h-full w-auto' : 'w-full h-full',
+      idleA: canvasURL(bs.idle[0]), idleB: canvasURL(bs.idle[1]),
+      attack: canvasURL(bs.attack), hurt: canvasURL(bs.hurt), defeat: canvasURL(bs.defeat),
+    };
   }, [enemy.id]);
   const [tick, setTick] = useState(0);
   useEffect(() => {
@@ -37,13 +41,14 @@ export default function BattleScene({ enemy, fx, casting, appearance, biome, res
   else playerImg = sheet.frames.right[tick];
   const playerUrl = canvasURL(playerImg);
 
-  // enemy pose
+  // enemy pose — species sprite reacts: lunging attack / recoil / collapse
   let enemyCls = '';
   let enemyStyle = {};
-  if (enemyDefeated) enemyCls = 'animate-battle-defeat';
-  else if (hit.playerDmg) enemyCls = 'animate-battle-lunge-r';
-  else if (hit.enemyDmg) { enemyCls = 'animate-battle-shake'; enemyStyle = { filter: 'brightness(1.9) saturate(0.6)' }; }
-  else enemyCls = 'animate-battle-sway';
+  let enemyImg = beast.idleA;
+  if (enemyDefeated) { enemyCls = 'animate-battle-defeat'; enemyImg = beast.defeat; }
+  else if (hit.playerDmg) { enemyCls = 'animate-battle-lunge-r'; enemyImg = beast.attack; }
+  else if (hit.enemyDmg) { enemyCls = 'animate-battle-shake'; enemyImg = beast.hurt; enemyStyle = { filter: 'brightness(1.9) saturate(0.6)' }; }
+  else { enemyCls = 'animate-battle-sway'; enemyImg = tick ? beast.idleB : beast.idleA; }
 
   const isProjectile = k.attack && !k.burn && (casting?.color || hit.castColor);
   const quake = hit.killer && hit.enemyDmg > 0 && !enemyDefeated;
@@ -63,7 +68,7 @@ export default function BattleScene({ enemy, fx, casting, appearance, biome, res
       {/* ---- ENEMY side (far, upper right) ---- */}
       <div className="absolute right-[12%] sm:right-[16%] bottom-[34%] sm:bottom-[36%] flex flex-col items-center">
         <div key={hit.key ? `e${hit.key}` : 'e'} className={`relative w-[92px] h-[92px] sm:w-[150px] sm:h-[150px] ${enemyCls}`} style={enemyStyle}>
-          <img src={tick ? beast.b : beast.a} className="w-full h-full" style={{ imageRendering: 'pixelated' }} alt="" draggable={false} />
+          <img src={enemyImg} className={beast.fit} style={{ imageRendering: 'pixelated' }} alt="" draggable={false} />
           {hit.enemyDmg ? (
             <span key={`edmg${hit.key}`} className="absolute -top-4 left-1/2 font-heading text-2xl sm:text-3xl text-amber-300 animate-battle-dmg" style={{ marginLeft: '-18px', textShadow: '2px 2px 0 #000' }}>
               -{hit.enemyDmg}
@@ -185,9 +190,9 @@ export default function BattleScene({ enemy, fx, casting, appearance, biome, res
       {result && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className={`px-8 py-3 bg-black/75 border-2 rounded-lg font-heading text-2xl sm:text-3xl tracking-widest animate-pop ${
-            result === 'victory' ? 'border-amber-400/70 text-amber-200' : result === 'flee' ? 'border-stone-500/70 text-stone-200' : 'border-rose-600/70 text-rose-300'
+            result === 'victory' ? 'border-amber-400/70 text-amber-200' : result === 'trial' ? 'border-cyan-400/70 text-cyan-200' : result === 'flee' ? 'border-stone-500/70 text-stone-200' : 'border-rose-600/70 text-rose-300'
           }`}>
-            {result === 'victory' ? t('battle.victory') : result === 'flee' ? t('battle.escaped') : t('battle.defeat')}
+            {result === 'victory' ? t('battle.victory') : result === 'trial' ? t('battle.trial') : result === 'flee' ? t('battle.escaped') : t('battle.defeat')}
           </div>
         </div>
       )}

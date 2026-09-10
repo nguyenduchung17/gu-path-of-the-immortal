@@ -66,6 +66,17 @@ export const PATHS = [
       { text: '+10% success · 10% material save · −8% essence cost', fx: { successPct: 2, saveChancePct: 2, refineEssencePct: 2 } },
     ],
   },
+  {
+    id: 'sword', name: 'Sword Path', icon: '⚔️', color: 'text-zinc-200', border: 'border-zinc-500/40', locked: true,
+    description: 'The way of the flying sword — precision, piercing strikes and bladework. All but lost in the Green Valley; only a true master can open it.',
+    levels: [
+      { text: '+3% Sword Gu damage', fx: { damagePct: 3 } },
+      { text: '+6% Sword Gu damage', fx: { damagePct: 3 } },
+      { text: '+9% Sword Gu damage · Sword Gu essence cost −5%', fx: { damagePct: 3, costPct: 5 } },
+      { text: '+12% Sword Gu damage', fx: { damagePct: 3 } },
+      { text: '+15% Sword Gu damage · Sword Gu essence cost −10%', fx: { damagePct: 3, costPct: 5 } },
+    ],
+  },
 ];
 
 export const PATH_BY_ID = Object.fromEntries(PATHS.map(p => [p.id, p]));

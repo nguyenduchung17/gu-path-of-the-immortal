@@ -236,6 +236,54 @@ export const DICT = {
     'pause.abandon': '✖ Abandon Cultivator',
     'pause.note': 'The world holds its breath while this menu is open.',
     'pause.abandonConfirm': 'Abandon this cultivator and delete this save? All progress in this slot will be lost.',
+
+    // ---- NPC roles ----
+    'role.food': 'Food Merchant',
+    'role.material': 'Material Merchant',
+    'role.gu': 'Gu Merchant',
+    'role.refiner': 'Refinement Master',
+    'role.quest': 'Quest Officer',
+    'role.inn': 'Innkeeper',
+    'role.arena': 'Arena Master',
+    'role.contribution': 'Exchange Keeper',
+    'role.general': 'General Store',
+    'role.blackmarket': 'Black Market Broker',
+    'role.sect': 'Sect Elder',
+    'role.unknown': '???',
+    'role.swordCultivator': 'Sword Cultivator',
+    'role.beastTamer': 'Beast Tamer',
+    'role.fistMaster': 'Wandering Fist Master',
+    'np.closed': '(closed right now)',
+
+    // ---- shop ----
+    'shop.gu': 'Gu',
+    'shop.guRotating': 'rare stock — rotates daily',
+
+    // ---- battle: master trials ----
+    'battle.trial': 'TRIAL PASSED',
+
+    // ---- mentors / masters ----
+    'master.relationship': 'Bond',
+    'master.st0': 'Unknown',
+    'master.st1': 'Recognized',
+    'master.st2': 'Accepted Disciple',
+    'master.st3': 'Trusted Disciple',
+    'master.st4': 'Successor',
+    'master.requirements': 'Requirements',
+    'master.teaches': 'Teaches',
+    'master.claim': 'Seek Recognition',
+    'master.duel': 'Accept the Trial',
+    'master.acceptTask': 'Accept Task',
+    'master.turnIn': 'Turn In',
+    'master.inProgress': 'In progress…',
+    'master.stepDone': 'Completed',
+    'master.completed': 'Teaching complete',
+    'master.completedNote': 'The master looks at you now the way one looks at an equal. There is nothing more to teach — only further to walk.',
+    'master.doneFlavor': 'Your path is your own now. Walk it steadily.',
+    'master.away': 'The master is nowhere to be seen — return at another hour.',
+    'master.trade': 'Trade',
+    'master.trialSurvive': 'Trial against {name}: stay standing for {n} turns.',
+    'master.trialDamage': 'Trial against {name}: deal {n} damage within {t} turns.',
   },
 
   vi: {
@@ -465,5 +513,53 @@ export const DICT = {
     'pause.abandon': '✖ Từ Bỏ Tu Sĩ',
     'pause.note': 'Thiên địa nín thở khi menu này còn mở.',
     'pause.abandonConfirm': 'Từ bỏ tu sĩ này và xóa ô lưu? Mọi tiến độ trong ô này sẽ mất.',
+
+    // ---- NPC roles ----
+    'role.food': 'Thương Gia Thực Phẩm',
+    'role.material': 'Thương Gia Nguyên Liệu',
+    'role.gu': 'Thương Gia Cổ Trùng',
+    'role.refiner': 'Bậc Thầy Luyện Cổ',
+    'role.quest': 'Quan Nhiệm Vụ',
+    'role.inn': 'Chủ Trọ',
+    'role.arena': 'Chủ Đấu Trường',
+    'role.contribution': 'Quan Ngân Khố',
+    'role.general': 'Tạp Hóa',
+    'role.blackmarket': 'Thương Gia Chợ Đen',
+    'role.sect': 'Trưởng Lão',
+    'role.unknown': '???',
+    'role.swordCultivator': 'Kiếm Tu',
+    'role.beastTamer': 'Thuần Thú Sư',
+    'role.fistMaster': 'Quyền Sư Vân Du',
+    'np.closed': '(đóng cửa lúc này)',
+
+    // ---- shop ----
+    'shop.gu': 'Cổ Trùng',
+    'shop.guRotating': 'hàng hiếm — đổi theo ngày',
+
+    // ---- battle: master trials ----
+    'battle.trial': 'VƯỢT THÍ',
+
+    // ---- mentors / masters ----
+    'master.relationship': 'Giao Tình',
+    'master.st0': 'Người Dưng',
+    'master.st1': 'Được Biết Mặt',
+    'master.st2': 'Đệ Tử Nhập Môn',
+    'master.st3': 'Đệ Tử Tâm Phúc',
+    'master.st4': 'Người Kế Thừa',
+    'master.requirements': 'Điều Kiện',
+    'master.teaches': 'Truyền thụ',
+    'master.claim': 'Xin Chỉ Giáo',
+    'master.duel': 'Nhận Lời Thí Đấu',
+    'master.acceptTask': 'Nhận Nhiệm Vụ',
+    'master.turnIn': 'Hoàn Thành',
+    'master.inProgress': 'Đang thực hiện…',
+    'master.stepDone': 'Đã hoàn thành',
+    'master.completed': 'Truyền thừa hoàn tất',
+    'master.completedNote': 'Người thầy giờ nhìn bạn như nhìn một bậc đồng môn. Chẳng còn gì để dạy — chỉ còn đường để đi.',
+    'master.doneFlavor': 'Con đường của ngươi là của ngươi. Đi cho vững.',
+    'master.away': 'Không thấy bóng dáng người thầy đâu — hãy quay lại lúc khác.',
+    'master.trade': 'Giao Dịch',
+    'master.trialSurvive': 'Thí đấu với {name}: trụ vững {n} lượt.',
+    'master.trialDamage': 'Thí đấu với {name}: gây {n} sát thương trong {t} lượt.',
   },
 };

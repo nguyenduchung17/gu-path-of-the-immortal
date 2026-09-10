@@ -101,5 +101,14 @@ export function migrateSave(old) {
     };
   }
 
+  if (s.version < 6) {
+    s = {
+      ...s,
+      version: 6,
+      masters: s.masters || {},
+      log: [...(s.log || []), 'Word spreads of reclusive masters in the wilds — and the shops of Green Valley settle into honest trades.'],
+    };
+  }
+
   return s;
 }

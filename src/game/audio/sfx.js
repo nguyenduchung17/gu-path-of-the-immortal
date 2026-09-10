@@ -1,9 +1,8 @@
 // Lightweight synthesized game audio (no external assets) + ambience bed.
 // Sounds are deliberately subtle; everything is muted via the HUD toggle.
 
-let ctxA = null, master = null, ambGain = null, ambFilter = null, ambSrc = null;
+let ctxA = null, master = null;
 let muted = (() => { try { return localStorage.getItem('gu_sound_off') === '1'; } catch { return false; } })();
-let wantedAmbience = null;
 
 function ensure() {
   if (!ctxA) {
@@ -100,30 +99,13 @@ export function sfx(name) {
   } catch { /* audio unavailable */ }
 }
 
-// Gentle looping ambience bed: town = soft murmur, forest = leaves, night = crickets-ish.
-export function setAmbience(kind) {
-  wantedAmbience = kind;
-  if (muted || !ensure()) return;
-  try {
-    if (!ambSrc) {
-      ambSrc = ctxA.createBufferSource();
-      ambSrc.buffer = noiseBuffer(2);
-      ambSrc.loop = true;
-      ambFilter = ctxA.createBiquadFilter();
-      ambFilter.type = 'lowpass';
-      ambGain = ctxA.createGain();
-      ambGain.gain.value = 0;
-      ambSrc.connect(ambFilter).connect(ambGain).connect(master);
-      ambSrc.start();
-    }
-    const target = kind === 'town' ? 0.035 : kind === 'forest' ? 0.028 : 0.03;
-    const freq = kind === 'town' ? 420 : kind === 'forest' ? 900 : 1600;
-    ambGain.gain.linearRampToValueAtTime(target, ctxA.currentTime + 1.2);
-    ambFilter.frequency.linearRampToValueAtTime(freq, ctxA.currentTime + 1.2);
-  } catch { /* audio unavailable */ }
+// Layered ambience lives in ambience.js (multiple soft beds + randomized
+// one-shot events); it routes through this same mute-controlled master gain.
+export function audioNodes() {
+  return { ok: !!running(), ctx: ctxA, master };
 }
 
-// first user gesture resumes ambience if it was requested while muted/suspended
+// first user gesture resumes the audio context (autoplay policies)
 export function primeAudio() {
-  if (ensure() && wantedAmbience && !muted) setAmbience(wantedAmbience);
+  ensure();
 }
