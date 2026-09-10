@@ -34,11 +34,17 @@ export default function CharacterCreation() {
   const starter = starterGu ? starterGuOf(starterGu) : null;
   const presetLabel = PRESETS.find((p) => p.id === appearance.preset)?.label;
   const canBegin = ready && aptitude && starterGu;
+  const [beginTaps, setBeginTaps] = useState(0); // pulses the warning on each blocked click
 
   const steps = [1, 2, 3, 4].map((n) => ({ n, label: t(`creation.step${n}`) }));
 
+  const missing = [
+    !aptitude && t('creation.needAptitude'),
+    !starterGu && t('creation.needStarter'),
+    isTrue && !understood && t('creation.permadeathCheck'),
+  ].filter(Boolean);
   const begin = () => {
-    if (!canBegin) return;
+    if (!canBegin) { setBeginTaps(n => n + 1); return; } // visible feedback — never a silent dead button
     finishCreate(name.trim() || t('creation.nameless'), gender, age, mode, appearance, aptitude, starterGu);
   };
 
@@ -189,8 +195,8 @@ export default function CharacterCreation() {
                   {t('ui.next')} →
                 </button>
               ) : (
-                <button onClick={begin} disabled={!canBegin}
-                  className={`flex-[2] py-3 rounded-lg text-white text-sm font-medium transition ${canBegin ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-stone-800 text-stone-500 cursor-not-allowed'}`}>
+                <button onClick={begin} aria-disabled={!canBegin}
+                  className={`flex-[2] py-3 rounded-lg text-white text-sm font-medium transition ${canBegin ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-stone-800 text-stone-300 hover:bg-stone-700'}`}>
                   {isTrue
                     ? (ready ? t('creation.beginTrue') : t('creation.trueWarn'))
                     : t('creation.begin', { mode: t(`diff.${mode === 'trueCultivation' ? 'true' : mode}.title`) })}
@@ -201,8 +207,9 @@ export default function CharacterCreation() {
               <div className="text-[10px] text-amber-300/80 text-center animate-fade-in">⚠ {t('creation.needAptitude')}</div>
             )}
             {step === 4 && !canBegin && (
-              <div className="text-[10px] text-amber-300/80 text-center animate-fade-in">
-                ⚠ {[!aptitude && t('creation.needAptitude'), !starterGu && t('creation.needStarter')].filter(Boolean).join(' · ')}
+              <div key={beginTaps}
+                className={`text-center animate-pop ${beginTaps ? 'text-[12px] text-amber-200 font-medium' : 'text-[10px] text-amber-300/80'}`}>
+                ⚠ {missing.join(' · ')}
               </div>
             )}
             {step === 1 && (
