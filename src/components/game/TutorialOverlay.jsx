@@ -10,6 +10,16 @@ export default function TutorialOverlay() {
   const { state, dispatch } = useGame();
   const { t } = useT();
   const [confirmSkip, setConfirmSkip] = useState(false);
+  // The welcome card is keyboard-dismissable — Enter starts the guided path, so
+  // keyboard-only players are never trapped behind it.
+  useEffect(() => {
+    if (!state.tutorial?.welcome) return;
+    const onKey = (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); dispatch({ type: 'TUTORIAL_START' }); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [state.tutorial?.welcome]);
   const tut = state.tutorial;
   if (!tut) return null;
 

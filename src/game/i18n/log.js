@@ -149,6 +149,7 @@ export const DICT_LOG = {
     'rec.ambushInterrupt': 'Your meditation shatters — AMBUSHED! The {enemy} found you!',
     'rec.interrupt': 'Your meditation shatters — the {enemy} found you!',
     'rec.cancel': 'You cease recovering. The essence gained is kept.',
+    'rec.moveBreak': 'You break off your meditation to move on. The essence already gained is kept.',
     'rec.noStonesInstant': 'Not enough primordial stones for instant recovery.',
     'rec.instant': 'You burn {n} primordial stones — essence floods back to full. (-{n} stones)',
 
@@ -523,6 +524,7 @@ export const DICT_LOG = {
     'rec.ambushInterrupt': 'Định lực tan vỡ — BỊ PHỤ KÍCH! {enemy} đã tìm ra bạn!',
     'rec.interrupt': 'Định lực tan vỡ — {enemy} đã tìm ra bạn!',
     'rec.cancel': 'Bạn ngừng hồi phục. Phần chân nguyên đã hồi được giữ nguyên.',
+    'rec.moveBreak': 'Bạn đoạn định để bước đi. Phần chân nguyên đã hồi được giữ nguyên.',
     'rec.noStonesInstant': 'Không đủ nguyên thạch để hồi phục tức thời.',
     'rec.instant': 'Bạn đốt {n} nguyên thạch — chân nguyên dạt dào trở lại đầy tràn. (-{n} nguyên thạch)',
 

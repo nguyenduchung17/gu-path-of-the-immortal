@@ -22,7 +22,7 @@ const DANGER_CHIP = {
 // The world is the app's background layer, rendered as pixel art on a canvas.
 // Camera follows the player smoothly; movement supports diagonals and animates
 // between cells instead of jumping. All game logic stays in the reducer.
-export default function WorldView({ paused, inputLocked }) {
+export default function WorldView({ paused, inputLocked, moveLocked }) {
   const { state, dispatch } = useGame();
   const canvasRef = useRef(null);
   const camRef = useRef(null);
@@ -35,7 +35,7 @@ export default function WorldView({ paused, inputLocked }) {
   const stateRef = useRef(state);
   stateRef.current = state;
   const propsRef = useRef({});
-  propsRef.current = { paused, inputLocked };
+  propsRef.current = { paused, inputLocked, moveLocked };
   const dispatchRef = useRef(dispatch);
   dispatchRef.current = dispatch;
 
@@ -110,8 +110,10 @@ export default function WorldView({ paused, inputLocked }) {
 
   // keyboard: held keys give smooth continuous movement (diagonals supported);
   // E interacts once per press.
-  const isLocked = (s) => propsRef.current.inputLocked || propsRef.current.paused
-    || s.combat || s.pendingEvent || s.dialogue || s.recovery || s.sleeping || s.deceased || s.wildEncounter;
+  // Movement is gated by real blockers and open UI panels — never by the
+  // tutorial welcome card, and never by recovery (a step simply ends it).
+  const isLocked = (s) => propsRef.current.moveLocked || propsRef.current.paused
+    || s.combat || s.pendingEvent || s.dialogue || s.sleeping || s.deceased || s.wildEncounter;
 
   useEffect(() => {
     const DIR_KEYS = ['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'];

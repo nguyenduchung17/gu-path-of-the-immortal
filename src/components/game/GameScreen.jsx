@@ -124,18 +124,22 @@ export default function GameScreen() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  const inputLocked = !!panel || paused || dashOpen || !!state.tutorial?.welcome;
+  // The tutorial welcome card gates interaction (E, HUD surfaces) but NOT world
+  // movement — the game's first lesson says "move", so a fresh cultivator
+  // pressing WASD must walk. Answering the card is still required to interact.
+  const uiLocked = !!panel || paused || dashOpen || !!state.tutorial?.welcome;
+  const moveLocked = !!panel || paused || dashOpen;
   const meta = panel ? PANEL_META[panel] : null;
 
   return (
     <div className="fixed inset-0 overflow-hidden bg-[#0d1410] text-stone-100 select-none">
       {/* background layer — the world fills the whole viewport */}
-      <WorldView paused={paused} inputLocked={inputLocked} />
+      <WorldView paused={paused} inputLocked={uiLocked} moveLocked={moveLocked} />
 
       {/* HUD overlays */}
       <HUDTop />
       <MessageLog />
-      {!inputLocked && <ExploreBar />}
+      {!uiLocked && <ExploreBar />}
       <ScoutReport />
       <HazardBadge />
       <MiniMap />

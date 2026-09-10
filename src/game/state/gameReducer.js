@@ -214,19 +214,24 @@ function baseReducer(state, action) {
 
     // ---------- World ----------
     case 'MOVE': {
-      if (busy(state)) return state;
-      const p = state.player;
+      // Meditation is never a cage: taking a step simply ends recovery (all
+      // essence already gained is kept) — movement is never silently blocked.
+      if (busy(state) && !state.recovery) return state;
+      const base = state.recovery
+        ? { ...state, recovery: null, log: [...state.log, T('rec.moveBreak')] }
+        : state;
+      const p = base.player;
       const nx = p.x + action.dx, ny = p.y + action.dy;
       let passNote = null;
       if (!isWalkable(nx, ny)) {
         // secret passages & hazard crossings — exploration Gu open the way
-        const ov = moveOverride(state, nx, ny);
+        const ov = moveOverride(base, nx, ny);
         if (!ov) return state;
         if (ov.blocked) return { ...state, log: [...state.log, ov.blocked] };
         passNote = ov.reason;
       }
       const facing = action.dx === 1 ? 'right' : action.dx === -1 ? 'left' : action.dy === 1 ? 'down' : 'up';
-      let s = revealFog(advanceTime({ ...state, player: { ...p, x: nx, y: ny, facing } }, BALANCE.time.moveMinutes), nx, ny, visionRadiusOf(state));
+      let s = revealFog(advanceTime({ ...base, player: { ...p, x: nx, y: ny, facing } }, BALANCE.time.moveMinutes), nx, ny, visionRadiusOf(base));
 
       const zone = zoneAt(nx, ny) || DEFAULT_ZONE;
       const ws = s.worldState;
