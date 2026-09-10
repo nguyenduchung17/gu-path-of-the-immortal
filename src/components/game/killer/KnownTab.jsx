@@ -1,7 +1,7 @@
 import React from 'react';
 import { useT } from '@/game/i18n/LangContext';
 import { useGame } from '@/game/state/GameContext';
-import { kmState } from '@/game/engine/killerMoves';
+import { kmState, kmName } from '@/game/engine/killerMoves';
 import KmCard from './KmCard';
 
 // KNOWN KILLER MOVES — every discovered technique, its live condition, equip
@@ -29,7 +29,7 @@ export default function KnownTab() {
           onEquip={() => dispatch({ type: 'KM_EQUIP', kmId: kmRec.id })}
           onUnequip={() => dispatch({ type: 'KM_UNEQUIP', kmId: kmRec.id })}
           onDismantle={() => {
-            if (window.confirm(t('km.dismantle.confirm', { name: kmRec.name?.en || '' }))) {
+            if (window.confirm(t('km.dismantle.confirm', { name: kmName(kmRec) }))) {
               dispatch({ type: 'KM_DISMANTLE', kmId: kmRec.id });
             }
           }} />

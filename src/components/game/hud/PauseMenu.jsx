@@ -31,6 +31,7 @@ export default function PauseMenu({ open, onClose, onOpenPanel }) {
         <h2 className="text-center text-xs font-heading tracking-[0.35em] text-emerald-300/90 mb-4">{t('pause.title')}</h2>
         <div className="space-y-1.5">
           <Entry primary onClick={onClose}>{t('pause.resume')}</Entry>
+          <Entry onClick={() => onOpenPanel('km')}>⚡ {t('ui.km')}</Entry>
           <Entry onClick={() => onOpenPanel('cultivation')}>{t('pause.character')}</Entry>
           <Entry onClick={() => onOpenPanel('inventory')}>{t('pause.inventory')}</Entry>
           <Entry onClick={() => onOpenPanel('map')}>{t('pause.map')}</Entry>

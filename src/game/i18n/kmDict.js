@@ -115,7 +115,7 @@ export const DICT_KM = {
     // combat
     'cmt.kmIncomplete': '{move} cannot be unleashed — missing: {miss}.',
     'battle.kmBound': 'Bound to {name}',
-    'km.help.steps': '1. Open Killer Moves 2. Select Research 3. Choose a Core Gu 4. Add Support Gu 5. Review compatibility 6. Experiment or use a Blueprint 7. Equip your discovery',
+    'codex.kmCreate.body': '1. Open Killer Moves 2. Select Research 3. Choose a Core Gu 4. Add Support Gu 5. Review compatibility 6. Experiment or use a Blueprint 7. Equip your discovery',
 
     // contextual tip (#23)
     'tip.killerMoves.title': 'Killer Move Research',
@@ -230,7 +230,7 @@ export const DICT_KM = {
 
     'cmt.kmIncomplete': '{move} chưa thể triển khai — thiếu: {miss}.',
     'battle.kmBound': 'Ràng buộc với {name}',
-    'km.help.steps': '1. Mở Sát Chiêu 2. Chọn Nghiên Cứu 3. Chọn Cổ Hạch Tâm 4. Thêm Cổ Phụ Trợ 5. Xem độ tương thích 6. Thử nghiệm hoặc dùng Bản Thiết Kế 7. Trang bị sát chiêu mới',
+    'codex.kmCreate.body': '1. Mở Sát Chiêu 2. Chọn Nghiên Cứu 3. Chọn Cổ Hạch Tâm 4. Thêm Cổ Phụ Trợ 5. Xem độ tương thích 6. Thử nghiệm hoặc dùng Bản Thiết Kế 7. Trang bị sát chiêu mới',
 
     'tip.killerMoves.title': 'Nghiên Cứu Sát Chiêu',
     'tip.killerMoves.body': 'Bạn đã có đủ Cổ để bắt đầu thử nghiệm Sát Chiêu. Kết hợp Cổ Hạch Tâm với Cổ Phụ Trợ để tạo kỹ năng cường hóa — mở ⚡ Sát Chiêu trên thanh công cụ.',

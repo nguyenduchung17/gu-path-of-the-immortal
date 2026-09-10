@@ -7,6 +7,7 @@ import { ROLES, rolesOf } from '@/game/data/roles';
 import { ITEM_BY_ID } from '@/game/data/items';
 import { BALANCE } from '@/game/config/balance';
 import { effectiveCost } from '@/game/engine/combat';
+import { kmBoundOf, kmName } from '@/game/engine/killerMoves';
 import { proficiencyOf } from '@/game/engine/proficiency';
 import { HUNGER_META, foodOf, foodCount, feedingEstimate, guCondition } from '@/game/engine/guLife';
 import { effectSummary } from '../battle/BattleCommandMenu';
@@ -52,6 +53,12 @@ export default function GuCard({ inst, equipped, onEquip, onUnequip, onRefine })
           <div className="text-sm font-semibold text-stone-100 flex items-center gap-1.5">
             {cond.vital && <span className="text-amber-300" title={t('vit.title')}>◍</span>}
             {isKillerMove(gu) && <span className="text-amber-300">★</span>}
+            {kmBoundOf(state, inst.instanceId) && (
+              <span className="text-[9px] px-1 rounded bg-amber-900/40 border border-amber-700/50 text-amber-200"
+                title={`${t('km.loadout.boundTo')}: ${kmName(kmBoundOf(state, inst.instanceId))}`}>
+                ⛓ {kmName(kmBoundOf(state, inst.instanceId))}
+              </span>
+            )}
             <span className="truncate">{gu.name}</span>
             <span className="text-[10px] text-stone-400">R{rank}</span>
           </div>

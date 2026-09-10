@@ -11,6 +11,8 @@ import PauseMenu from './hud/PauseMenu';
 import OverlayWindow from './hud/OverlayWindow';
 import CharacterPanel from './CharacterPanel';
 import GuPanel from './GuPanel';
+import KillerMovesPanel from './KillerMovesPanel';
+import { kmCanResearch } from '@/game/engine/killerMoves';
 import RecipesPanel from './RecipesPanel';
 import DaoMasteryPanel from './DaoMasteryPanel';
 import InventoryPanel from './InventoryPanel';
@@ -43,6 +45,7 @@ import DashboardScreen from './DashboardScreen';
 const PANEL_META = {
   cultivation: { titleKey: 'ui.cultivation', icon: '🧘' },
   gu: { titleKey: 'ui.gu', icon: '🐉' },
+  km: { titleKey: 'ui.km', icon: '⚡' },
   recipes: { titleKey: 'ui.recipes', icon: '📖' },
   dao: { titleKey: 'ui.dao', icon: '☯️' },
   inventory: { titleKey: 'ui.inventory', icon: '🎒' },
@@ -110,7 +113,7 @@ export default function GameScreen() {
         return;
       }
       // hotbar hotkeys (C/G/R/M/I/Q/P) match the hotbar tooltips
-      const HOTKEYS = { c: 'cultivation', g: 'gu', r: 'recipes', m: 'dao', i: 'inventory', q: 'quests', p: 'map', b: 'bestiary' };
+      const HOTKEYS = { c: 'cultivation', g: 'gu', k: 'km', r: 'recipes', m: 'dao', i: 'inventory', q: 'quests', p: 'map', b: 'bestiary' };
       const id = HOTKEYS[e.key.toLowerCase()];
       if (!id || e.repeat) return;
       const s = escRef.current;
@@ -136,13 +139,14 @@ export default function GameScreen() {
       <ScoutReport />
       <HazardBadge />
       <MiniMap />
-      <Hotbar active={panel} onSelect={(id) => (id === 'dashboard' ? setDashOpen(true) : openPanel(id))} onPause={() => setPaused(true)} />
+      <Hotbar active={panel} notify={kmCanResearch(state) && !state.tutorial?.active ? ['km'] : []} onSelect={(id) => (id === 'dashboard' ? setDashOpen(true) : openPanel(id))} onPause={() => setPaused(true)} />
 
       {/* in-game panel overlays (world stays visible underneath) */}
       {panel && (
         <OverlayWindow title={t(meta.titleKey)} icon={meta.icon} wide={meta.wide} onClose={() => setPanel(null)}>
           {panel === 'cultivation' && <CharacterPanel onRecover={() => setRecoveryOpen(true)} />}
           {panel === 'gu' && <GuPanel />}
+          {panel === 'km' && <KillerMovesPanel />}
           {panel === 'recipes' && <RecipesPanel />}
           {panel === 'dao' && <DaoMasteryPanel />}
           {panel === 'inventory' && <InventoryPanel />}

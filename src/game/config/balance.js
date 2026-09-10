@@ -284,6 +284,32 @@ export const BALANCE = {
     nightDetectBonus: 1,      // enemies notice you farther in the dark
     nightGatherBonus: { moonPetal: 1 }, // moonlit materials yield more at night
   },
+
+  // ---- Killer Moves (Sát Chiêu) ----
+  // Research is deliberately affordable early (#11): essence + stones only.
+  // Failure never destroys Gu — strain + a short cooldown (#12).
+  killerMoves: {
+    baseChance: 35,         // research base success %
+    perMastery: 6,          // per core-path mastery level
+    compatBonus: { excellent: 15, good: 10, unstable: 0, poor: -15 },
+    blueprintChance: 20,    // (on the blueprint itself)
+    baseActivation: 70,     // combat activation chance base %
+    actPerMastery: 3,
+    actPerSupport: -5,      // each support destabilizes slightly
+    activationMin: 40, activationMax: 95,
+    supportDamagePct: 12,   // each support adds core damage
+    supportCostPct: 50,     // support essence contribution
+    essenceBase: 8, essencePerSupport: 3,   // research cost
+    stonesBase: 5, stonesPerSupport: 2,     // research cost
+    retryCdMin: 240,        // failed-experiment cooldown (game minutes)
+    strainDays: 2,          // Gu strain duration after failure
+    strainEffPct: -10,      // strained efficiency
+    strainCostPct: 10,      // strained essence cost
+    slotsBase: 2,           // battle loadout slots
+    slotsAtRank: 1,         // p.rank >= 1 unlocks the 3rd slot
+    // complexity is mastery-gated (#21): max SUPPORT Gu by core-path level
+    maxSupportsByMastery: { 1: 1, 2: 1, 3: 2, 4: 3, 5: 4 },
+  },
 };
 
 // Difficulty modes — one config object, never hardcoded elsewhere.

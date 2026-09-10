@@ -5,6 +5,7 @@ import { PATH_BY_ID } from '@/game/data/paths';
 import { ROLES } from '@/game/data/roles';
 import { GU_BY_ID } from '@/game/data/gu';
 import { kmName, kmMissing, kmPseudoGu } from '@/game/engine/killerMoves';
+import { locPathName } from '@/game/i18n/tr';
 import { effectSummary } from '../battle/BattleCommandMenu';
 import { sfx } from '@/game/audio/sfx';
 
@@ -28,7 +29,7 @@ export default function KmCard({ km, onEquip, onUnequip, onDismantle }) {
           </div>
           <div className="flex items-center gap-1.5 flex-wrap mt-1">
             {km.paths.map(p => (
-              <span key={p} className="text-[9px] px-1.5 py-0.5 rounded border border-stone-700 text-stone-300">{PATH_BY_ID[p]?.icon} {PATH_BY_ID[p] ? t(`ui.dao`) : ''}</span>
+              <span key={p} className="text-[9px] px-1.5 py-0.5 rounded border border-stone-700 text-stone-300">{PATH_BY_ID[p]?.icon} {locPathName(PATH_BY_ID[p]) || p}</span>
             ))}
             {km.roles.map(r => (
               <span key={r} className={`text-[9px] px-1.5 py-0.5 rounded border ${ROLES[r]?.tone || 'border-stone-700 text-stone-300'}`}>{ROLES[r]?.icon} {t(`role.${r}`)}</span>

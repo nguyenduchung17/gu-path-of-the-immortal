@@ -6,6 +6,7 @@ import { ITEM_BY_ID, ITEMS } from '@/game/data/items';
 import { PATH_BY_ID } from '@/game/data/paths';
 import { ROLES, rolesOf } from '@/game/data/roles';
 import { effectiveCost, activationChanceOf, strikeRange, guAttackRange } from '@/game/engine/combat';
+import { kmMissing, kmName, kmBoundOf } from '@/game/engine/killerMoves';
 import { targetKindOf, targetLabelKey, targetSummary } from '@/game/engine/targeting';
 
 // Short localized summary of what a Gu does in battle.
@@ -59,7 +60,7 @@ function RoleIcons({ gu }) {
   );
 }
 
-function GuOption({ inst, state, combat, killer, onClick }) {
+function GuOption({ inst, state, combat, killer, boundKm, onClick }) {
   const { t } = useT();
   const gu = GU_BY_ID[inst.guId];
   const path = PATH_BY_ID[gu.path];
@@ -67,7 +68,7 @@ function GuOption({ inst, state, combat, killer, onClick }) {
   const cost = effectiveCost(gu, state, inst);
   const chance = activationChanceOf(gu, inst, state, combat);
   const noEssence = state.player.primevalEssence < cost;
-  const disabled = cd > 0 || noEssence;
+  const disabled = cd > 0 || noEssence || !!boundKm;
   // targeting (#15–#18): the card names its category, and area Gu show how
   // many living enemies they would hit right now
   const kind = targetKindOf(gu);
@@ -86,6 +87,7 @@ function GuOption({ inst, state, combat, killer, onClick }) {
         <span className="text-xs font-medium truncate">{killer && <span className="text-amber-300">★ </span>}{gu.name}</span>
         <span className={`text-[10px] shrink-0 ${noEssence ? 'text-rose-300' : 'text-stone-400'}`}>⚡{cost}{cd > 0 ? ` · ⏳${cd}` : ''}</span>
       </div>
+      {boundKm && <div className="text-[9px] text-amber-300/80 mt-0.5 truncate">⛓ {t('battle.kmBound', { name: kmName(boundKm) })}</div>}
       <div className="text-[10px] text-stone-400 truncate mt-0.5">
         {path.icon} {path.name} · <RoleIcons gu={gu} />
       </div>
@@ -102,7 +104,7 @@ function GuOption({ inst, state, combat, killer, onClick }) {
 // chips the enemy's guard); DEFEND appears only when a defensive Gu is
 // actually equipped — a normal body alone cannot simply "defend" against
 // beasts. Gu are filterable by combat role so a toolkit build stays readable.
-export default function BattleCommandMenu({ state, combat, busy, onGu, onItem, onStrike, onObserve, onDefend, onFlee }) {
+export default function BattleCommandMenu({ state, combat, busy, onGu, onKm, onItem, onStrike, onObserve, onDefend, onFlee }) {
   const { t } = useT();
   const [tab, setTab] = useState('main');
   const [guFilter, setGuFilter] = useState('all');
@@ -110,6 +112,11 @@ export default function BattleCommandMenu({ state, combat, busy, onGu, onItem, o
   const equipped = p.equippedGu.map(id => state.ownedGu.find(g => g.instanceId === id)).filter(Boolean);
   const normalGu = equipped.filter(inst => !isKillerMove(GU_BY_ID[inst.guId]));
   const killerGu = equipped.filter(inst => isKillerMove(GU_BY_ID[inst.guId]));
+  // forged Killer Moves: only known + equipped moves fire in battle (#17);
+  // their bound components can no longer act individually (#14)
+  const equippedKms = (state.killerMoves?.known || []).filter(k => (state.killerMoves?.equipped || []).includes(k.id));
+  const boundMap = {};
+  for (const k of equippedKms) for (const id of [k.coreInstanceId, ...(k.supportInstanceIds || [])]) boundMap[id] = k;
   // generic DEFEND requires an equipped defensive Gu (barrier / damage reduction)
   const hasDefensiveGu = equipped.some(inst => rolesOf(GU_BY_ID[inst.guId]).includes('defense'));
   // only fare meant for a fight can be consumed mid-battle
@@ -165,13 +172,33 @@ export default function BattleCommandMenu({ state, combat, busy, onGu, onItem, o
           )}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-40 overflow-y-auto scrollbar-thin">
             {tab === 'gu' && (visibleGu.length
-              ? visibleGu.map(inst => <GuOption key={inst.instanceId} inst={inst} state={state} combat={combat} killer={false}
+              ? visibleGu.map(inst => <GuOption key={inst.instanceId} inst={inst} state={state} combat={combat} killer={false} boundKm={boundMap[inst.instanceId]}
                   onClick={act(() => { sfx('ui'); setTab('main'); onGu(inst); })} />)
               : <div className="text-[11px] text-stone-500 col-span-2 px-2 py-1">— {filterOf.label} —</div>)}
-            {tab === 'killer' && (killerGu.length
-              ? killerGu.map(inst => <GuOption key={inst.instanceId} inst={inst} state={state} combat={combat} killer
-                  onClick={act(() => { sfx('ui'); setTab('main'); onGu(inst); })} />)
-              : <div className="text-[11px] text-stone-500 col-span-2 px-2 py-1">{t('battle.noKiller')}</div>)}
+            {tab === 'killer' && (<>
+              {equippedKms.map(k => {
+                const miss = kmMissing(state, k);
+                const cd = combat.cooldowns[k.id] || 0;
+                const noEss = state.player.primevalEssence < k.essence;
+                return (
+                  <button key={k.id} disabled={disabled || miss.length > 0 || cd > 0 || noEss}
+                    onClick={act(() => { sfx('killer'); setTab('main'); onKm(k); })}
+                    className="text-left rounded-lg border border-amber-500/60 bg-amber-900/25 text-amber-100 hover:bg-amber-800/35 px-2.5 py-2 transition disabled:opacity-40 disabled:cursor-not-allowed">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-medium truncate">⚡ {kmName(k)}</span>
+                      <span className={`text-[10px] shrink-0 ${noEss ? 'text-rose-300' : 'text-stone-400'}`}>⚡{k.essence}{cd > 0 ? ` · ⏳${cd}` : ''}</span>
+                    </div>
+                    <div className="text-[10px] text-stone-400 truncate mt-0.5">
+                      🎯 {k.activation}% · ⚔️ {k.damage[0]}–{k.damage[1]} · ⏳{k.cooldown}
+                    </div>
+                    {miss.length > 0 && <div className="text-[9px] text-rose-300 mt-0.5">⚠ {t('km.incomplete')} — {miss.join(', ')}</div>}
+                  </button>
+                );
+              })}
+              {killerGu.map(inst => <GuOption key={inst.instanceId} inst={inst} state={state} combat={combat} killer boundKm={boundMap[inst.instanceId]}
+                onClick={act(() => { sfx('ui'); setTab('main'); onGu(inst); })} />)}
+              {!equippedKms.length && !killerGu.length && <div className="text-[11px] text-stone-500 col-span-2 px-2 py-1">{t('battle.noKiller')}</div>}
+            </>)}
             {tab === 'item' && (meds.length
               ? meds.map(it => (
                 <button key={it.id} disabled={disabled} onClick={act(() => { setTab('main'); onItem(it.id); })}

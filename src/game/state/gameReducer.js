@@ -37,6 +37,7 @@ import {
 } from '../i18n/tr';
 import { TUTORIAL_STEPS, TUTORIAL_SUPPLIES, TUTORIAL_STONES } from '../data/tutorial';
 import { tutorialObserve } from '../engine/tutorial';
+import { kmSeed, kmAction } from '../engine/killerMoves';
 
 const START_STAGE = CULTIVATION_STAGES[0];
 
@@ -48,7 +49,7 @@ export function createNewGame(name, gender, age, difficulty, slot, appearance, a
   const essenceCap = essenceCapFor(START_STAGE.maxEssence, apt);
   const starterFood = foodOf(starter);
   const fresh = {
-    version: 16,
+    version: 17,
     difficulty: DIFFICULTIES[difficulty] ? difficulty : 'standard',
     slot: slot || 1,
     time: { day: BALANCE.time.startDay, min: BALANCE.time.startMinutes },
@@ -92,6 +93,7 @@ export function createNewGame(name, gender, age, difficulty, slot, appearance, a
     bestiary: {},
     missions: { active: [], completed: [] },
     arena: { wins: 0, losses: 0 },
+    killerMoves: kmSeed(),
     recovery: null, breakthrough: null, toasts: [],
     combat: null, pendingEvent: null, dialogue: null,
     log: [
@@ -1021,7 +1023,7 @@ function baseReducer(state, action) {
       // meaningful Gu uses feed recognition-trial objectives (masteryUses only
       // increments when a Gu actually shaped the action)
       const usesBefore = Object.values(state.combat?.masteryUses || {}).reduce((a, b) => a + b, 0);
-      let s = executeRound(state, { type: action.action, guInstanceId: action.guInstanceId, itemId: action.itemId, targetUid: action.targetUid });
+      let s = executeRound(state, { type: action.action, guInstanceId: action.guInstanceId, itemId: action.itemId, moveId: action.moveId, targetUid: action.targetUid });
       // the first clash records the foe in your bestiary
       if (state.combat && !state.combat.seen && ENEMY_BY_ID[state.combat.enemyId]) {
         const b = { ...(state.bestiary || {}) };
@@ -1057,6 +1059,13 @@ function baseReducer(state, action) {
         for (const id of c.killed || [c.enemyId]) s = withQuestEvents(s, { type: 'ENEMY_KILLED', id });
         for (const [lootId, lootQty] of Object.entries(c.rewards?.items || {})) s = withQuestEvents(s, { type: 'ITEM_COLLECTED', id: lootId, qty: lootQty });
         if (c.arena) s = withQuestEvents(s, { type: 'ARENA_WON' });
+        // Killer Move blueprints looted from pack leaders (#8)
+        for (const bp of c.rewards?.blueprints || []) {
+          if ((s.killerMoves?.blueprints || []).includes(bp)) continue;
+          s = { ...s, killerMoves: { ...s.killerMoves, blueprints: [...(s.killerMoves.blueprints || []), bp] } };
+          s = pushToast(s, { icon: '📐', title: T('km.toast.blueprint'), lines: [T(`km.bpName.${bp}`), T(`km.bpHint.${bp}`)] });
+          s = { ...s, log: [...s.log, T('km.log.blueprint', { name: T(`km.bpName.${bp}`) })] };
+        }
       }
       // arena resolution — stake was posted up front
       if (c.arena) {
@@ -1277,6 +1286,18 @@ function baseReducer(state, action) {
 
     case 'DISMISS_TOAST':
       return { ...state, toasts: (state.toasts || []).filter(t => t.id !== action.id) };
+
+    // ---------- Killer Moves (Sát Chiêu) ----------
+    // All KM logic (research, loadout, binding, feedback) lives in
+    // engine/killerMoves.js — every action performs or explains itself (#51).
+    case 'KM_SEEN':
+    case 'KM_RESEARCH':
+    case 'KM_EQUIP':
+    case 'KM_UNEQUIP':
+    case 'KM_DISMANTLE': {
+      const res = kmAction(state, action);
+      return res === undefined ? state : res;
+    }
 
     // ---------- Staged tutorial ----------
     // The UI (welcome card, lesson cards, tips) dispatches these; the fresh-

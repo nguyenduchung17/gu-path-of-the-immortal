@@ -16,6 +16,7 @@ import { CONTENT_VI } from './content';
 import { DICT_STARTER } from './starterDict';
 import { DICT_PACK } from './packDict';
 import { DICT_CAVE } from './caveDict';
+import { DICT_KM } from './killerMoveDict';
 import { DANGER_LABEL, visualOf } from '../data/enemies';
 import { TERRAIN_LABELS } from '../data/terrain';
 

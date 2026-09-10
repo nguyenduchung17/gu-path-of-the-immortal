@@ -9,6 +9,9 @@
 export const TUTORIAL_SUPPLIES = { ration: 2, herb: 2, beastCore: 1 };
 export const TUTORIAL_STONES = 10;
 
+import { GU_BY_ID } from './gu';
+import { rolesOf } from './roles';
+
 // lines = number of tut.<id>.lN keys the lesson card renders.
 export const TUTORIAL_STEPS = [
   { id: 'move', lines: 1, check: s => (s.tutorial?.moves || 0) >= 6 },
@@ -30,7 +33,11 @@ export const TUTORIAL_STEPS = [
 
 // One-time contextual tips — advanced systems explained the moment they
 // first touch the player, whatever the state of the main tutorial.
+// The Killer Move tip (#22, #23, #47): the moment the player CAN research —
+// two owned Gu, one able to lead — the door is pointed out. No wall of text.
 export const TIP_DEFS = [
+  { id: 'killerMoves', due: s => (s.ownedGu || []).length >= 2 && !(s.killerMoves?.known || []).length
+    && (s.ownedGu || []).some(g => rolesOf(GU_BY_ID[g.guId]).includes('attack')) },
   // One tip per Dao Path — only the player's OWN starter path ever becomes
   // due (it is knownPaths[0]), so the tutorial explains exactly the mechanic
   // their first Gu uses, never all the paths at once.

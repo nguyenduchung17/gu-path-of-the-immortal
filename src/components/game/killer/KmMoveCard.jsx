@@ -30,7 +30,7 @@ export default function KmMoveCard({ move, showActions = true }) {
           </div>
           <div className="text-[10px] text-stone-400 mt-0.5 flex flex-wrap gap-1.5 items-center">
             {st.corePath && <span className={PATH_BY_ID[st.corePath]?.color}>{PATH_BY_ID[st.corePath]?.icon} {PATH_BY_ID[st.corePath]?.name}</span>}
-            {(st.rolesOf ?? []).length > 0 && st.rolesOf.map(r => (
+            {st.roles.map(r => (
               <span key={r} className={`px-1 rounded border ${ROLES[r]?.tone || ''}`}>{ROLES[r]?.icon} {t(`role.${r}`)}</span>
             ))}
           </div>
@@ -69,7 +69,6 @@ export default function KmMoveCard({ move, showActions = true }) {
           {st.slot != null
             ? <button onClick={unequip} className="text-[10px] px-2 py-1 rounded bg-white/10 hover:bg-white/20 text-stone-200">{t('km.unequip')}</button>
             : <button onClick={equip} disabled={slots <= 0 || !st.status.complete}
-              disabled-reason={st.status.complete ? undefined : t('km.equipIncomplete')}
               title={!st.status.complete ? t('km.equipIncomplete') : undefined}
               className={`text-[10px] px-2 py-1 rounded ${st.status.complete ? 'bg-amber-800/60 hover:bg-amber-700/70 text-amber-100' : 'bg-stone-800 text-stone-500 cursor-not-allowed'}`}>{t('km.equip')}</button>}
           <button onClick={dismantle} title={t('km.dismantleHint')}

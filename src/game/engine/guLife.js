@@ -60,9 +60,13 @@ export function guCondition(state, inst) {
     stability += BALANCE.guRefine.injuryStability;
   }
   if (vital) { effPct += BALANCE.vital.effBonusPct; stability += BALANCE.vital.stabilityBonusPct; }
+  // Killer Move research strain (#12): a failed experiment leaves every
+  // component tired for a few days — weaker and costlier, never destroyed
+  const strained = (inst.strainUntilDay || 0) > day;
+  if (strained) { effPct += BALANCE.killerMoves.strainEffPct; costPct += BALANCE.killerMoves.strainCostPct; }
   const rankBonus = 1 + (BALANCE.guRefine.rankPowerStep / 100) * Math.max(0, (inst.rank || gu.rank) - gu.rank);
   return {
-    band, vital, injured, severity: inst.injurySeverity || null,
+    band, vital, injured, strained, severity: inst.injurySeverity || null,
     injuredUntilDay: inst.injuredUntilDay || 0,
     effPct, stability, costPct,
     effMul: Math.max(0.1, (1 + effPct / 100) * rankBonus),

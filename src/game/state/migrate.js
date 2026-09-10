@@ -276,6 +276,18 @@ export function migrateSave(old) {
     };
   }
 
+  // v17: Killer Moves (Sát Chiêu) — researched techniques binding a Core Gu
+  // with Support Gu. Existing characters get the empty record; the one-time
+  // availability tip fires once they own two compatible Gu.
+  if (s.version < 17) {
+    s = {
+      ...s,
+      version: 17,
+      killerMoves: s.killerMoves || { known: [], loadout: [null, null, null], blueprints: [], seen: false, cdUntil: 0 },
+      log: [...(s.log || []), 'Word spreads of an old art — binding several Gu into a single Killer Move. The Killer Moves menu opens.'],
+    };
+  }
+
   // Self-heal the quest state on every load: legacy shapes become per-quest
   // records and hunt progress is rebuilt from the kill tally.
   return normalizeQuestState(s);
