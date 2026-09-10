@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { useGame } from '@/game/state/GameContext';
 import { BALANCE, recoveryRatePerSec, recoveryCosts } from '@/game/config/balance';
 import { zoneAt, CAMP_CELLS } from '@/game/data/world';
+import { totalGameMin } from '@/game/engine/vitalGu';
 
 function fmt(sec) {
   const m = Math.floor(sec / 60), s = Math.round(sec % 60);
@@ -17,7 +18,7 @@ export default function RecoveryModal({ open, onClose }) {
   const recovering = !!state.recovery;
   const costs = recoveryCosts(p);
   const mode = recovering ? state.recovery.mode : 'normal';
-  const rate = recoveryRatePerSec(p, mode);
+  const rate = recoveryRatePerSec(p, mode, totalGameMin(state.time));
   const fullSecs = costs.missing / Math.max(0.01, rate);
   const canInstant = p.spiritStones >= costs.instant;
   const canAccel = p.spiritStones >= costs.accelerated;
@@ -43,7 +44,7 @@ export default function RecoveryModal({ open, onClose }) {
           return;
         }
       }
-      dispatch({ type: 'RECOVERY_TICK', amount: recoveryRatePerSec(p, m) });
+      dispatch({ type: 'RECOVERY_TICK', amount: recoveryRatePerSec(p, m, totalGameMin(state.time)) });
     }, BALANCE.recovery.tickMs);
     return () => clearInterval(t);
   }, [recovering, state.recovery?.mode, p.x, p.y, state.worldState?.enemies]);
@@ -88,14 +89,14 @@ export default function RecoveryModal({ open, onClose }) {
               className="w-full text-left px-3 py-2.5 rounded-lg bg-white/5 hover:bg-white/10 border border-stone-800">
               <div className="flex justify-between text-sm text-stone-100">Normal Recovery <span className="text-emerald-300">Free</span></div>
               <div className="text-[10px] text-stone-500">
-                +{recoveryRatePerSec(p, 'normal').toFixed(2)}/s — est. {fmt(costs.missing / recoveryRatePerSec(p, 'normal'))} to full
+                +{recoveryRatePerSec(p, 'normal', totalGameMin(state.time)).toFixed(2)}/s — est. {fmt(costs.missing / recoveryRatePerSec(p, 'normal', totalGameMin(state.time)))} to full
               </div>
             </button>
             <button onClick={() => dispatch({ type: 'START_RECOVERY', mode: 'accelerated' })} disabled={!canAccel}
               className={`w-full text-left px-3 py-2.5 rounded-lg border ${canAccel ? 'bg-white/5 hover:bg-white/10 border-stone-800' : 'border-stone-900 bg-black/20 opacity-60 cursor-not-allowed'}`}>
               <div className="flex justify-between text-sm text-stone-100">Accelerated <span className="text-amber-300">💎 {costs.accelerated}</span></div>
               <div className="text-[10px] text-stone-500">
-                ≈{BALANCE.recovery.acceleratedMultiplier}× speed — est. {fmt(costs.missing / recoveryRatePerSec(p, 'accelerated'))} to full
+                ≈{BALANCE.recovery.acceleratedMultiplier}× speed — est. {fmt(costs.missing / recoveryRatePerSec(p, 'accelerated', totalGameMin(state.time)))} to full
               </div>
             </button>
             <button onClick={() => dispatch({ type: 'INSTANT_RECOVERY' })} disabled={!canInstant}

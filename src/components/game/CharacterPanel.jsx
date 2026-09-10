@@ -7,6 +7,7 @@ import { breakthroughChecklist } from '@/game/state/gameReducer';
 import { TERRACE } from '@/game/data/world';
 import { tierOf, scoreOf, constitutionName } from '@/game/config/aptitude';
 import EssenceSphere from './EssenceSphere';
+import { totalGameMin, fmtRemaining } from '@/game/engine/vitalGu';
 
 function Stat({ label, value }) {
   return (
@@ -44,7 +45,7 @@ export default function CharacterPanel({ onRecover }) {
   const checklist = peak ? null : breakthroughChecklist(state);
   const ready = checklist?.ok;
   const breakthroughReady = !peak && p.cultivationProgress >= 100;
-  const bd = recoveryBreakdown(p, state.recovery?.mode || 'normal');
+  const bd = recoveryBreakdown(p, state.recovery?.mode || 'normal', totalGameMin(state.time));
   const missingEss = p.maxPrimevalEssence - p.primevalEssence;
   const recSecs = missingEss > 0 ? missingEss / bd.total : 0;
   const estFull = missingEss <= 0 ? 'Full'
@@ -87,15 +88,23 @@ export default function CharacterPanel({ onRecover }) {
             <div className="w-full text-[10px] text-stone-500 space-y-0.5 rounded-lg bg-black/30 px-2.5 py-1.5">
               <div className="flex justify-between"><span>Base Recovery</span><span>+{bd.base.toFixed(2)}/s</span></div>
               <div className="flex justify-between"><span>Aptitude Bonus</span><span className={bd.aptBonus >= 0 ? 'text-emerald-400/90' : 'text-rose-300/80'}>+{bd.aptBonus.toFixed(2)}/s</span></div>
-              {bd.unstableMul < 1 && <div className="flex justify-between text-rose-300/80"><span>Vital-Gu instability</span><span>×{bd.unstableMul.toFixed(2)}</span></div>}
+              {bd.instability ? (
+                <div className="text-rose-300/80">
+                  <div className="flex justify-between"><span>Aperture Unstable</span><span>−{bd.instability.recoveryPct}%</span></div>
+                  <div className="flex justify-between"><span>Cause: {t(`vit.cause.${bd.instability.cause}`)}</span><span>{fmtRemaining(bd.instabilityRemaining)}</span></div>
+                </div>
+              ) : (
+                <div className="flex justify-between text-emerald-400/80"><span>Vital Gu</span><span>Stable</span></div>
+              )}
               {bd.accelMul > 1 && <div className="flex justify-between text-sky-300/80"><span>Accelerated</span><span>×{bd.accelMul}</span></div>}
               <div className="flex justify-between border-t border-white/5 pt-0.5 text-sky-300/90"><span>Total</span><span>+{bd.total.toFixed(2)}/s</span></div>
             </div>
           )}
           <div className="text-[11px] text-stone-400">{t('ui.stones')}: <span className="text-amber-300">💎 {p.spiritStones}</span></div>
-          {p.vitalUnstableMin > 0 && (
+          {bd.instability && (
             <div className="text-[10px] text-rose-300/80 text-center">
-              {t('vit.unstable', { p: BALANCE.vital.switchPenaltyPct, d: Math.ceil(p.vitalUnstableMin / (24 * 60)) })}
+              <div>Aperture Unstable — Cause: {t(`vit.cause.${bd.instability.cause}`)}</div>
+              <div>Remaining: {fmtRemaining(bd.instabilityRemaining)} · Effect: Essence Recovery −{bd.instability.recoveryPct}%</div>
             </div>
           )}
         </div>

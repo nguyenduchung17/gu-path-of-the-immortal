@@ -2,6 +2,7 @@ import React, { createContext, useContext, useReducer, useEffect, useCallback, u
 import { gameReducer } from './gameReducer';
 import { migrateSave } from './migrate';
 import { recoveryRatePerSec } from '../config/balance';
+import { totalGameMin } from '../engine/vitalGu';
 import { ENEMY_BY_ID } from '../data/enemies';
 import { persistCombatEnemyState } from '../engine/combat';
 
@@ -58,7 +59,7 @@ function normalize(raw) {
     };
   }
   if (s.recovery) {
-    const rate = recoveryRatePerSec(s.player, s.recovery.mode);
+    const rate = recoveryRatePerSec(s.player, s.recovery.mode, totalGameMin(s.time));
     const elapsed = Math.max(0, (Date.now() - (s.recovery.startedAt || Date.now())) / 1000);
     const essence = Math.min(s.player.maxPrimevalEssence, (s.player.primevalEssence || 0) + rate * elapsed);
     s = {

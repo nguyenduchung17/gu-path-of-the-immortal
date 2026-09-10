@@ -5,6 +5,7 @@ import { GU_BY_ID } from '@/game/data/gu';
 import { PATH_BY_ID, SYNERGIES } from '@/game/data/paths';
 import { BALANCE } from '@/game/config/balance';
 import { HUNGER_META, hungerBand, isVital } from '@/game/engine/guLife';
+import { vitalStatusOf, fmtRemaining } from '@/game/engine/vitalGu';
 import GuCard from './gu/GuCard';
 import RefineGuModal from './RefineGuModal';
 
@@ -23,6 +24,7 @@ export default function GuPanel() {
   const activeSyn = SYNERGIES.filter(sy => sy.paths.every(p => equippedPaths.has(p)));
 
   const vitalInst = state.vitalGu ? state.ownedGu.find(g => g.instanceId === state.vitalGu) : null;
+  const vital = vitalStatusOf(state);
   const soon = state.ownedGu.filter(g => !isVital(state, g) && hungerBand(g.satiety) === 'hungry').length;
   const starving = state.ownedGu.filter(g => !isVital(state, g) && ['starving', 'critical'].includes(hungerBand(g.satiety))).length;
   const autoFeed = !!state.settings?.autoFeed;
@@ -57,15 +59,31 @@ export default function GuPanel() {
         <div className="mb-3 rounded-lg border border-amber-600/50 bg-gradient-to-r from-amber-900/20 to-transparent p-3">
           <div className="flex items-center justify-between gap-2">
             <div className="text-[10px] font-heading tracking-[0.25em] text-amber-300/90">{t('vit.title')}</div>
-            {state.player.vitalUnstableMin > 0 && (
-              <div className="text-[9px] text-rose-300/80">
-                {t('vit.unstable', { p: BALANCE.vital.switchPenaltyPct, d: Math.ceil(state.player.vitalUnstableMin / (24 * 60)) })}
+            {vital && (
+              <div className={`text-[9px] px-1.5 py-0.5 rounded border ${vital.status === 'stable' ? 'border-emerald-700/60 bg-emerald-900/30 text-emerald-300' : 'border-rose-700/60 bg-rose-900/30 text-rose-200'}`}>
+                {t('vit.status')}: {t(`vit.state.${vital.status}`)}
               </div>
             )}
           </div>
           <div className="text-sm font-semibold text-amber-100 mt-1">
             {GU_BY_ID[vitalInst.guId].name} <span className="text-[10px] text-stone-400">Rank {vitalInst.rank || GU_BY_ID[vitalInst.guId].rank} · {PATH_BY_ID[GU_BY_ID[vitalInst.guId].path].name}</span>
           </div>
+          {vital && (
+            <div className="text-[10px] mt-0.5 space-y-0.5">
+              {vital.status === 'stable' && <div className="text-emerald-200/80">✦ {t('vit.stableNote')}</div>}
+              {vital.instability && (
+                <div className="text-rose-200/90">
+                  <div>{t('vit.cause')}: {t(`vit.cause.${vital.causeKey}`)}</div>
+                  <div>{t('vit.remaining')}: {fmtRemaining(vital.remainingMin)} · {t('vit.recoveryPenalty')}: −{vital.recoveryPct}%</div>
+                </div>
+              )}
+              {vital.injured && (
+                <div className="text-rose-200/90">
+                  🩹 {t(vital.severity === 'severe' ? 'hun.injuredSevere' : 'hun.injured', { p: vital.severity === 'severe' ? BALANCE.guRefine.severeEffPct : BALANCE.guRefine.injuryEffPct, d: vital.injuredUntilDay })}
+                </div>
+              )}
+            </div>
+          )}
           <div className="text-[10px] text-amber-200/80 mt-0.5 space-x-2">
             <span>✦ {t('vit.bonus', { e: BALANCE.vital.effBonusPct, s: BALANCE.vital.stabilityBonusPct })}</span>
             <span>🍖 {t('vit.noFeed')}</span>

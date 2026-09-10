@@ -179,6 +179,24 @@ export function migrateSave(old) {
     s = { ...s, version: 11, log: [...(s.log || []), 'Your journal settles — every quest now keeps its own record, progress and all.'] };
   }
 
+  // v12: Vital-Gu instability is now an explicit, cause-driven record
+  // (cause + window + penalty). Legacy saves carry a bare minute-counter with
+  // no recorded cause — instability without a valid cause is invalid, so it is
+  // removed and essence recovery restored.
+  if (s.version < 12) {
+    const p = s.player || {};
+    const hadInstability = (p.vitalUnstableMin || 0) > 0;
+    const player = { ...p };
+    delete player.vitalUnstableMin;
+    player.vitalInstability = null;
+    s = {
+      ...s,
+      version: 12,
+      player,
+      log: [...(s.log || []), ...(hadInstability ? ['The Vital Gu bond settles — the aperture is stable once more.'] : [])],
+    };
+  }
+
   // Self-heal the quest state on every load: legacy shapes become per-quest
   // records and hunt progress is rebuilt from the kill tally.
   return normalizeQuestState(s);
