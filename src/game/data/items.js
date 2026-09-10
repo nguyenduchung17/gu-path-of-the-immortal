@@ -26,6 +26,16 @@ export const ITEMS = [
   // More food (the food merchant's trade)
   { id: 'riceBun', name: 'Steamed Rice Bun', category: 'food', description: 'A warm bun from the market stalls. Restores 12 HP.', value: 2, use: { hp: 12 } },
   { id: 'gingerTea', name: 'Ginger Tea', category: 'food', description: 'A warming clay cup of tea. Restores 6 HP.', value: 2, use: { hp: 6 } },
+  // Gu food — each Dao Path's Gu eats its own fare (fed via the Gu panel)
+  { id: 'flameGrass', name: 'Flame Grass', category: 'guFood', description: 'A warm-bladed grass that smolders faintly. Food for Fire-path Gu.', value: 5 },
+  { id: 'spiritWater', name: 'Spirit Spring Water', category: 'guFood', description: 'Spring water that glimmers with qi. Food for Water-path Gu.', value: 5 },
+  { id: 'mineralEssence', name: 'Mineral Essence', category: 'guFood', description: 'Ground essence-bearing ore. Food for Earth-path Gu.', value: 5 },
+  { id: 'venomSac', name: 'Venom Sac', category: 'guFood', description: 'A gland of concentrated venom — a delicacy for venomous Gu.', value: 7 },
+  { id: 'beastMeat', name: 'Beast Meat', category: 'guFood', description: 'Qi-rich meat from wild beasts. Feeds beast-natured Gu.', value: 4 },
+  // Gu gear — containment for capturing wild Gu, and care for injured ones
+  { id: 'sealingJar', name: 'Gu Sealing Jar', category: 'guGear', description: 'A clay jar sealed with a paper charm. Holds one wild Gu during capture.', value: 20 },
+  { id: 'bindingVessel', name: 'Spirit Binding Vessel', category: 'guGear', rarity: 'rare', description: 'An inscribed vessel that carries a bound spirit — far stronger than a mere jar.', value: 80 },
+  { id: 'restorationPellet', name: 'Spirit Restoration Pellet', category: 'guGear', description: 'A medicinal pellet that mends an injured Gu instantly.', value: 60 },
   // Quest
   { id: 'lostGuFragment', name: 'Lost Gu Fragment', category: 'questItems', description: 'A shard of an ancient Gu. The Gu Master wants it.', value: 0 },
   { id: 'brokenSwordFragment', name: 'Broken Sword Fragment', category: 'questItems', description: 'Half a blade, snapped long ago. A master might want it back.', value: 0 },
@@ -33,4 +43,4 @@ export const ITEMS = [
 ];
 
 export const ITEM_BY_ID = Object.fromEntries(ITEMS.map(i => [i.id, i]));
-export const ITEM_CATEGORIES = ['materials', 'medicine', 'food', 'questItems'];
+export const ITEM_CATEGORIES = ['materials', 'medicine', 'food', 'guFood', 'guGear', 'questItems'];

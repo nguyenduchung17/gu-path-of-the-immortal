@@ -60,8 +60,78 @@ export const BALANCE = {
     leash: 8,                        // how far from home an enemy will chase
     giveUpDist: 5,                   // losing the player by this margin ends the chase
     activeRadius: 16,                // enemies beyond this distance idle (performance)
+    wildGuRespawnMs: 10 * 60 * 1000, // wild Gu returns to its haunt after capture/kill
   },
   inn: { mealItemId: 'simpleMeal' },
+  // Gu hunger — long-term resource management, not micromanagement.
+  hunger: {
+    maxSatiety: 100,
+    decayPerDay: 30,                 // satiety lost per in-game day (feed roughly every ~3 days)
+    bands: { wellFedMin: 75, normalMin: 40, hungryMin: 15 },
+    penalties: {
+      normal:   { effPct: 0,   costPct: 0,  stability: 0 },
+      hungry:   { effPct: -5,  costPct: 5,  stability: -5 },
+      starving: { effPct: -15, costPct: 5,  stability: -15 },
+      critical: { effPct: -40, costPct: 10, stability: -30 },
+    },
+    criticalDaysToDeath: 2,          // days at 0 satiety before a Gu may die
+    autoFeedThreshold: 35,           // auto-feed kicks in below this satiety
+    pathFoods: {                     // what each Dao Path's Gu eats
+      fire: 'flameGrass', water: 'spiritWater', earth: 'mineralEssence', poison: 'venomSac',
+      wind: 'beastMeat', enslavement: 'beastMeat', sword: 'beastMeat', refinement: 'spiritGrass',
+    },
+  },
+  // Vital Gu (Cổ Bản Mệnh) — one bound companion, protected and empowered.
+  vital: {
+    effBonusPct: 8,
+    stabilityBonusPct: 5,
+    switchCooldownDays: 3,
+    switchPenaltyPct: 20,            // essence recovery penalty after re-binding
+    switchPenaltyDays: 1,
+  },
+  // Wild Gu capture — never guaranteed.
+  capture: {
+    base: 55,
+    perDifficulty: 8,                // − per captureDifficulty point of the species
+    rarityPenalty: { common: 0, uncommon: 8, rare: 18, epic: 30, legendary: 45 },
+    rankGapPenalty: 12,              // − per species rank above the player's rank
+    hpFullPenalty: 15,              // − at full health
+    weakenBonusMax: 35,             // + as the target's HP drops
+    luckPerPoint: 0.3,
+    masteryPerLevel: 2,             // + per relevant path mastery level
+    jarBonus: { sealingJar: 0, bindingVessel: 20 },
+    observeBonus: 8,
+    min: 5, max: 90,
+    fleeChance: 50,                 // skittish Gu slips away after a failed capture
+    attemptMinutes: 10,
+  },
+  // Gu rank-up refinement — risky, meaningful, configurable.
+  guRefine: {
+    maxRank: 5,
+    baseSuccess: 70,
+    perInt: 1,
+    perLuck: 0.5,
+    refineMasteryPerLevel: 3,
+    rankPenalty: 12,                 // − per target rank above 1
+    stonesPerRank: 60,              // × target rank
+    essencePerRank: 12,             // × target rank
+    foodPerRank: 3,                 // path food × per rank
+    corePerRank: 1,                 // beast cores × per rank
+    injuryChance: 45,               // on failure
+    deathChance: 8,                 // on failure — normal Gu only
+    injuryDays: 2,
+    injuryEffPct: -30,
+    injuryStability: -10,
+    severeInjuryDays: 2,
+    severeEffPct: -50,
+    refineBlockDays: 2,
+    rankPowerStep: 25,              // +25% effect power per rank above base
+  },
+  // Fog of war — the map is discovered by walking, not given.
+  fog: {
+    revealRadius: 5,                 // tiles revealed around the player as she moves
+    visionRadius: 4,                 // "currently visible" bright radius on the map
+  },
   // The accelerated game clock. Baseline: 1 real second = 1 in-game minute.
   time: {
     tickMs: 1000,             // real-time heartbeat of the clock
@@ -127,5 +197,7 @@ export function recoveryRatePerSec(player, mode) {
   // aptitude (and any Special Constitution) speeds essence recovery
   const apt = player.aptitude && typeof player.aptitude === 'object' ? player.aptitude : null;
   const aptMul = apt ? recoveryMulOf(apt) : 1;
-  return (player.maxPrimevalEssence / secs) * aptMul * (mode === 'accelerated' ? cfg.acceleratedMultiplier : 1);
+  // re-binding the Vital Gu leaves the aperture unstable for a while
+  const unstable = player.vitalUnstableMin > 0 ? (1 - BALANCE.vital.switchPenaltyPct / 100) : 1;
+  return (player.maxPrimevalEssence / secs) * aptMul * unstable * (mode === 'accelerated' ? cfg.acceleratedMultiplier : 1);
 }
