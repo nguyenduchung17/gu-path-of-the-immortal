@@ -10,6 +10,7 @@ const ITEMS = [
   { id: 'inventory', icon: '🎒', key: 'I' },
   { id: 'quests', icon: '📜', key: 'Q' },
   { id: 'map', icon: '🧭', key: 'P' },
+  { id: 'dashboard', icon: '📊', label: 'Dashboard' },
 ];
 
 // Bottom-center game hotbar — panels open as overlays over the world.
@@ -21,7 +22,7 @@ export default function Hotbar({ active, onSelect, onPause }) {
         <button
           key={it.id}
           onClick={() => { sfx('ui'); onSelect(it.id); }}
-          title={`${t(`ui.${it.id}`)} (${it.key})`}
+          title={it.label || `${t(`ui.${it.id}`)} (${it.key})`}
           className={`w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex flex-col items-center justify-center transition border ${
             active === it.id
               ? 'bg-emerald-600/80 border-emerald-400/60 shadow-inner'
@@ -29,7 +30,7 @@ export default function Hotbar({ active, onSelect, onPause }) {
           }`}
         >
           <span className="text-base sm:text-lg leading-none">{it.icon}</span>
-          <span className="hidden sm:block text-[8px] text-stone-300 mt-0.5 leading-none">{t(`ui.${it.id}`)}</span>
+          <span className="hidden sm:block text-[8px] text-stone-300 mt-0.5 leading-none">{it.label || t(`ui.${it.id}`)}</span>
         </button>
       ))}
       <div className="w-px self-stretch bg-stone-600/50 mx-0.5" />

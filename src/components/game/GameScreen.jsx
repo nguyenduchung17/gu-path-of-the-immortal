@@ -31,6 +31,7 @@ import InnModal from './InnModal';
 import SleepOverlay from './SleepOverlay';
 import MemorialPanel from './MemorialPanel';
 import Toasts from './Toasts';
+import DashboardScreen from './DashboardScreen';
 
 const PANEL_META = {
   cultivation: { titleKey: 'ui.cultivation', icon: '🧘' },
@@ -52,14 +53,15 @@ export default function GameScreen() {
   const [inn, setInn] = useState(null);
   const [recoveryOpen, setRecoveryOpen] = useState(false);
   const [paused, setPaused] = useState(false);
+  const [dashOpen, setDashOpen] = useState(false);
 
   // real-time heartbeat of the accelerated game clock (1s = 1 in-game minute).
   // Paused while sleeping or while the system menu is open.
   useEffect(() => {
-    if (state.sleeping || state.deceased || paused) return;
+    if (state.sleeping || state.deceased || paused || dashOpen) return;
     const t = setInterval(() => dispatch({ type: 'TIME_TICK' }), BALANCE.time.tickMs);
     return () => clearInterval(t);
-  }, [state.sleeping, state.deceased, paused, dispatch]);
+  }, [state.sleeping, state.deceased, paused, dashOpen, dispatch]);
 
   // essence recovery started → surface the cultivation panel
   useEffect(() => { if (state.recovery) setPanel('cultivation'); }, [state.recovery?.startedAt]);
@@ -67,14 +69,15 @@ export default function GameScreen() {
   // game-style Esc behavior: close the topmost overlay; if nothing is open, open the system menu.
   const escRef = useRef({});
   escRef.current = {
-    panel, paused, shop, service, inn, recoveryOpen,
+    panel, paused, shop, service, inn, recoveryOpen, dashOpen,
     busy: !!(state.combat || state.pendingEvent || state.dialogue || state.sleeping || state.deceased || state.breakthrough || state.wildEncounter),
   };
   useEffect(() => {
     const onKey = (e) => {
       if (e.key === 'Escape') {
         const s = escRef.current;
-        if (s.panel) setPanel(null);
+        if (s.dashOpen) setDashOpen(false);
+        else if (s.panel) setPanel(null);
         else if (s.shop) setShop(null);
         else if (s.service) setService(null);
         else if (s.inn) setInn(null);
@@ -95,7 +98,7 @@ export default function GameScreen() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  const inputLocked = !!panel || paused;
+  const inputLocked = !!panel || paused || dashOpen;
   const meta = panel ? PANEL_META[panel] : null;
 
   return (
@@ -106,7 +109,7 @@ export default function GameScreen() {
       {/* HUD overlays */}
       <HUDTop />
       <MessageLog />
-      <Hotbar active={panel} onSelect={setPanel} onPause={() => setPaused(true)} />
+      <Hotbar active={panel} onSelect={(id) => (id === 'dashboard' ? setDashOpen(true) : setPanel(id))} onPause={() => setPaused(true)} />
 
       {/* in-game panel overlays (world stays visible underneath) */}
       {panel && (
@@ -144,6 +147,9 @@ export default function GameScreen() {
       )}
       <RecoveryModal open={recoveryOpen} onClose={() => setRecoveryOpen(false)} />
       <BreakthroughOverlay />
+
+      {/* growth dashboard — dedicated full-screen view */}
+      {dashOpen && <DashboardScreen onClose={() => setDashOpen(false)} />}
 
       {/* system menu overlay */}
       <PauseMenu open={paused} onClose={() => setPaused(false)} onOpenPanel={(id) => { setPaused(false); setPanel(id); }} />
