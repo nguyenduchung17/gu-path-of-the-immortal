@@ -258,6 +258,31 @@ export const BALANCE = {
     minigameBonusPerHit: 8,              // each calibration hit, max +24%
     minigameSpeed: 0.05,                 // pulse speed (% per ms)
   },
+
+  // KILLER MOVES — engine-canonical section (engine/killerMoves.js).
+  // Values mirror the `km` section above so research UI and engine agree.
+  killerMoves: {
+    supportDamagePct: 45,               // each support adds this % of the core's damage window
+    supportCostPct: 50,                 // supports lend half their own essence cost to the move
+    baseActivation: 72,
+    actPerMastery: 3,                   // per level of the Core Path's mastery
+    actPerSupport: -3,                  // complexity makes activation harder
+    activationMin: 40, activationMax: 100,
+    compatBonus: { excellent: 20, good: 12, unstable: 4, poor: -10 },
+    baseChance: 35,                     // research success base %
+    perMastery: 4,                      // + per Core Path mastery level
+    essenceBase: 12,                    // flat experiment cost (core + overhead)
+    essencePerSupport: 4,
+    stonesBase: 5, stonesPerSupport: 5,  // 5 stones per component incl. the core
+    strainDays: 1,                      // failed experiment strains every component
+    strainEffPct: -20,                  // strained Gu efficiency (guLife)
+    strainCostPct: 20,                  // strained Gu cost increase (guLife)
+    retryCdMin: 2880,                   // re-try cooldown after a failure (2 in-game days)
+    maxSupportsByMastery: [0, 1, 1, 2, 2, 3], // indexed by mastery level 1–5
+    slotsBase: 2,                       // equipped technique slots (3rd unlocks at rank)
+    slotsAtRank: 3,
+  },
+
   // CAVES — separate underground maps with their own fog. Vision underground
   // is a fraction of surface sight; a scouting Gu claws most of it back.
   cave: {
