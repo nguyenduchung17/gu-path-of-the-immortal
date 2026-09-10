@@ -41,6 +41,7 @@ export const TIP_DEFS = [
   { id: 'pathPoison', due: s => (s.tutorial?.moves || 0) >= 3 && (s.knownPaths || [])[0] === 'poison' },
   { id: 'pathWind', due: s => (s.tutorial?.moves || 0) >= 3 && (s.knownPaths || [])[0] === 'wind' },
   { id: 'pathEarth', due: s => (s.tutorial?.moves || 0) >= 3 && (s.knownPaths || [])[0] === 'earth' },
+  { id: 'pathStrength', due: s => (s.tutorial?.moves || 0) >= 3 && (s.knownPaths || [])[0] === 'strength' },
   { id: 'pathSword', due: s => (s.tutorial?.moves || 0) >= 3 && (s.knownPaths || [])[0] === 'sword' },
   { id: 'pathEnslavement', due: s => (s.tutorial?.moves || 0) >= 3 && (s.knownPaths || [])[0] === 'enslavement' },
   { id: 'pathRefinement', due: s => (s.tutorial?.moves || 0) >= 3 && (s.knownPaths || [])[0] === 'refinement' },

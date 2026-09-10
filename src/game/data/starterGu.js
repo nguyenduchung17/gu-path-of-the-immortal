@@ -14,6 +14,7 @@ export const STARTER_GU = [
   { guId: 'swiftFang', icon: '🌪️', key: 'swiftFang' },
   { guId: 'stoneFist', icon: '🪨', key: 'stoneFist' },
   { guId: 'ironEdge', icon: '⚔️', key: 'ironEdge' },
+  { guId: 'ironFist', icon: '💪', key: 'ironFist' },
 ];
 
 export const DEFAULT_STARTER_GU = 'emberFang';

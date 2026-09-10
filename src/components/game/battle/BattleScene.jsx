@@ -159,6 +159,23 @@ export default function BattleScene({ combat, enemies, fx, casting, appearance, 
         <div key={`mom${hit.key}`} className="absolute left-[10%] sm:left-[16%] bottom-[10%] w-[88px] h-[88px] sm:w-[136px] sm:h-[136px] rounded-full border-2 border-teal-200/70 animate-battle-swirl"
           style={{ borderTopColor: 'transparent', borderBottomColor: 'transparent' }} />
       )}
+      {/* ---- STRENGTH (Lực Đạo): phantom fists, shockwaves, dust, cracked ground ---- */}
+      {k.strength && (
+        <>
+          {/* a colossal phantom fist sweeping into the foe */}
+          <div key={`fst${hit.key}`} className="absolute left-[22%] sm:left-[28%] bottom-[26%] w-16 h-14 sm:w-28 sm:h-24 rounded-lg animate-battle-fist"
+            style={{ background: `linear-gradient(165deg, ${col}, rgba(25,12,4,0.9))`, boxShadow: `0 0 26px 5px ${col}55` }} />
+          {/* shockwave ring at the impact point */}
+          <div key={`swk${hit.key}`} className="absolute left-[48%] sm:left-[46%] bottom-[30%] w-14 h-14 sm:w-24 sm:h-24 rounded-full border-[3px] border-amber-200/70 animate-battle-impact" />
+          {/* dust kicked off the ground */}
+          {[0, 1, 2].map((i) => (
+            <span key={`du${hit.key}${i}`} className="absolute left-[46%] sm:left-[44%] bottom-[12%] w-2.5 h-3 sm:w-3.5 sm:h-4 bg-stone-400/70 rounded-full animate-battle-shards" style={{ animationDelay: `${i * 0.07}s` }} />
+          ))}
+          {/* cracked ground beneath the foe line */}
+          <div key={`crk${hit.key}`} className="absolute left-[38%] sm:left-[36%] bottom-[6%] w-[38%] h-5 opacity-60 animate-fade-in"
+            style={{ background: 'repeating-linear-gradient(78deg, rgba(0,0,0,0.6) 0 2px, transparent 2px 8px), radial-gradient(ellipse at center, rgba(0,0,0,0.5), transparent 70%)' }} />
+        </>
+      )}
       {hit.playerStatusText && (
         <span key={`pst${hit.key}`} className="absolute left-[13%] sm:left-[17%] bottom-[20%] font-heading text-xs sm:text-sm text-teal-200 animate-battle-dmg whitespace-nowrap pointer-events-none"
           style={{ textShadow: '2px 2px 0 #000' }}>

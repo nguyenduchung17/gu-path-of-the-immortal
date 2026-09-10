@@ -225,6 +225,13 @@ const SPAWN_CELLS = [
   { packId: null, member: 'ancientGuardian', behavior: 'guard', cells: [[70, 40]] },
   { packId: null, member: 'ancientGuardian', behavior: 'guard', cells: [[75, 45]] },
   { packId: null, member: 'bandit', behavior: 'aggressive', cells: [[70, 33]] },
+  // Strength Path counters (#13) — flyers, a control cultivator, spined tanks
+  { packId: 'pk_hawks_a', member: 'galeHawk', behavior: 'aggressive', cells: [[40, 12], [41, 12]] },
+  { packId: 'pk_hawks_b', member: 'galeHawk', behavior: 'aggressive', cells: [[70, 24], [71, 25]] },
+  { packId: null, member: 'mistWarlock', behavior: 'territorial', cells: [[56, 50]] },
+  { packId: null, member: 'mistWarlock', behavior: 'guard', cells: [[72, 47]] },
+  { packId: null, member: 'spinedToad', behavior: 'territorial', cells: [[62, 48]] },
+  { packId: null, member: 'spinedToad', behavior: 'territorial', cells: [[12, 50]] },
 ];
 
 // Elite bosses — ancient horrors rooted in the most dangerous corners of the
@@ -270,13 +277,13 @@ export function initialEnemies() {
 export const ZONE_FAUNA = {
   wildForest: ['wildWolf', 'poisonSpider', 'forestSerpent'],
   deepForest: ['shadowHound', 'ironfangAlpha', 'mutatedBeast'],
-  forestOutskirts: ['wildWolf', 'wildBoar', 'bloodCrow'],
-  southernWilds: ['wildWolf', 'forestSerpent', 'stoneBeast'],
+  forestOutskirts: ['wildWolf', 'wildBoar', 'bloodCrow', 'galeHawk'],
+  southernWilds: ['wildWolf', 'forestSerpent', 'stoneBeast', 'spinedToad'],
   farmland: ['wildBoar'],
-  eastHills: ['bloodCrow', 'wildBoar', 'bandit'],
+  eastHills: ['bloodCrow', 'wildBoar', 'bandit', 'galeHawk'],
   eastPlains: ['wildBoar', 'bandit'],
-  marsh: ['forestSerpent', 'poisonSpider'],
-  ruins: ['poisonSpider', 'ancientGuardian', 'shadowHound'],
+  marsh: ['forestSerpent', 'poisonSpider', 'mistWarlock', 'spinedToad'],
+  ruins: ['poisonSpider', 'ancientGuardian', 'shadowHound', 'mistWarlock'],
   banditCamp: ['bandit', 'banditChief'],
   ironfangTerritory: ['ironfangAlpha', 'shadowHound'],
 };

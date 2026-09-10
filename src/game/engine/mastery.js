@@ -3,6 +3,7 @@ import { PATH_BY_ID } from '../data/paths';
 import { RECIPES, RECIPE_BY_ID } from '../data/recipes';
 import { GU_BY_ID } from '../data/gu';
 import { BALANCE } from '../config/balance';
+import { syncVitality, strengthLevelOf } from '../engine/strength';
 import { T, TL, locGuName, locPathName, locPathLevelText, locRecipeRumor, locRecipeClue, locRecipeLead } from '../i18n/tr';
 
 export function masteryOf(state, pathId) {
@@ -70,6 +71,9 @@ export function grantMastery(state, pathId, xp, statKey = null, via = null) {
     }
     s = pushToast(s, { kind: 'pathLevel', icon: def.icon, title: T('mst.levelToast', { path: locPathName(def), n: leveledTo }), lines: [T(`mst.title${leveledTo}`), ...lines] });
     s = { ...s, log: [...(s.log || []), T('mst.levelLog', { path: locPathName(def), n: leveledTo, title: T(`mst.title${leveledTo}`) })] };
+    // STRENGTH (Lực Đạo): deeper mastery hardens the body — Max HP grows with
+    // the Path's vitality bonus and current HP grows with it
+    if (pathId === 'strength') s = { ...s, player: syncVitality(s.player, next.level) };
   }
   return s;
 }
@@ -78,6 +82,8 @@ export function discoverPath(state, pathId) {
   if (!PATH_BY_ID[pathId] || (state.knownPaths || []).includes(pathId)) return state;
   const def = PATH_BY_ID[pathId];
   let s = { ...state, knownPaths: [...(state.knownPaths || []), pathId] };
+  // discovering the Strength Path (Lực Đạo) grants its level-1 vitality bonus
+  if (pathId === 'strength') s = { ...s, player: syncVitality(s.player, strengthLevelOf(s)) };
   s = pushToast(s, { kind: 'path', icon: def.icon, title: T('toast.pathDiscovered', { path: locPathName(def) }), lines: [TL('path.' + def.id + '.desc', def.description)] });
   return { ...s, log: [...(s.log || []), T('mst.discoverLog', { path: locPathName(def) })] };
 }

@@ -155,6 +155,9 @@
 .animate-battle-quake { animation: battleQuake 0.45s ease-out; }
 @keyframes battleProjectileFar { 0% { transform: translateX(0); opacity: 1; } 100% { transform: translateX(34vw); opacity: 0.35; } }
 .animate-battle-projectile-far { animation: battleProjectileFar 0.5s ease-out forwards; }
+/* Strength Path (Lực Đạo) — a phantom fist sweeps into the foe line */
+@keyframes battleFist { 0% { opacity: 0; transform: translateX(-90px) skewY(-8deg) scale(0.6); } 25% { opacity: 0.9; } 70% { opacity: 0.85; transform: translateX(60px) skewY(-8deg) scale(1.15); } 100% { opacity: 0; transform: translateX(110px) skewY(-8deg) scale(0.9); } }
+.animate-battle-fist { animation: battleFist 0.6s ease-out forwards; }
 
 /* cultivation aperture (essence sphere) */
 @keyframes apertureRise { 0% { transform: translateY(0) scale(1); opacity: 0; } 15% { opacity: 1; } 100% { transform: translateY(-72px) scale(0.6); opacity: 0; } }

@@ -7,9 +7,10 @@ import { locGuDesc } from '@/game/i18n/tr';
 const PATH_TINT = {
   fire: '#ff8a4a', lightning: '#ffe95a', water: '#4aa8ff', ice: '#a8e0ff',
   poison: '#b0e04a', wind: '#9fe8b0', earth: '#d9a04a', sword: '#dfe4f8',
+  strength: '#e8975a',
 };
 
-const PATH_SFX = { fire: 'fire', wind: 'wind', earth: 'stone', water: 'water' };
+const PATH_SFX = { fire: 'fire', wind: 'wind', earth: 'stone', water: 'water', strength: 'impact' };
 
 // A tiny non-battle demonstration of a starter Gu: its attack animation, its
 // signature status proc, and one line of description — before committing.

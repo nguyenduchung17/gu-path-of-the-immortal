@@ -84,6 +84,8 @@ export function sfx(name) {
       case 'cancel': blip({ type: 'triangle', f0: 420, f1: 280, dur: 0.09, vol: 0.07 }); break;
       case 'fire': noise({ dur: 0.25, vol: 0.12, freq: 600, q: 0.6 }); blip({ type: 'sawtooth', f0: 300, f1: 120, dur: 0.2, vol: 0.08 }); break;
       case 'wind': noise({ dur: 0.3, vol: 0.1, freq: 1500, q: 0.4 }); break;
+      case 'impact': blip({ type: 'triangle', f0: 95, f1: 38, dur: 0.28, vol: 0.2 }); noise({ dur: 0.2, vol: 0.12, freq: 200, q: 0.6 }); break;
+      case 'force': blip({ type: 'triangle', f0: 130, f1: 70, dur: 0.12, vol: 0.12 }); break;
       case 'stone': blip({ type: 'triangle', f0: 110, f1: 60, dur: 0.15, vol: 0.14 }); noise({ dur: 0.1, vol: 0.08, freq: 300 }); break;
       case 'water': blip({ type: 'sine', f0: 500, f1: 800, dur: 0.12, vol: 0.08 }); blip({ type: 'sine', f0: 650, f1: 950, dur: 0.12, vol: 0.06, delay: 0.08 }); break;
       case 'heal': blip({ type: 'sine', f0: 520, f1: 780, dur: 0.25, vol: 0.09 }); break;

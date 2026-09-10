@@ -44,6 +44,7 @@ import { planIntent } from './intent';
 import { terrainModsOf, TERRAIN_LABELS } from '../data/terrain';
 import { LEADER_DOWN } from '../data/packs';
 import { resolveTargets, targetKindOf } from './targeting';
+import { strengthFxOf, strengthLevelOf, forceOf } from './strength';
 import { T, TL, locGuName, locEnemyName, locPathName, locItemName, locTerrainLabel } from '../i18n/tr';
 
 const G = () => BALANCE.combat.gauge;
@@ -76,10 +77,22 @@ const dispOf = (e) => e.label || locEnemyName(ENEMY_BY_ID[e.defId] || e);
 // ---- Damage ranges & crits ----
 // Every damaging action rolls inside a visible min–max range (BALANCE), so
 // damage is variable, never fixed. The battle UI shows these same ranges.
-export function strikeRange(player) {
+// STRENGTH PATH (LỰC ĐẠO) mastery gradually sharpens the basic Strike —
+// visible in the same range the UI shows (never stronger than offensive Gu).
+export function strikeRange(player, state) {
   const sc = BALANCE.combat.strike;
   const b = (player.rank || 0) * sc.perRank + Math.floor((player.strength || 0) * sc.perStr);
-  return { min: sc.min + b, max: sc.max + b, accuracy: sc.accuracy };
+  const mul = 1 + (state ? (strengthFxOf(state).strikePct || 0) : 0) / 100;
+  return { min: Math.max(1, Math.round((sc.min + b) * mul)), max: Math.max(1, Math.round((sc.max + b) * mul)), accuracy: sc.accuracy };
+}
+
+// LỰC THẾ (Strength Momentum): one stack per landing Strike / Strength Gu
+// blow — capped; at the cap the log says so instead of silently stacking.
+function gainForce(pSt, push) {
+  const cap = BALANCE.strength.force.cap;
+  if (forceOf(pSt) >= cap) { push(T('cmt.forceMax', { cap })); return; }
+  pSt.push({ type: 'force', power: 1, duration: 999 });
+  push(T('cmt.forceGain', { n: forceOf(pSt) }));
 }
 export function guAttackRange(gu) {
   const gv = BALANCE.combat.guDamage;
@@ -291,7 +304,7 @@ export function activationChanceOf(gu, inst, state, combat) {
 // Stacking caps: damage-over-time effects stack, but never without limit — at
 // the cap a fresh application refreshes the strongest stack instead. Poison
 // stacks to ×5 (the attrition identity); wind momentum holds at 5 stacks.
-const STACK_CAPS = { burn: 3, poison: 5, momentum: 5, ccResist: 2 };
+const STACK_CAPS = { burn: 3, poison: 5, momentum: 5, ccResist: 2, force: BALANCE.strength.force.cap };
 function addStatus(statuses, entry) {
   const cap = STACK_CAPS[entry.type];
   if (cap) {
@@ -404,6 +417,18 @@ function applyGu(gu, player, enemy, pSt, eSt, combat, push, fx, syn, weather, mu
       if (gu.path === enemy.weakness) {
         dmg = Math.floor(dmg * (1 + BALANCE.combat.weaknessBonusPct / 100));
         push(T('cmt.weaknessRoar', { path: locPathName(PATH_BY_ID[gu.path]), enemy: dispOf(enemy) }));
+      }
+      // STRENGTH — LỰC THẾ momentum drives the blow deeper; airborne foes
+      // blunt pure force (the Path's weakness), while the Iron & Gale pairing
+      // lets a wind-carried charge land at full weight
+      if (gu.path === 'strength') {
+        const fstacks = forceOf(pSt);
+        if (fstacks) dmg = Math.floor(dmg * (1 + fstacks * BALANCE.strength.force.dmgPerStackPct / 100));
+        if (enemy.abilities?.includes('evasive')) {
+          dmg = Math.floor(dmg * (1 - BALANCE.strength.strikeVsFlyingPct / 100));
+          if (h === 0) push(T('cmt.strikeVsFlier', { enemy: dispOf(enemy) }));
+        }
+        if (syn.has('ironGale')) dmg = Math.floor(dmg * 1.1);
       }
       // path synergy — lightning races across a soaked hide
       if (gu.element === 'lightning' && hasStatus(eSt, 'soaked')) {
@@ -527,7 +552,16 @@ function applyGu(gu, player, enemy, pSt, eSt, combat, push, fx, syn, weather, mu
       push(T('cmt.momentum', { n: stacks + 1, p: mom.power }));
     } else push(T('cmt.momentumMax', { cap: mom.cap || 5 }));
   }
-  if (e.stab) applyStabilityDamage(enemy, combat, e.stab * (mul >= 1 ? 1 : 0.75), push, gu.path);
+  if (e.stab) {
+    let stabAmt = e.stab * (mul >= 1 ? 1 : 0.75);
+    // STRENGTH: momentum deepens the shatter (+ per stack), and the Mountain
+    // Breaker pairing (Strength+Earth — the tank/Break build) deepens it again
+    if (gu.path === 'strength') {
+      stabAmt *= 1 + forceOf(pSt) * BALANCE.strength.force.breakPerStackPct / 100;
+      if (syn.has('mountainBreaker')) stabAmt *= 1.25;
+    }
+    applyStabilityDamage(enemy, combat, stabAmt, push, gu.path);
+  }
   if (selfFx && e.summon) {
     const p = Math.max(1, Math.floor(e.summon.power * mul * (1 + (fx.summonPct || 0) / 100) * (syn.has('tamedTides') ? 1.15 : 1)));
     eSt.push({ type: 'summon', power: p, duration: (e.summon.duration || 3) + (fx.summonTurns || 0) });
@@ -937,21 +971,38 @@ function executeRoundInner(state, action, hpBefore) {
   } else if (action.type === 'strike') {
     // free basic attack — the weak emergency fallback (0 essence, chips GUARD).
     // 95% accuracy; rolls inside the visible strike range, may crit.
+    // STRENGTH PATH (LỰC ĐẠO): mastery sharpens the strike, LỰC THẾ momentum
+    // raises both its damage and its GUARD-crushing — and every landing hit
+    // builds the momentum a phantom Killer Move devours later. Airborne foes
+    // are hard to reach with a bare fist; spined foes punish Strike spam.
     const sc = cfg.strike;
-    const rng = strikeRange(player);
-    if (Math.random() * 100 >= rng.accuracy) {
-      push(T('cmt.strikeMiss', { enemy: dispOf(target) }));
+    const sLv = strengthLevelOf(state);
+    const fcfg = BALANCE.strength;
+    const flying = !!target.abilities?.includes('evasive');
+    const rng = strikeRange(player, state);
+    const acc = rng.accuracy - (flying ? fcfg.strikeVsFlyingAcc : 0);
+    if (Math.random() * 100 >= acc) {
+      push(flying ? T('cmt.strikeAirMiss', { enemy: dispOf(target) }) : T('cmt.strikeMiss', { enemy: dispOf(target) }));
     } else {
+      const stacks = forceOf(pSt);
       let dmg = rollIn(rng);
+      dmg = Math.floor(dmg * (1 + stacks * fcfg.force.dmgPerStackPct / 100));
       dmg = Math.floor(dmg * damageTakenMul(target));
       const guard = target.statuses.find(s => s.type === 'guard');
       if (guard) { dmg = Math.floor(dmg * (1 - (guard.power || 0) / 100)); push(T('cmt.guardHunker', { enemy: dispOf(target) })); }
       dmg = Math.max(1, dmg - Math.floor(effDefenseOf(target) * 0.5));
+      if (syn.has('bladeBrawn')) dmg = Math.floor(dmg * 1.15); // Strength+Sword: physical burst
       const critMul = critMulOf(null);
       if (critMul > 1) { dmg = Math.floor(dmg * critMul); push(T('cmt.strikeCrit')); }
       target.hp -= dmg;
       push(T('cmt.strike', { enemy: dispOf(target), dmg }));
-      applyStabilityDamage(target, combat, Math.round(sc.stab + player.strength * sc.stabPerStr), push);
+      const stabAmt = (sc.stab + player.strength * sc.stabPerStr) * (1 + stacks * fcfg.force.breakPerStackPct / 100);
+      applyStabilityDamage(target, combat, Math.round(stabAmt), push, sLv > 0 ? 'strength' : null);
+      if (sLv > 0) gainForce(pSt, push);
+      if (target.abilities?.includes('counter')) {
+        player.hp -= fcfg.counterDmg;
+        push(T('cmt.strikeCounter', { enemy: dispOf(target), dmg: fcfg.counterDmg }));
+      }
     }
   } else if (action.type === 'observe') {
     // free recon: reveal the foes and steady your Killer-Move focus
@@ -993,6 +1044,21 @@ function executeRoundInner(state, action, hpBefore) {
     }
     if (activated) {
       const fx = bonusOf(state, gu.path);
+      // STRENGTH — LỰC THẾ consumption: a momentum-eating Killer Move devours
+      // stacks for raw crushing force before the blow lands
+      let forceBonusPct = 0;
+      const cons = gu.effect.consumeForce;
+      if (cons && strengthLevelOf(state) > 0) {
+        const take = Math.min(cons.max, forceOf(pSt));
+        if (take > 0) {
+          let removed = 0;
+          for (let i = pSt.length - 1; i >= 0 && removed < take; i--) {
+            if (pSt[i].type === 'force') { pSt.splice(i, 1); removed++; }
+          }
+          forceBonusPct = take * (cons.dmgPerStackPct || BALANCE.strength.killerConsume.dmgPerStackPct);
+          push(T('cmt.forceConsume', { n: take, p: forceBonusPct }));
+        }
+      }
       // targeting categories (#15–#23): resolve who is hit and how hard
       const tlist = resolveTargets(combat, gu, target.uid);
       let meaningful = false;
@@ -1003,9 +1069,14 @@ function executeRoundInner(state, action, hpBefore) {
         if (kind === 'chain' && i > 0) push(T('cmt.chainLeap', { enemy: dispOf(foe) }));
         if (kind === 'cleave' && i > 0) push(T('cmt.cleaveHit', { enemy: dispOf(foe) }));
         const m = applyGu(gu, player, foe, pSt, foe.statuses, combat, push, fx, syn, weather,
-          cond.effMul * (1 + prof.powerPct / 100) * t.mul, { selfFx: i === 0, procMul: t.sec ? 0.6 : 1 });
+          cond.effMul * (1 + prof.powerPct / 100) * t.mul * (1 + forceBonusPct / 100), { selfFx: i === 0, procMul: t.sec ? 0.6 : 1 });
         if (m) meaningful = true;
       });
+      // STRENGTH — landing a Strength Gu blow feeds LỰC THẾ; a momentum-
+      // devouring Killer Move feasts instead of feeding
+      if (meaningful && gu.path === 'strength' && !gu.effect.consumeForce && strengthLevelOf(state) > 0) {
+        gainForce(pSt, push);
+      }
       if (meaningful) {
         combat.contributed[gu.path] = true;
         guUsedName = gu.name;

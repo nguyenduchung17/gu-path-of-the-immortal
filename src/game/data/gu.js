@@ -310,6 +310,34 @@ export const GU = [
     energyCost: 9, cooldown: 3,
     effect: { attack: { power: 7, range: [6, 9] }, stab: 12, delay: { pct: 15 }, target: { kind: 'all' } },
   },
+  // ---- Strength (Lực Đạo) — the body as weapon ----
+  // forceGain: each landing blow builds +1 LỰC THẾ (max BALANCE.strength.force.cap).
+  // consumeForce: the Killer Move devours up to `max` momentum stacks, each
+  // adding dmgPerStackPct raw damage — a momentum-consuming move never builds.
+  {
+    id: 'ironFist', name: 'Iron Fist Gu', rank: 1, type: 'Attack', path: 'strength', element: 'none', rarity: 'common',
+    description: 'A Gu of dense body-forging qi. Every landing blow builds LỰC THẾ (Force Momentum) — and its strikes grind the foe\u2019s GUARD to splinters.',
+    energyCost: 3, cooldown: 1,
+    effect: { attack: { power: 8, range: [7, 10] }, stab: 10, forceGain: 1 },
+  },
+  {
+    id: 'giantFistPhantom', name: 'Giant Fist Phantom', rank: 3, type: 'Attack', path: 'strength', element: 'none', rarity: 'epic',
+    description: 'A colossal phantom fist descends — the signature Killer Move of the Strength Path. Devours up to 3 LỰC THẾ stacks, each one adding raw crushing force.',
+    energyCost: 12, cooldown: 3,
+    effect: { attack: { power: 22, range: [18, 26] }, stab: 22, consumeForce: { max: 3, dmgPerStackPct: 8 } },
+  },
+  {
+    id: 'rhinoCharge', name: 'Rhino Phantom Charge', rank: 3, type: 'Attack', path: 'strength', element: 'none', rarity: 'epic',
+    description: 'A phantom rhino carries your charge in — heavy GUARD damage, bites through part of any armor, and hurls the foe\u2019s next action back.',
+    energyCost: 10, cooldown: 3,
+    effect: { attack: { power: 14, range: [12, 16], armorPen: 30 }, stab: 18, delay: { pct: 40 } },
+  },
+  {
+    id: 'bullRushPhantom', name: 'Bull Rush Phantom', rank: 3, type: 'Attack', path: 'strength', element: 'none', rarity: 'epic',
+    description: 'A phantom bull carries your charge THROUGH the enemy line — the primary foe takes the full impact, aligned foes are trampled and thrown off pace.',
+    energyCost: 12, cooldown: 3,
+    effect: { attack: { power: 13, range: [11, 15] }, stab: 10, delay: { pct: 20 }, target: { kind: 'cleave', pct: 50 } },
+  },
 ];
 
 export const GU_BY_ID = Object.fromEntries(GU.map(g => [g.id, g]));

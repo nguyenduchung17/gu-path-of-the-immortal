@@ -5,7 +5,7 @@ import { PATHS } from '@/game/data/paths';
 
 // "Path Combat Effects" — the eight combat identities in one glance. Shown
 // during starter selection and available later from the Help codex.
-const FX_PATHS = ['fire', 'lightning', 'water', 'ice', 'poison', 'wind', 'earth', 'sword'];
+const FX_PATHS = ['fire', 'lightning', 'water', 'ice', 'poison', 'wind', 'earth', 'sword', 'strength'];
 
 export default function PathEffectsPanel() {
   const { t } = useT();

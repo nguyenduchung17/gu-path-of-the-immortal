@@ -265,6 +265,17 @@ export function migrateSave(old) {
     };
   }
 
+  if (s.version < 16) {
+    // Strength Path (Lực Đạo): track the un-bonused Max-HP base so the Path's
+    // mastery vitality bonus can ride on top of it from now on.
+    const p = s.player || {};
+    s = {
+      ...s,
+      version: 16,
+      player: { ...p, baseMaxHp: p.baseMaxHp ?? p.maxHp, strengthHpPct: 0 },
+    };
+  }
+
   // Self-heal the quest state on every load: legacy shapes become per-quest
   // records and hunt progress is rebuilt from the kill tally.
   return normalizeQuestState(s);

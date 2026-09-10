@@ -41,6 +41,8 @@ export function effectSummary(gu, t) {
   if (e.attack?.armorPen) parts.push(`${t('fx.armorPen')} ${e.attack.armorPen}%`);
   if (e.selfDelay) parts.push(`${t('fx.selfDelay')} +${e.selfDelay.pct}%`);
   if (e.soak) parts.push(t('fx.soak'));
+  if (e.forceGain) parts.push(`${t('fx.forceGain')} +${e.forceGain}/hit`);
+  if (e.consumeForce) parts.push(t('fx.forceConsume', { n: e.consumeForce.max, p: e.consumeForce.dmgPerStackPct }));
   return parts.join(' · ');
 }
 
@@ -115,7 +117,8 @@ export default function BattleCommandMenu({ state, combat, busy, onGu, onItem, o
     .filter(it => (state.inventory[it.category]?.[it.id] || 0) > 0);
   const disabled = busy || combat.over;
   // Strike's real numbers, always visible — never guess basic damage
-  const sr = strikeRange(p);
+  // (Strength Path mastery raises this exact same range)
+  const sr = strikeRange(p, state);
 
   const FILTERS = [
     { id: 'all', label: t('battle.tabAll'), roles: null },

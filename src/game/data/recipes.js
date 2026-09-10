@@ -199,6 +199,29 @@ export const RECIPES = [
     clue: 'An enslavement recipe written in an elite horror\u2019s marrow.',
     lead: 'A pact written in the Dread Matriarch\u2019s own marrow.',
   },
+  // ---- Strength Path (Lực Đạo): the three phantom Killer Moves ----
+  // Each reveals itself as body-forging mastery deepens (milestone grants).
+  {
+    id: 'giantFistPhantom', guId: 'giantFistPhantom', path: 'strength', masteryReq: 3, stageReq: 5,
+    materials: { beastCore: 3, ironOre: 3, beastBlood: 2 }, essence: 30, stones: 90, milestoneLevel: 3,
+    rumor: 'Body-forgers speak of a phantom fist that answers only those who strike true.',
+    clue: 'It reveals itself to the Skilled of the Strength Path.',
+    lead: 'Granted at Strength Mastery Level 3.',
+  },
+  {
+    id: 'rhinoCharge', guId: 'rhinoCharge', path: 'strength', masteryReq: 4, stageReq: 6,
+    materials: { ironOre: 5, beastCore: 3, beastBlood: 3 }, essence: 35, stones: 120, milestoneLevel: 4,
+    rumor: 'Old hunters swear a beast of spirit-light once shattered a stone gate in one charge.',
+    clue: 'It reveals itself to Experts of the Strength Path.',
+    lead: 'Granted at Strength Mastery Level 4.',
+  },
+  {
+    id: 'bullRushPhantom', guId: 'bullRushPhantom', path: 'strength', masteryReq: 5, stageReq: 8,
+    materials: { beastBlood: 4, beastCore: 4, ironOre: 4 }, essence: 40, stones: 150, milestoneLevel: 5,
+    rumor: 'The wildest of the body-forging scriptures is said to trample whole lines of foes.',
+    clue: 'It is said to reveal itself only to Masters of the Strength Path.',
+    lead: 'Granted at Strength Mastery Level 5.',
+  },
 ];
 
 export const RECIPE_BY_ID = Object.fromEntries(RECIPES.map(r => [r.id, r]));

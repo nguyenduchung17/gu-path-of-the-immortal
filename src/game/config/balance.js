@@ -105,6 +105,22 @@ export const BALANCE = {
     // Slow by design — fleeing leaves a wound that persists for a long while.
     regen: { defaultPctPerMin: 0.25, elitePctPerMin: 0.5, stabilityPctPerMin: 5 },
   },
+  // STRENGTH PATH (LỰC ĐẠO) — the body as weapon: a sharper basic Strike,
+  // deeper vitality (Max HP) and LỰC THẾ (Strength Momentum) built by landing
+  // melee hits and devoured by phantom Killer Moves. Never a flat damage
+  // multiplier: force stacks gate damage AND GUARD-crushing, and what feeds
+  // on momentum cannot also build it.
+  strength: {
+    force: {
+      cap: 5,               // max LỰC THẾ stacks
+      dmgPerStackPct: 4,    // per stack: Strength damage +
+      breakPerStackPct: 8, // per stack: GUARD (stability) damage +
+    },
+    killerConsume: { max: 3, dmgPerStackPct: 8 }, // Killer Moves devour stacks for force
+    strikeVsFlyingAcc: 25,  // Strike accuracy lost vs airborne foes
+    strikeVsFlyingPct: 35,  // Strength Gu damage lost vs airborne foes
+    counterDmg: 3,          // SPINED foes rake this back per basic Strike
+  },
   world: {
     respawnMs: 4 * 60 * 1000,        // world enemy respawn timer
     gatherRespawnMs: 3 * 60 * 1000,  // gathering node respawn timer
@@ -155,7 +171,7 @@ export const BALANCE = {
     pathFoods: {                     // what each Dao Path's Gu eats
       fire: 'flameGrass', water: 'spiritWater', earth: 'mineralEssence', poison: 'venomSac',
       wind: 'beastMeat', enslavement: 'beastMeat', sword: 'beastMeat', refinement: 'spiritGrass',
-      lightning: 'beastMeat', ice: 'spiritWater',
+      lightning: 'beastMeat', ice: 'spiritWater', strength: 'beastMeat',
     },
   },
   // Vital Gu (Cổ Bản Mệnh) — one bound companion, protected and empowered.

@@ -110,6 +110,18 @@ export const PATHS = [
       { text: '+15% Sword Gu damage · Sword Gu essence cost −10%', fx: { damagePct: 3, costPct: 5 } },
     ],
   },
+  {
+    id: 'strength', name: 'Strength Path', icon: '💪', color: 'text-orange-300', border: 'border-orange-700/40',
+    description: 'The body is the weapon. A sharper Strike, deeper vitality and crushing melee force — Lực Thế gathers behind every blow until a phantom Killer Move ends the fight.',
+    levels: [
+      // cumulative: +5/8/12/18/25% Strike damage · +3/5/8/12/15% Max HP (spec)
+      { text: '+5% Strike damage · +3% Max HP', fx: { strikePct: 5, maxHpPct: 3 } },
+      { text: '+3% Strike damage · +2% Max HP', fx: { strikePct: 3, maxHpPct: 2 } },
+      { text: '+4% Strike damage · +3% Max HP', fx: { strikePct: 4, maxHpPct: 3 } },
+      { text: '+6% Strike damage · +4% Max HP', fx: { strikePct: 6, maxHpPct: 4 } },
+      { text: '+7% Strike damage · +3% Max HP · Strength Gu essence cost −10%', fx: { strikePct: 7, maxHpPct: 3, costPct: 10 } },
+    ],
+  },
 ];
 
 export const PATH_BY_ID = Object.fromEntries(PATHS.map(p => [p.id, p]));
@@ -119,4 +131,7 @@ export const SYNERGIES = [
   { id: 'windFan', name: 'Riding the Wind', paths: ['fire', 'wind'], desc: 'Fire Gu damage +10% while a Wind Gu is also equipped.' },
   { id: 'mountainSpring', name: 'Mountain Springs', paths: ['earth', 'water'], desc: 'Barriers +15% and you regenerate 2 HP per round.' },
   { id: 'tamedTides', name: 'Tamed Tides', paths: ['enslavement', 'water'], desc: 'Summon strength +15%.' },
+  { id: 'ironGale', name: 'Iron & Gale', paths: ['strength', 'wind'], desc: 'Strength Gu damage +10% — the wind carries the charge into melee.' },
+  { id: 'mountainBreaker', name: 'Mountain Breaker', paths: ['strength', 'earth'], desc: 'GUARD damage from Strength techniques +25% — the tank-and-Break build.' },
+  { id: 'bladeBrawn', name: 'Blade & Brawn', paths: ['strength', 'sword'], desc: 'Basic Strike damage +15% — pure physical burst.' },
 ];

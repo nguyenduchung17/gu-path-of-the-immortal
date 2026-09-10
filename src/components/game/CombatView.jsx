@@ -23,7 +23,7 @@ const PATH_COLORS = {
   fire: '#ff8a4a', water: '#4aa8ff', wind: '#9fe8b0', earth: '#d9a04a',
   lightning: '#ffe95a', ice: '#a8e0ff', poison: '#b0e04a',
   darkness: '#a88ad8', blood: '#e06a6a', metal: '#c8ccd8', wood: '#8fc86a',
-  sword: '#dfe4f8',
+  sword: '#dfe4f8', strength: '#e8975a',
 };
 
 // Every status shows icon, remaining duration and stacks — hover for details.
@@ -48,6 +48,7 @@ const STATUS_META = {
   paralysis: { icon: '⚡', label: 'Paralyzed', desc: 'Loses its next action. Nerves harden after it lands.', tone: 'bg-yellow-900/50 text-yellow-200 border-yellow-600/50' },
   frozen: { icon: '❄️', label: 'Frozen', desc: 'Loses its next action — charged attacks are interrupted.', tone: 'bg-sky-900/50 text-sky-100 border-cyan-500/50' },
   momentum: { icon: '💨', label: 'Wind Momentum', desc: 'Each stack: +5% Speed. Lasts the whole battle (max 5).', tone: 'bg-teal-900/50 text-teal-200 border-teal-600/50' },
+  force: { icon: '💪', label: 'Force Momentum', desc: 'LỰC THẾ — each stack: +4% Strength damage, +8% GUARD damage. Killer Moves devour stacks for crushing force.', tone: 'bg-orange-900/50 text-orange-200 border-orange-600/50' },
   ccResist: { icon: '🧿', label: 'Hardened', desc: 'Control resistance +30% — paralysis and freeze land less often.', tone: 'bg-indigo-900/50 text-indigo-200 border-indigo-600/50' },
   demoralized: { icon: '🏳️', label: 'Demoralized', desc: 'Its leader has fallen — damage and speed reduced.', tone: 'bg-stone-800/60 text-stone-300 border-stone-500/50' },
 };
@@ -59,7 +60,7 @@ function guSound(gu, kinds) {
   if (kinds.heal || kinds.essence) return 'heal';
   if (kinds.investigate) return 'sense';
   if (isKillerMove(gu)) return 'killer';
-  if (kinds.attack) return gu.path === 'fire' ? 'fire' : gu.path === 'wind' ? 'wind' : gu.path === 'earth' ? 'stone' : gu.path === 'water' ? 'water' : 'cast';
+  if (kinds.attack) return gu.path === 'fire' ? 'fire' : gu.path === 'wind' ? 'wind' : gu.path === 'earth' ? 'stone' : gu.path === 'water' ? 'water' : gu.path === 'strength' ? 'impact' : 'cast';
   return 'cast';
 }
 
@@ -94,7 +95,7 @@ function StatusChips({ statuses }) {
       {groups.map((g, i) => {
         const meta = STATUS_META[g.type];
         const value = g.type === 'barrier' ? `${g.power}·${g.duration}`
-          : g.type === 'momentum' ? `×${g.count}`
+          : g.type === 'momentum' || g.type === 'force' ? `×${g.count}`
           : g.type === 'demoralized' ? '—'
           : `${g.count > 1 ? `×${g.count} ` : ''}${g.duration}`;
         return (
@@ -174,6 +175,8 @@ export default function CombatView() {
       else if (l.includes('FROZEN solid')) { kinds.frozen = true; statusText = t('battle.frozen'); }
       else if ((m = l.match(/POISON ×(\d+)/))) { kinds.poison = true; statusText = t('battle.poisonStack', { n: m[1] }); }
       else if ((m = l.match(/WIND MOMENTUM \+(\d+)/))) { kinds.momentum = true; playerStatusText = t('battle.momentumGain', { n: m[1] }); }
+      else if ((m = l.match(/spines rake you for (\d+) damage/))) playerDmg += +m[1];
+      else if ((m = l.match(/💪.*?\+(\d+)/))) { kinds.force = true; playerStatusText = t('battle.forceGain', { n: m[1] }); }
       else if (l.includes('Stone Guard braces')) kinds.defense = true;
       else if (l.includes('blurs your form')) kinds.evasion = true;
       else if (l.includes('hardens your defense') || l.includes('brace behind')) kinds.defense = true;
@@ -194,6 +197,9 @@ export default function CombatView() {
         kinds[key] = kinds[key] ?? key !== 'attack';
       }
       if (gu.effect.attack) kinds.attack = true;
+      // STRENGTH (Lực Đạo) attacks get the physical VFX treatment — phantom
+      // fists, shockwaves, dust and cracked ground, never magical projectiles
+      if (gu.path === 'strength' && kinds.attack) kinds.strength = true;
     }
     pendingGu.current = null;
     const castColor = gu ? PATH_COLORS[gu.path] || '#8fd8a0' : null;
@@ -211,6 +217,7 @@ export default function CombatView() {
     if (block) sfx('block');
     if (kinds.paralysis || kinds.frozen) sfx('crit');
     if (kinds.momentum) sfx('wind');
+    if (kinds.force) sfx('force');
     if (kinds.poison) sfx('cast');
   }, [logLen]);
 

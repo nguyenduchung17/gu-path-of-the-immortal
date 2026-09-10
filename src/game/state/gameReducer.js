@@ -23,6 +23,7 @@ import { ARENA_BY_ID } from '../data/arena';
 import { DEFAULT_APPEARANCE } from '../data/appearance';
 import { essenceCapFor, cultivateMulOf, normalizeAptitude, rollAptitudeScore, rollConstitution } from '../config/aptitude';
 import { starterGuOf } from '../data/starterGu';
+import { syncVitality, strengthLevelOf } from '../engine/strength';
 import { SPECIES_BY_ID, wildCombatDef, captureChanceOf, initialWildGu } from '../data/wildGu';
 import { revealFog, seedFog, foodOf } from '../engine/guLife';
 import { applyExploreGu, carryIntoCombat, visionRadiusOf, checkHiddenPaths, hazardStep, moveOverride, exploreActive, ambushOf } from '../engine/exploration';
@@ -44,8 +45,8 @@ export function createNewGame(name, gender, age, difficulty, slot, appearance, a
   );
   const essenceCap = essenceCapFor(START_STAGE.maxEssence, apt);
   const starterFood = foodOf(starter);
-  return {
-    version: 15,
+  const fresh = {
+    version: 16,
     difficulty: DIFFICULTIES[difficulty] ? difficulty : 'standard',
     slot: slot || 1,
     time: { day: BALANCE.time.startDay, min: BALANCE.time.startMinutes },
@@ -94,6 +95,9 @@ export function createNewGame(name, gender, age, difficulty, slot, appearance, a
     ],
     createdAt: Date.now(),
   };
+  // STRENGTH PATH (Lực Đạo): a strength starter enjoys the level-1 vitality
+  // bonus from its first breath; other cultivators gain it when they learn it
+  return { ...fresh, player: syncVitality(fresh.player, starter.path === 'strength' ? 1 : 0) };
 }
 
 
@@ -804,6 +808,10 @@ export function gameReducer(state, action) {
       const st = CULTIVATION_STAGES[np.rank * 4 + np.stage];
       np.maxHp = st.maxHp;
       np.hp = Math.min(st.maxHp, np.hp + (st.maxHp - p.maxHp));
+      // STRENGTH vitality bonus rides on top of the stage pool — baseMaxHp
+      // tracks the un-bonused value so the bonus never stacks with itself
+      np.baseMaxHp = st.maxHp;
+      Object.assign(np, syncVitality(np, strengthLevelOf(state)));
       np.maxPrimevalEssence = essenceCapFor(st.maxEssence, np.aptitude);
       // only a major rank breakthrough fully restores the aperture — minors
       // refill just a fraction, so chained breakthroughs are never free

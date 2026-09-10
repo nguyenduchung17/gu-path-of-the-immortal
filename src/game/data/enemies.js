@@ -120,6 +120,31 @@ export const ENEMIES = [
     recipeDrops: [{ recipeId: 'nightSwarm', chance: 100 }],
     description: 'The mother of every spider in the mist. Her web spans the whole Ironfang hollow, and she remembers each strand.',
   },
+  // ---- Strength Path counters (#13): foes that challenge a pure brawler ----
+  // FLYING — a bare fist cannot reach the sky; bring wind or a thrown art.
+  {
+    id: 'galeHawk', name: 'Gale Hawk', hp: 28, attack: 8, defense: 1, speed: 10,
+    abilities: ['evasive'], weakness: 'wind',
+    statusResist: { paralysis: 20, freeze: 30 },
+    drops: [{ itemId: 'windCrystal', chance: 40, qty: 1 }, { itemId: 'beastBlood', chance: 35, qty: 1 }, { itemId: 'beastCore', chance: 20, qty: 1 }],
+    description: 'A hunting hawk that rides the open winds. It strikes from angles a grounded fighter cannot answer.',
+  },
+  // CONTROL CULTIVATOR — keeps a melee brawler slowed, bound and starving.
+  {
+    id: 'mistWarlock', name: 'Mist Warlock', hp: 38, attack: 9, defense: 2, speed: 5,
+    abilities: ['poison', 'numb'], weakness: 'lightning',
+    statusResist: { poison: 100 },
+    drops: [{ itemId: 'shadowSilk', chance: 50, qty: 1 }, { itemId: 'moonPetal', chance: 30, qty: 1 }, { itemId: 'beastCore', chance: 40, qty: 1 }],
+    description: 'A stray cultivator hiding in the wet mists. His bindings slow the body — the one weapon a Strength fighter has.',
+  },
+  // COUNTER — spined hide; every bare-handed Strike invites payback.
+  {
+    id: 'spinedToad', name: 'Spined Toad', hp: 44, attack: 7, defense: 5, speed: 3,
+    abilities: ['counter'], weakness: 'ice',
+    statusResist: { paralysis: 30, freeze: 30 },
+    drops: [{ itemId: 'beastBlood', chance: 60, qty: 1 }, { itemId: 'ore', chance: 40, qty: 1 }, { itemId: 'beastCore', chance: 30, qty: 1 }],
+    description: 'A toad grown a hide of dense spines. Punishes mindless Strike spam — find the flaw in its stance instead.',
+  },
 ];
 
 export const ENEMY_BY_ID = Object.fromEntries(ENEMIES.map(e => [e.id, e]));
@@ -145,6 +170,10 @@ export const ECOLOGY = {
   mistDevourer:    { activity: 'nocturnal', stabWeakness: 'earth' },
   ruinWarden:      { stabMul: 0.75, stabWeakness: 'earth' },
   dreadMatriarch:  { activity: 'nocturnal', ambusher: true },
+  // Strength Path counters (#13)
+  galeHawk:        { activity: 'diurnal', stabMul: 1.25 },
+  mistWarlock:    { activity: 'nocturnal', ambusher: true },
+  spinedToad:      { stabMul: 0.9, stabWeakness: 'strength' },
 };
 export const ecoOf = (id) => ECOLOGY[id] || {};
 
@@ -172,6 +201,10 @@ export const ENEMY_VISUALS = {
   mistDevourer:     { kind: 'devourer', rank: 'Rank 3 · Peak Stage', danger: 5, pace: 180 },
   ruinWarden:       { kind: 'warden', rank: 'Rank 3 · Peak Stage', danger: 5, pace: 320 },
   dreadMatriarch:   { kind: 'matriarch', rank: 'Rank 3 · Peak Stage', danger: 5, pace: 150 },
+  // Strength Path counters
+  galeHawk:         { kind: 'bird',    rank: 'Rank 2 · Early Stage',  danger: 2, pace: 110 },
+  mistWarlock:      { kind: 'bandit',  rank: 'Rank 2 · Middle Stage', danger: 3, pace: 180 },
+  spinedToad:       { kind: 'mutant',  rank: 'Rank 2 · Early Stage',  danger: 2, pace: 300 },
   // wild Gu (world encounters — captured or hunted)
   flameBeetle:  { kind: 'spider', rank: 'Rank 1 · Wild Gu', danger: 1, pace: 280 },
   mistCarp:     { kind: 'snake',   rank: 'Rank 1 · Wild Gu', danger: 1, pace: 320 },
