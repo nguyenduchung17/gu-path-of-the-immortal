@@ -1,5 +1,6 @@
 import { GU_BY_ID } from '../data/gu';
 import { ITEM_BY_ID } from '../data/items';
+import { grantMastery, learnRecipe } from './mastery';
 
 let _idc = 0;
 const newInstanceId = () => 'g' + Date.now().toString(36) + (_idc++).toString(36);
@@ -25,7 +26,15 @@ export function applyEffects(state, effects) {
   if (effects.hp) player.hp = Math.min(player.maxHp, Math.max(0, player.hp + effects.hp));
   if (effects.essence) player.primevalEssence = Math.min(player.maxPrimevalEssence, Math.max(0, player.primevalEssence + effects.essence));
   if (effects.spiritStones) player.spiritStones = Math.max(0, player.spiritStones + effects.spiritStones);
-  if (effects.exp) { player.exp += effects.exp; player.totalInsight = (player.totalInsight || 0) + effects.exp; }
+  if (effects.progress) {
+    player.cultivationProgress = Math.min(100, (player.cultivationProgress || 0) + effects.progress);
+    player.totalInsight = (player.totalInsight || 0) + effects.progress;
+  }
+  if (effects.exp) { // legacy "insight" effects → cultivation progress
+    const gain = Math.max(1, Math.round(effects.exp / 2));
+    player.cultivationProgress = Math.min(100, (player.cultivationProgress || 0) + gain);
+    player.totalInsight = (player.totalInsight || 0) + effects.exp;
+  }
   if (effects.items) for (const [id, qty] of Object.entries(effects.items)) {
     const it = ITEM_BY_ID[id]; if (it) add(it.category, id, qty);
   }
@@ -43,7 +52,9 @@ export function applyEffects(state, effects) {
   if (effects.flag) quests.flags = { ...quests.flags, [effects.flag]: true };
   if (effects.message) log.push(effects.message);
 
-  const next = { ...state, player, inventory, ownedGu, reputation, quests, worldState, log };
+  let next = { ...state, player, inventory, ownedGu, reputation, quests, worldState, log };
+  if (effects.mastery) for (const [pid, xp] of Object.entries(effects.mastery)) next = grantMastery(next, pid, xp);
+  if (effects.recipes) for (const id of effects.recipes) next = learnRecipe(next, id);
   if (pendingCombat) next._pendingCombat = pendingCombat;
   return next;
 }

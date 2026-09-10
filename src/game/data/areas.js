@@ -83,6 +83,7 @@ export const AREAS = [
       { x: 12, y: 5, type: 'spiritGrass', name: 'Spirit Grass', emoji: '🌾' },
       { x: 14, y: 8, type: 'ore', name: 'Jade Ore', emoji: '🪨' },
       { x: 5, y: 8, type: 'moonPetal', name: 'Moon Petal', emoji: '🌸' },
+      { x: 6, y: 4, type: 'windCrystal', name: 'Wind Crystal', emoji: '💠' },
       { x: 10, y: 9, type: 'herb', name: 'Spirit Herb', emoji: '🌿' },
     ],
     exits: [

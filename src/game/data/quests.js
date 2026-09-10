@@ -15,7 +15,7 @@ export const QUESTS = [
     id: 'q_stoneBeast', name: 'The Stone Menace', giver: 'guMaster',
     description: 'A Stone Beast blocks the forest path. Defeat it.',
     objective: { type: 'defeat', enemy: 'stoneBeast', qty: 1 },
-    rewards: { giveGu: 'ironSkin', spiritStones: 30, reputation: { sect: 2 }, message: 'You earn the Iron Skin Gu for your courage.' },
+    rewards: { giveGu: 'ironSkin', recipes: ['mountainGuard'], spiritStones: 30, reputation: { sect: 2 }, message: 'You earn the Iron Skin Gu and the Mountain Guard recipe for your courage.' },
   },
   {
     id: 'q_lostGu', name: 'The Lost Gu', giver: 'mysteriousTraveler',

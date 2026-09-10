@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useGame } from '@/game/state/GameContext';
-import { GU, GU_BY_ID } from '@/game/data/gu';
-import { ITEM_BY_ID } from '@/game/data/items';
+import { GU_BY_ID } from '@/game/data/gu';
+import { PATH_BY_ID, SYNERGIES } from '@/game/data/paths';
+import { effectiveCost } from '@/game/engine/combat';
 
 const TYPE_COLOR = {
   Attack: 'text-rose-300 border-rose-700/40',
@@ -9,18 +10,24 @@ const TYPE_COLOR = {
   Movement: 'text-emerald-300 border-emerald-700/40',
   Control: 'text-violet-300 border-violet-700/40',
   Healing: 'text-lime-300 border-lime-700/40',
+  Summon: 'text-fuchsia-300 border-fuchsia-700/40',
   Investigation: 'text-amber-300 border-amber-700/40',
   Support: 'text-fuchsia-300 border-fuchsia-700/40',
 };
 
-function GuCard({ inst, equipped, onEquip, onUnequip }) {
+function GuCard({ inst, equipped, onEquip, onUnequip, state }) {
   const gu = GU_BY_ID[inst.guId];
+  const path = PATH_BY_ID[gu.path];
+  const cost = effectiveCost(gu, state);
   return (
     <div className={`rounded-lg border p-3 bg-black/20 ${equipped ? 'border-emerald-500/60 bg-emerald-900/10' : 'border-stone-800'}`}>
       <div className="flex justify-between items-start">
         <div>
           <div className="text-sm font-semibold text-stone-100">{gu.name}</div>
-          <div className={`text-[10px] inline-block px-1.5 rounded border ${TYPE_COLOR[gu.type]}`}>{gu.type} · Rank {gu.rank}</div>
+          <div className="flex gap-1 items-center mt-0.5">
+            <div className={`text-[10px] inline-block px-1.5 rounded border ${TYPE_COLOR[gu.type]}`}>{gu.type}</div>
+            <div className={`text-[10px] inline-block px-1.5 rounded border ${path.border} ${path.color}`}>{path.icon} {path.name}</div>
+          </div>
         </div>
         {equipped
           ? <button onClick={() => onUnequip(inst.instanceId)} className="text-[10px] px-2 py-1 rounded bg-emerald-700/40 text-emerald-200">Equipped</button>
@@ -28,8 +35,9 @@ function GuCard({ inst, equipped, onEquip, onUnequip }) {
       </div>
       <p className="text-[11px] text-stone-400 mt-1.5">{gu.description}</p>
       <div className="text-[10px] text-stone-500 mt-1.5 flex gap-3">
-        <span>⚡ {gu.energyCost}</span><span>⏳ {gu.cooldown}</span>
-        {gu.element !== 'none' && <span className="capitalize">◈ {gu.element}</span>}
+        <span>⚡ {cost}{cost !== gu.energyCost && <span className="text-emerald-400"> (−mastery)</span>}</span>
+        <span>⏳ {gu.cooldown}</span>
+        <span className="capitalize">{gu.rarity}</span>
       </div>
     </div>
   );
@@ -37,63 +45,36 @@ function GuCard({ inst, equipped, onEquip, onUnequip }) {
 
 export default function GuPanel() {
   const { state, dispatch } = useGame();
-  const [mode, setMode] = useState('owned');
   const equipped = new Set(state.player.equippedGu);
+  const equippedPaths = new Set(state.player.equippedGu.map(id => {
+    const inst = state.ownedGu.find(g => g.instanceId === id);
+    return inst && GU_BY_ID[inst.guId].path;
+  }));
+  const activeSyn = SYNERGIES.filter(sy => sy.paths.every(p => equippedPaths.has(p)));
 
   return (
     <div className="pt-3 animate-fade-in">
-      <div className="flex gap-1 mb-3">
-        <button onClick={() => setMode('owned')} className={`px-3 py-1.5 rounded-lg text-xs ${mode === 'owned' ? 'bg-emerald-600 text-white' : 'bg-white/5 text-stone-300'}`}>My Gu ({state.ownedGu.length})</button>
-        <button onClick={() => setMode('refine')} className={`px-3 py-1.5 rounded-lg text-xs ${mode === 'refine' ? 'bg-emerald-600 text-white' : 'bg-white/5 text-stone-300'}`}>Refine</button>
-      </div>
+      <p className="text-xs text-stone-400 mb-2">
+        Equipped Gu are usable in combat (up to 6). Using Gu of a Path in battle deepens your mastery of that Path.
+      </p>
 
-      {mode === 'owned' ? (
-        <>
-          <p className="text-xs text-stone-400 mb-2">Equipped Gu are usable in combat. Up to 6 may be equipped — build synergies.</p>
-          <div className="grid sm:grid-cols-2 gap-2">
-            {state.ownedGu.map(inst => (
-              <GuCard key={inst.instanceId} inst={inst} equipped={equipped.has(inst.instanceId)}
-                onEquip={(id) => dispatch({ type: 'EQUIP_GU', instanceId: id })}
-                onUnequip={(id) => dispatch({ type: 'UNEQUIP_GU', instanceId: id })} />
-            ))}
-          </div>
-        </>
-      ) : (
-        <RefineView />
+      {activeSyn.length > 0 && (
+        <div className="mb-3 rounded-lg border border-amber-700/40 bg-amber-900/10 p-3">
+          <div className="text-[10px] uppercase tracking-wider text-amber-300/80 mb-1">Active Synergies</div>
+          {activeSyn.map(sy => (
+            <div key={sy.id} className="text-xs text-amber-200"><b>{sy.name}</b> — <span className="text-stone-400">{sy.desc}</span></div>
+          ))}
+        </div>
       )}
-    </div>
-  );
-}
 
-function RefineView() {
-  const { state, dispatch } = useGame();
-  return (
-    <div className="grid sm:grid-cols-2 gap-2">
-      {GU.map(gu => {
-        const recipe = gu.refinement;
-        const need = { ...recipe }; delete need.primevalEssence;
-        const canAfford = Object.entries(need).every(([id, q]) => (state.inventory.materials?.[id] || 0) >= q) && state.player.primevalEssence >= (recipe.primevalEssence || 0);
-        const chance = Math.min(95, 70 + state.player.intelligence * 2 + Math.floor(state.player.luck * 0.5));
-        return (
-          <div key={gu.id} className="rounded-lg border border-stone-800 bg-black/20 p-3">
-            <div className="text-sm font-semibold text-stone-100">{gu.name}</div>
-            <div className="text-[10px] text-stone-500 mb-1">Rank {gu.rank} · {gu.type}</div>
-            <p className="text-[11px] text-stone-400 mb-2">{gu.description}</p>
-            <div className="text-[10px] text-stone-400 space-y-0.5">
-              {Object.entries(need).map(([id, q]) => {
-                const have = state.inventory.materials?.[id] || 0;
-                return <div key={id} className={have >= q ? '' : 'text-rose-400'}>{ITEM_BY_ID[id]?.name || id}: {have}/{q}</div>;
-              })}
-              <div className={state.player.primevalEssence >= (recipe.primevalEssence || 0) ? '' : 'text-rose-400'}>Essence: {state.player.primevalEssence}/{recipe.primevalEssence || 0}</div>
-              <div className="text-amber-300/70">Success: {chance}%</div>
-            </div>
-            <button disabled={!canAfford} onClick={() => dispatch({ type: 'REFINE_GU', guId: gu.id })}
-              className={`mt-2 w-full py-1.5 rounded-lg text-xs font-medium ${canAfford ? 'bg-emerald-600 hover:bg-emerald-500 text-white' : 'bg-stone-800 text-stone-500 cursor-not-allowed'}`}>
-              Refine
-            </button>
-          </div>
-        );
-      })}
+      <div className="grid sm:grid-cols-2 gap-2">
+        {state.ownedGu.map(inst => (
+          <GuCard key={inst.instanceId} inst={inst} equipped={equipped.has(inst.instanceId)} state={state}
+            onEquip={(id) => dispatch({ type: 'EQUIP_GU', instanceId: id })}
+            onUnequip={(id) => dispatch({ type: 'UNEQUIP_GU', instanceId: id })} />
+        ))}
+      </div>
+      {state.ownedGu.length === 0 && <div className="text-stone-500 text-sm py-6 text-center">You own no Gu yet.</div>}
     </div>
   );
 }

@@ -23,7 +23,7 @@ export const EVENTS = [
     text: 'A narrow crack in the rock leads into darkness. A low growl echoes within.',
     options: [
       { label: 'Enter boldly', effects: { startCombat: 'mutatedBeast', message: 'A Mutated Beast lunges!' } },
-      { label: 'Investigate quietly', effects: { items: { ironOre: 2 }, message: 'You find ore near the entrance and slip away unseen.' } },
+      { label: 'Investigate quietly', effects: { items: { ironOre: 2 }, recipes: ['tideBinding'], message: 'You find ore near the entrance — and a weathered scroll bearing the Tide Binding recipe.' } },
       { label: 'Leave', effects: { message: 'You decide discretion is the better part of valor.' } },
     ],
   },
@@ -41,7 +41,7 @@ export const EVENTS = [
     text: 'A cloaked merchant offers a rare Moon Petal for 40 stones.',
     options: [
       { label: 'Buy it (40 stones)', effects: { spiritStones: -40, items: { moonPetal: 1 }, flag: 'hasMoonPetal', message: 'You acquire a Moon Petal.' } },
-      { label: 'Rob him', effects: { items: { moonPetal: 1, spiritStone: 20 }, flag: 'hasMoonPetal', reputation: { merchants: -4 }, startCombat: 'bandit', message: 'You snatch his wares — but he has friends! (-merchant rep)' } },
+      { label: 'Rob him', effects: { items: { moonPetal: 1 }, spiritStones: 20, flag: 'hasMoonPetal', reputation: { merchants: -4 }, startCombat: 'bandit', message: 'You snatch his wares and coin — but he has friends! (-merchant rep)' } },
       { label: 'Decline', effects: { message: 'You walk away.' } },
     ],
   },

@@ -28,7 +28,7 @@ export default function DialogueModal({ onShop }) {
           <div className="space-y-2">
             {npc.shop && <button onClick={() => { onShop(npc.id); close(); }} className="w-full text-left px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-sm">🛒 Trade</button>}
             {npcQuests.length > 0 && <button onClick={() => setView('quests')} className="w-full text-left px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-sm">📜 Quests ({npcQuests.length})</button>}
-            {npc.id === 'sectElder' && <p className="text-[11px] text-stone-400 px-3">Cultivate at the ✦ marker within the sect for a 50% insight bonus.</p>}
+            {npc.id === 'sectElder' && <p className="text-[11px] text-stone-400 px-3">Cultivate at the ✦ marker within the sect for ×1.5 cultivation progress.</p>}
             <button onClick={close} className="w-full text-left px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-sm text-stone-400">Leave</button>
           </div>
         )}

@@ -8,6 +8,10 @@ export const ITEMS = [
   { id: 'shadowSilk', name: 'Shadow Silk', category: 'materials', description: 'Thread spun by shadow beasts.', value: 10 },
   { id: 'moonPetal', name: 'Moon Petal', category: 'materials', description: 'A petal that drinks moonlight.', value: 9 },
   { id: 'spiritGrass', name: 'Spirit Grass', category: 'materials', description: 'Grows where qi gathers.', value: 4 },
+  { id: 'windCrystal', name: 'Wind Crystal', category: 'materials', description: 'A shard of solidified wind. Hums when storms near.', value: 14 },
+  { id: 'beastBlood', name: 'Beast Blood', category: 'materials', description: 'Vital blood of a wild beast, still warm with qi.', value: 8 },
+  { id: 'serpentGland', name: 'Serpent Gland', category: 'materials', description: 'A venom gland prized by Gu refiners.', value: 16 },
+  { id: 'mistSilk', name: 'Mist Silk', category: 'materials', description: 'Gossamer silk spun from drifting mist.', value: 12 },
   // Medicine
   { id: 'medicine', name: 'Healing Salve', category: 'medicine', description: 'Restores 25 HP.', value: 15, use: { hp: 25 } },
   { id: 'healingPill', name: 'Greater Healing Pill', category: 'medicine', description: 'Restores 55 HP.', value: 35, use: { hp: 55 } },

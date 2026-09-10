@@ -34,7 +34,7 @@ export default function TutorialOverlay() {
             </p>
           </div>
           <p className="text-[10px] text-stone-500 text-center px-2">
-            Tip: the Gu Master in town can refine gathered materials into new Gu. Cultivate at the Azure Cloud Sect for bonus insight.
+            Tip: Essence never regenerates on its own — recover it from the Cultivation tab. Recipes are sold by town masters, and every Gu belongs to a Dao Path you can master.
           </p>
         </div>
 
