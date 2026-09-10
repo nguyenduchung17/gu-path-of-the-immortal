@@ -119,3 +119,25 @@
 .animate-battle-cast { animation: battleCast 0.5s ease-out forwards; }
 @keyframes battleProjectile { 0% { transform: translateX(0); opacity: 1; } 100% { transform: translateX(170px); opacity: 0.4; } }
 .animate-battle-projectile { animation: battleProjectile 0.35s ease-out forwards; }
+@keyframes battleImpact { 0% { opacity: 0.9; transform: scale(0.3); } 100% { opacity: 0; transform: scale(2.2); } }
+.animate-battle-impact { animation: battleImpact 0.45s ease-out forwards; }
+@keyframes battleAuraRise { 0% { opacity: 0; transform: translateY(10px); } 30% { opacity: 1; } 100% { opacity: 0; transform: translateY(-24px); } }
+.animate-battle-aurarise { animation: battleAuraRise 0.9s ease-out forwards; }
+@keyframes battleShards { 0% { opacity: 0; transform: translateY(8px); } 40% { opacity: 1; } 100% { opacity: 0; transform: translateY(-20px); } }
+.animate-battle-shards { animation: battleShards 0.7s ease-out forwards; }
+@keyframes battleSwirl { 0% { opacity: 0; transform: rotate(0deg) scale(0.6); } 40% { opacity: 0.9; } 100% { opacity: 0; transform: rotate(200deg) scale(1.25); } }
+.animate-battle-swirl { animation: battleSwirl 0.8s ease-out forwards; }
+@keyframes battleBind { 0%, 100% { opacity: 0; } 25%, 75% { opacity: 0.9; } }
+.animate-battle-bind { animation: battleBind 0.8s ease-in-out forwards; }
+@keyframes battleBanner { 0% { opacity: 0; transform: translateX(-24px); } 15% { opacity: 1; transform: none; } 80% { opacity: 1; } 100% { opacity: 0; } }
+.animate-battle-banner { animation: battleBanner 1.6s ease-out forwards; }
+@keyframes battleFlashScreen { 0% { opacity: 0.85; } 100% { opacity: 0; } }
+.animate-battle-flash { animation: battleFlashScreen 0.3s ease-out forwards; }
+@keyframes battleLungeR { 0% { transform: translateX(0); } 40% { transform: translateX(-54px); } 100% { transform: translateX(0); } }
+.animate-battle-lunge-r { animation: battleLungeR 0.45s ease-out; }
+@keyframes battleDefeat { 0% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translateY(10px) rotate(80deg); } }
+.animate-battle-defeat { animation: battleDefeat 0.9s ease-in forwards; }
+@keyframes battleFaint { 0% { opacity: 1; } 100% { opacity: 0.4; transform: translateY(8px); } }
+.animate-battle-faint { animation: battleFaint 0.9s ease-in forwards; }
+@keyframes battleSway { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
+.animate-battle-sway { animation: battleSway 2.2s ease-in-out infinite; }

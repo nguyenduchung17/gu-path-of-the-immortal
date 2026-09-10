@@ -5,6 +5,8 @@ import { CULTIVATION_STAGES } from '@/game/data/cultivation';
 import { diffOf } from '@/game/config/balance';
 import { phaseOf, timeLabel, PHASE_ICON } from '@/game/engine/time';
 import { zoneAt, DEFAULT_ZONE } from '@/game/data/world';
+import { appearanceOf } from '@/game/data/appearance';
+import PortraitFrame from '../PortraitFrame';
 
 const DANGER_CHIP = {
   0: 'border-emerald-600/50 bg-emerald-950/60 text-emerald-300',
@@ -38,7 +40,7 @@ export default function HUDTop() {
       <div className="flex items-start justify-between gap-2 p-2.5">
         {/* left cluster: identity + vitals */}
         <div className="pointer-events-auto flex items-center gap-3 rounded-xl bg-black/45 backdrop-blur border border-emerald-900/50 px-3 py-2 shadow-lg">
-          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-900 flex items-center justify-center text-lg shadow-inner shrink-0">🧑</div>
+          <PortraitFrame appearance={appearanceOf(p)} size={38} />
           <div className="leading-tight">
             <div className="text-xs font-semibold text-stone-100">{p.name}</div>
             <div className="text-[10px] text-emerald-300/80">{stage.name} · {p.aptitude} · <span className="text-amber-200/70">{diffOf(state).label}</span></div>

@@ -210,8 +210,8 @@ export function executeRound(state, action) {
     if (!inst) return state;
     const gu = GU_BY_ID[inst.guId];
     const cost = effectiveCost(gu, state);
-    if (player.primevalEssence < cost) { push('Not enough primeval essence!'); return state; }
-    if ((cooldowns[inst.instanceId] || 0) > 0) { push(`${gu.name} is on cooldown.`); return state; }
+    if (player.primevalEssence < cost) { push('Not enough primeval essence!'); return { ...state, combat: { ...combat, log } }; }
+    if ((cooldowns[inst.instanceId] || 0) > 0) { push(`${gu.name} is on cooldown.`); return { ...state, combat: { ...combat, log } }; }
     player.primevalEssence -= cost;
     cooldowns[inst.instanceId] = gu.cooldown;
     const fx = bonusOf(state, gu.path);

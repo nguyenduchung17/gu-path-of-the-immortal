@@ -149,4 +149,6 @@ export const GU = [
 ];
 
 export const GU_BY_ID = Object.fromEntries(GU.map(g => [g.id, g]));
+// Killer-Move tier: high-rank / rare Gu get the banner + stronger VFX in battle.
+export const isKillerMove = (gu) => !!gu && (gu.rank >= 3 || gu.rarity === 'epic' || gu.rarity === 'legendary');
 export const GU_TYPES = ['Attack', 'Defense', 'Movement', 'Control', 'Healing', 'Summon', 'Investigation', 'Support'];

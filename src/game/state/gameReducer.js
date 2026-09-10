@@ -19,11 +19,12 @@ import { tickEnemies } from '../engine/enemies';
 import { MISSION_BY_ID } from '../data/missions';
 import { CONTRIBUTION_OFFERS } from '../data/contribution';
 import { ARENA_BY_ID } from '../data/arena';
+import { DEFAULT_APPEARANCE } from '../data/appearance';
 
 const APTITUDES = ['Dull', 'Ordinary', 'Good', 'Outstanding', 'Heavenly'];
 const START_STAGE = CULTIVATION_STAGES[0];
 
-export function createNewGame(name, gender, age, difficulty, slot) {
+export function createNewGame(name, gender, age, difficulty, slot, appearance) {
   const aptitude = APTITUDES[Math.floor(Math.random() * APTITUDES.length)];
   return {
     version: 4,
@@ -43,6 +44,7 @@ export function createNewGame(name, gender, age, difficulty, slot) {
       strength: 6, agility: 6, perception: 6, intelligence: 6, luck: 6,
       x: 42, y: 44, currentArea: 'greenValleyRegion', facing: 'down',
       spiritStones: 50, equippedGu: ['g_start'], totalInsight: 0,
+      appearance: appearance || DEFAULT_APPEARANCE,
     },
     ownedGu: [{ instanceId: 'g_start', guId: 'swiftFang', rank: 1 }],
     inventory: { materials: { herb: 3 }, medicine: { medicine: 1 }, food: { ration: 2 }, questItems: {} },
@@ -158,7 +160,7 @@ export function gameReducer(state, action) {
     case 'LOAD':
       return action.state;
     case 'NEW_GAME':
-      return createNewGame(action.name, action.gender, action.age, action.difficulty, action.slot);
+      return createNewGame(action.name, action.gender, action.age, action.difficulty, action.slot, action.appearance);
     case 'RESET':
       return { noSave: true };
 

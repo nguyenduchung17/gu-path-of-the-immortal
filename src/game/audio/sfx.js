@@ -81,6 +81,19 @@ export function sfx(name) {
       case 'dodge': noise({ dur: 0.09, vol: 0.07, freq: 1600, q: 2 }); break;
       case 'encounter': blip({ type: 'square', f0: 190, f1: 150, dur: 0.14, vol: 0.12 }); blip({ type: 'square', f0: 240, f1: 190, dur: 0.14, vol: 0.1, delay: 0.13 }); break;
       case 'chime': blip({ type: 'sine', f0: 660, dur: 0.2, vol: 0.1 }); blip({ type: 'sine', f0: 990, dur: 0.3, vol: 0.08, delay: 0.12 }); break;
+      case 'confirm': blip({ type: 'triangle', f0: 520, f1: 700, dur: 0.09, vol: 0.08 }); break;
+      case 'cancel': blip({ type: 'triangle', f0: 420, f1: 280, dur: 0.09, vol: 0.07 }); break;
+      case 'fire': noise({ dur: 0.25, vol: 0.12, freq: 600, q: 0.6 }); blip({ type: 'sawtooth', f0: 300, f1: 120, dur: 0.2, vol: 0.08 }); break;
+      case 'wind': noise({ dur: 0.3, vol: 0.1, freq: 1500, q: 0.4 }); break;
+      case 'stone': blip({ type: 'triangle', f0: 110, f1: 60, dur: 0.15, vol: 0.14 }); noise({ dur: 0.1, vol: 0.08, freq: 300 }); break;
+      case 'water': blip({ type: 'sine', f0: 500, f1: 800, dur: 0.12, vol: 0.08 }); blip({ type: 'sine', f0: 650, f1: 950, dur: 0.12, vol: 0.06, delay: 0.08 }); break;
+      case 'heal': blip({ type: 'sine', f0: 520, f1: 780, dur: 0.25, vol: 0.09 }); break;
+      case 'sense': blip({ type: 'sine', f0: 1200, f1: 1600, dur: 0.15, vol: 0.07 }); break;
+      case 'summon': blip({ type: 'sawtooth', f0: 160, f1: 90, dur: 0.3, vol: 0.1 }); noise({ dur: 0.2, vol: 0.06, freq: 250 }); break;
+      case 'killer': blip({ type: 'square', f0: 160, f1: 320, dur: 0.3, vol: 0.12 }); noise({ dur: 0.35, vol: 0.12, freq: 700 }); blip({ type: 'sine', f0: 880, dur: 0.4, vol: 0.08, delay: 0.2 }); break;
+      case 'fail': blip({ type: 'sawtooth', f0: 200, f1: 120, dur: 0.2, vol: 0.09 }); blip({ type: 'sawtooth', f0: 150, f1: 90, dur: 0.2, vol: 0.07, delay: 0.1 }); break;
+      case 'block': noise({ dur: 0.08, vol: 0.12, freq: 500, q: 3 }); blip({ type: 'triangle', f0: 220, f1: 180, dur: 0.08, vol: 0.09 }); break;
+      case 'crit': blip({ type: 'square', f0: 880, f1: 1320, dur: 0.15, vol: 0.09 }); break;
       case 'die': blip({ type: 'sawtooth', f0: 140, f1: 40, dur: 0.5, vol: 0.14 }); noise({ dur: 0.4, vol: 0.08, freq: 300 }); break;
       default: break;
     }

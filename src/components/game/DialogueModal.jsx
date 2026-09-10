@@ -6,7 +6,12 @@ import { objectiveMet } from '@/game/state/gameReducer';
 import { diffOf } from '@/game/config/balance';
 import { shopOpen } from '@/game/engine/time';
 import { INNS } from '@/game/data/world';
+import { npcAppearance } from '@/game/gfx/characterSprites';
+import { appearanceOf } from '@/game/data/appearance';
+import PortraitFrame from './PortraitFrame';
 
+// Game-style dialogue: the world stays visible behind, the NPC (who turned to
+// face you) gets a pixel portrait, and the player's own portrait joins in.
 export default function DialogueModal({ onShop, onService, onInn }) {
   const { state, dispatch } = useGame();
   const npc = NPC_BY_ID[state.dialogue.npcId];
@@ -17,13 +22,17 @@ export default function DialogueModal({ onShop, onService, onInn }) {
   const close = () => dispatch({ type: 'CLOSE_DIALOGUE' });
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 flex items-end sm:items-center justify-center p-3">
-      <div className="max-w-md w-full rounded-2xl border border-emerald-800/50 bg-[#0d1410] p-4 animate-pop">
+    <div className="fixed inset-0 z-20 bg-black/25 flex items-end justify-center p-3 pb-20 sm:pb-8 pointer-events-none">
+      <div className="max-w-md w-full rounded-2xl border border-emerald-800/50 bg-[#0d1410]/95 backdrop-blur p-4 animate-pop pointer-events-auto shadow-2xl">
         <div className="flex items-center gap-3 mb-3">
-          <div className="w-12 h-12 rounded-full bg-emerald-900/40 flex items-center justify-center text-2xl">{npc.avatar}</div>
-          <div>
+          <PortraitFrame appearance={npcAppearance(npc.id)} size={52} />
+          <div className="flex-1 min-w-0">
             <div className="text-sm font-semibold text-emerald-100">{npc.name}</div>
             <p className="text-[11px] text-stone-400 italic">"{npc.greeting}"</p>
+          </div>
+          <div className="flex flex-col items-center gap-1">
+            <PortraitFrame appearance={appearanceOf(state.player)} size={30} />
+            <span className="text-[8px] text-stone-500">You</span>
           </div>
         </div>
 

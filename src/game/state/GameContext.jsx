@@ -81,9 +81,9 @@ export function GameProvider({ children }) {
 
   const beginCreate = useCallback((i) => setCreateSlot(i), []);
   const cancelCreate = useCallback(() => setCreateSlot(null), []);
-  const finishCreate = useCallback((name, gender, age, difficulty) => {
+  const finishCreate = useCallback((name, gender, age, difficulty, appearance) => {
     const slot = createSlot;
-    dispatch({ type: 'NEW_GAME', name, gender, age, difficulty, slot });
+    dispatch({ type: 'NEW_GAME', name, gender, age, difficulty, slot, appearance });
     setCreateSlot(null);
     setActiveSlot(slot);
   }, [createSlot]);

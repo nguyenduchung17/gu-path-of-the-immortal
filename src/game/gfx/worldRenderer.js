@@ -7,10 +7,12 @@ import { ENEMY_BY_ID } from '../data/enemies';
 import { BALANCE } from '../config/balance';
 import { darknessOf, warmthOf } from '../engine/time';
 import { buildTiles, buildTrees } from './tiles';
-import { makeHumanSheet, makeBeastSheet, makeResourceIcon, npcPalette, beastPalette } from './sprites';
+import { makeBeastSheet, makeResourceIcon, beastPalette } from './sprites';
+import { getCharacterSheet, npcAppearance } from './characterSprites';
+import { appearanceOf } from '../data/appearance';
 import { hash2, makeCanvas } from './pixel';
 
-let TILES = null, TREES = null, playerSheet = null;
+let TILES = null, TREES = null;
 const npcSheets = new Map();
 const beastSheets = new Map();
 const resIcons = new Map();
@@ -20,11 +22,10 @@ function ensure() {
   if (TILES) return;
   TILES = buildTiles();
   TREES = buildTrees();
-  playerSheet = makeHumanSheet({ robe: '#2f7a52', hair: '#141414' });
 }
 
 function npcSheet(id) {
-  if (!npcSheets.has(id)) npcSheets.set(id, makeHumanSheet(npcPalette(id)));
+  if (!npcSheets.has(id)) npcSheets.set(id, getCharacterSheet(npcAppearance(id)));
   return npcSheets.get(id);
 }
 
@@ -255,8 +256,8 @@ export function drawWorld(display, state, view) {
     if (ent.kind === 'player') {
       const sx = (view.pX - x0) * 16, sy = (view.pY - y0) * 16;
       shadow(sx + 8, sy + 13);
-      const frame = moving ? [1, 2][Math.floor(t / 110) % 2] : 0;
-      g.drawImage(playerSheet[view.facing || 'down'][frame], sx, sy - 8);
+      const frame = moving ? [1, 0, 2, 0][Math.floor(t / 100) % 4] : 0;
+      g.drawImage(getCharacterSheet(appearanceOf(state.player)).frames[view.facing || 'down'][frame], sx, sy - 8);
       if (dark > 0.15) glows.push({ x: sx + 8, y: sy + 2, r: 30, col: '255,230,170', a: dark * 0.35 });
     } else if (ent.kind === 'npc') {
       const n = ent.ref;
@@ -269,7 +270,7 @@ export function drawWorld(display, state, view) {
       if (Math.abs(dx) <= 2 && Math.abs(dy) <= 2) dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
       else dir = ['down', 'left', 'right', 'up'][(h * 4) | 0];
       shadow(sx + 8, sy + 13);
-      g.drawImage(npcSheet(n.id)[dir][0], sx, sy - 8 - bob);
+      g.drawImage(npcSheet(n.id).frames[dir][0], sx, sy - 8 - bob);
       label(NPC_BY_ID[n.id].name.split(' ').slice(-1)[0], sx + 8, sy + 16, 5);
       if (state.dialogue?.npcId === n.id) { // talking
         g.fillStyle = '#f0c95a'; g.fillRect(sx + 6, sy - 16, 1, 2); g.fillRect(sx + 8, sy - 18, 1, 2); g.fillRect(sx + 10, sy - 15, 1, 1);
