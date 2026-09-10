@@ -8,6 +8,7 @@ import { GU_BY_ID } from '../data/gu';
 import { ITEM_BY_ID } from '../data/items';
 import { WORLD } from '../data/world';
 import { SPECIES_BY_ID } from '../data/wildGu';
+import { totalGameMin } from './vitalGu';
 
 const DAY_MIN = 24 * 60;
 let _tid = 0;
@@ -153,10 +154,14 @@ export function tickGuLife(state, mins) {
     if (touched) dirty = true;
   }
 
-  // Vital-Gu re-binding instability counts down in game-minutes
-  if (s.player.vitalUnstableMin > 0) {
-    const rem = Math.max(0, s.player.vitalUnstableMin - mins);
-    if (rem !== s.player.vitalUnstableMin) { s = { ...s, player: { ...s.player, vitalUnstableMin: rem } }; dirty = true; }
+  // Vital-Gu instability is an explicit record with a cause and an end time —
+  // it expires on its own and can never be triggered by hunger or cultivation.
+  const vInst = s.player.vitalInstability;
+  if (vInst && totalGameMin(s.time) >= vInst.endMin) {
+    s = { ...s, player: { ...s.player, vitalInstability: null } };
+    s = toast(s, { icon: '🩸', title: 'APERTURE STABLE', lines: ['The Vital Gu bond settles — essence recovery returns to normal.'] });
+    s = addLog(s, 'Your aperture settles — the Vital Gu bond is stable once more.');
+    dirty = true;
   }
 
   if (dirty) s = { ...s, ownedGu: nextOwned, inventory, player: { ...s.player, equippedGu: equipped } };

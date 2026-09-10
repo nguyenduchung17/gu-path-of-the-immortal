@@ -25,6 +25,7 @@ import { essenceCapFor, cultivateMulOf, normalizeAptitude, rollAptitudeScore, ro
 import { starterGuOf } from '../data/starterGu';
 import { SPECIES_BY_ID, wildCombatDef, captureChanceOf, initialWildGu } from '../data/wildGu';
 import { revealFog, seedFog, foodOf } from '../engine/guLife';
+import { startInstability } from '../engine/vitalGu';
 import { QS, acceptQuest, turnInQuest, toggleTrack, abandonQuest, applyQuestEvent, emptyQuests, markDiscovered } from '../engine/questEngine';
 
 const START_STAGE = CULTIVATION_STAGES[0];
@@ -37,7 +38,7 @@ export function createNewGame(name, gender, age, difficulty, slot, appearance, a
   const essenceCap = essenceCapFor(START_STAGE.maxEssence, apt);
   const starterFood = foodOf(starter);
   return {
-    version: 11,
+    version: 12,
     difficulty: DIFFICULTIES[difficulty] ? difficulty : 'standard',
     slot: slot || 1,
     time: { day: BALANCE.time.startDay, min: BALANCE.time.startMinutes },
@@ -53,7 +54,7 @@ export function createNewGame(name, gender, age, difficulty, slot, appearance, a
       willpower: 10,
       strength: 6, agility: 6, perception: 6, intelligence: 6, luck: 6,
       x: 42, y: 44, currentArea: 'greenValleyRegion', facing: 'down',
-      spiritStones: 50, equippedGu: ['g_start'], totalInsight: 0,
+      spiritStones: 50, equippedGu: ['g_start'], totalInsight: 0, vitalInstability: null,
       appearance: appearance || DEFAULT_APPEARANCE,
     },
     ownedGu: [{ instanceId: 'g_start', guId: starter.id, rank: starter.rank }],
@@ -956,9 +957,24 @@ export function gameReducer(state, action) {
       }
       const gu = GU_BY_ID[inst.guId];
       const prev = state.vitalGu ? state.ownedGu.find(g => g.instanceId === state.vitalGu) : null;
-      let s = { ...state, vitalGu: inst.instanceId, vitalSwitchDay: day, player: { ...state.player, vitalUnstableMin: (state.player.vitalUnstableMin || 0) + cfg.switchPenaltyDays * 24 * 60 } };
-      s = pushToast(s, { icon: '🩸', title: 'CỔ BẢN MỆNH — VITAL GU', lines: [`${gu.name} is bound as your Vital Gu.`, ...(prev ? [`The bond with ${GU_BY_ID[prev.guId].name} is released.`] : []), `Essence recovery −${cfg.switchPenaltyPct}% for ${cfg.switchPenaltyDays} day(s).`] });
-      s = { ...s, log: [...s.log, `${gu.name} becomes your Vital Gu (Cổ Bản Mệnh) — it never needs feeding, and refinement can never destroy it. Essence recovery −${cfg.switchPenaltyPct}% for ${cfg.switchPenaltyDays} day(s).`] };
+      // The FIRST bond is stable from the very start — instability follows only
+      // a re-binding that replaces an existing Vital Gu (explicit cause).
+      const switching = !!prev;
+      let s = { ...state, vitalGu: inst.instanceId, vitalSwitchDay: day };
+      if (switching) s = startInstability(s, 'switched', cfg.switchPenaltyPct, cfg.switchPenaltyDays * 24 * 60);
+      s = pushToast(s, {
+        icon: '🩸', title: 'CỔ BẢN MỆNH — VITAL GU',
+        lines: [
+          `${gu.name} is bound as your Vital Gu.`,
+          ...(prev ? [`The bond with ${GU_BY_ID[prev.guId].name} is released.`] : []),
+          ...(switching
+            ? [`Cause: Changed Vital Gu — Essence recovery −${cfg.switchPenaltyPct}% for ${cfg.switchPenaltyDays} day(s).`]
+            : ['The bond is stable — no penalties.']),
+        ],
+      });
+      s = { ...s, log: [...s.log, switching
+        ? `${gu.name} becomes your Vital Gu (Cổ Bản Mệnh). The re-binding leaves the aperture unstable — essence recovery −${cfg.switchPenaltyPct}% for ${cfg.switchPenaltyDays} day(s).`
+        : `${gu.name} becomes your Vital Gu (Cổ Bản Mệnh) — a stable bond from the very start. It never needs feeding, and refinement can never destroy it.`] };
       return advanceTime(s, BALANCE.time.talkMinutes);
     }
 
@@ -985,8 +1001,9 @@ export function gameReducer(state, action) {
         } else if (list.vital) {
           // the bond shields the Vital Gu: never death — a severe weakening instead
           s = { ...s, ownedGu: s.ownedGu.map(g => g.instanceId === inst.instanceId ? { ...g, injuredUntilDay: day + cfg.severeInjuryDays, injurySeverity: 'severe', refineBlockedUntilDay: day + cfg.refineBlockDays } : g) };
-          s = pushToast(s, { icon: '🩹', title: 'VITAL GU WEAKENED', lines: [`${gu.name} — power ${cfg.severeEffPct}%`, `Cannot refine again for ${cfg.refineBlockDays} day(s).`, 'Recover by waiting, or use a Spirit Restoration Pellet.'] });
-          s = { ...s, log: [...s.log, `Refinement fails catastrophically — ${gu.name} (Vital Gu) is severely weakened, but the bond shields it from death.`] };
+          s = startInstability(s, 'refinement', BALANCE.vital.refineRecoveryPct, cfg.severeInjuryDays * 24 * 60);
+          s = pushToast(s, { icon: '🩹', title: 'VITAL GU WEAKENED', lines: [`${gu.name} — power ${cfg.severeEffPct}%`, `Cannot refine again for ${cfg.refineBlockDays} day(s).`, `Cause: Failed Refinement — Essence recovery −${BALANCE.vital.refineRecoveryPct}% for ${cfg.severeInjuryDays} day(s).`] });
+          s = { ...s, log: [...s.log, `Refinement fails catastrophically — ${gu.name} (Vital Gu) is severely weakened, but the bond shields it from death. The aperture is unstable — essence recovery −${BALANCE.vital.refineRecoveryPct}% for ${cfg.severeInjuryDays} day(s).`] };
         } else if (Math.random() * 100 < cfg.deathChance) {
           s = { ...s, ownedGu: s.ownedGu.filter(g => g.instanceId !== inst.instanceId), player: { ...s.player, equippedGu: s.player.equippedGu.filter(id => id !== inst.instanceId) } };
           s = pushToast(s, { icon: '☠', title: 'GU DESTROYED', lines: [`${gu.name} could not withstand the refinement.`, 'It is gone from your collection.'] });

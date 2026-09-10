@@ -134,8 +134,9 @@ export const BALANCE = {
     effBonusPct: 8,
     stabilityBonusPct: 5,
     switchCooldownDays: 3,
-    switchPenaltyPct: 20,            // essence recovery penalty after re-binding
+    switchPenaltyPct: 20,            // essence recovery penalty after RE-binding (never the first bond)
     switchPenaltyDays: 1,
+    refineRecoveryPct: 15,           // temporary recovery penalty while a failed refinement destabilizes the bond
   },
   // Wild Gu capture — never guaranteed.
   capture: {
@@ -238,13 +239,14 @@ export function shopPrice(base, state) {
   return Math.max(1, Math.floor(base * diffOf(state).priceMul * (1 - rep * 0.02)));
 }
 
-export function recoveryRatePerSec(player, mode = 'normal') {
-  return recoveryBreakdown(player, mode).total;
+export function recoveryRatePerSec(player, mode = 'normal', nowMin) {
+  return recoveryBreakdown(player, mode, nowMin).total;
 }
 
 // Why the recovery rate is what it is — shown in the Cultivation menu so the
-// player sees aptitude has a real, mechanical effect.
-export function recoveryBreakdown(player, mode = 'normal') {
+// player sees aptitude has a real, mechanical effect. Vital-Gu instability is
+// an explicit, cause-driven record — never inferred from cultivation.
+export function recoveryBreakdown(player, mode = 'normal', nowMin) {
   const cfg = BALANCE.recovery;
   const stage = player.rank * 4 + (player.stage || 0);
   const secs = cfg.fullRecoverySeconds * (1 + cfg.rankTimePerStage * stage);
@@ -252,10 +254,20 @@ export function recoveryBreakdown(player, mode = 'normal') {
   // aptitude (and any Special Constitution) speeds essence recovery
   const apt = player.aptitude && typeof player.aptitude === 'object' ? player.aptitude : null;
   const aptMul = apt ? recoveryMulOf(apt) : 1;
-  // re-binding the Vital Gu leaves the aperture unstable for a while
-  const unstableMul = player.vitalUnstableMin > 0 ? (1 - BALANCE.vital.switchPenaltyPct / 100) : 1;
+  // instability only counts while its recorded window is open
+  const inst = player.vitalInstability;
+  const active = inst && (nowMin === undefined || nowMin < inst.endMin) ? inst : null;
+  const unstableMul = active ? (1 - active.recoveryPct / 100) : 1;
   const accelMul = mode === 'accelerated' ? cfg.acceleratedMultiplier : 1;
-  return { base, aptBonus: base * (aptMul - 1), unstableMul, accelMul, total: base * aptMul * unstableMul * accelMul };
+  return {
+    base,
+    aptBonus: base * (aptMul - 1),
+    instability: active,
+    instabilityRemaining: active && nowMin !== undefined ? Math.max(0, active.endMin - nowMin) : 0,
+    unstableMul,
+    accelMul,
+    total: base * aptMul * unstableMul * accelMul,
+  };
 }
 
 // Dynamic recovery prices: 1 stone per missing essence (instant), ½ stone
