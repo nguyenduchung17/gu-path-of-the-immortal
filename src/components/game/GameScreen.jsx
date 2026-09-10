@@ -11,6 +11,7 @@ import CombatView from './CombatView';
 import EventModal from './EventModal';
 import DialogueModal from './DialogueModal';
 import ShopPanel from './ShopPanel';
+import TutorialOverlay from './TutorialOverlay';
 
 export default function GameScreen() {
   const { state } = useGame();
@@ -34,6 +35,7 @@ export default function GameScreen() {
       {state.pendingEvent && <EventModal />}
       {state.dialogue && <DialogueModal onShop={setShop} />}
       {shop && <ShopPanel npcId={shop} onClose={() => setShop(null)} />}
+      <TutorialOverlay />
     </div>
   );
 }
