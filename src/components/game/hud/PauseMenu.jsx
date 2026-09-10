@@ -25,7 +25,7 @@ export default function PauseMenu({ open, onClose, onOpenPanel }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fade-in" onClick={onClose}>
       <div className="w-80 max-w-[92vw] rounded-xl border border-emerald-800/60 bg-[#101812] p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <h2 className="text-center text-xs tracking-[0.35em] text-emerald-300/90 mb-4">— SYSTEM —</h2>
+        <h2 className="text-center text-xs font-heading tracking-[0.35em] text-emerald-300/90 mb-4">— SYSTEM —</h2>
         <div className="space-y-1.5">
           <Entry primary onClick={onClose}>▶ Resume</Entry>
           <Entry onClick={() => onOpenPanel('cultivation')}>🧘 Character</Entry>

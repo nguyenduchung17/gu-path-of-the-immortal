@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useGame } from '@/game/state/GameContext';
+import { sfx, isMuted, toggleMuted } from '@/game/audio/sfx';
 import { CULTIVATION_STAGES } from '@/game/data/cultivation';
 import { diffOf } from '@/game/config/balance';
 import { phaseOf, timeLabel, PHASE_ICON } from '@/game/engine/time';
@@ -26,6 +27,7 @@ function Bar({ value, max, from, to }) {
 // Compact floating top HUD over the fullscreen world.
 export default function HUDTop() {
   const { state } = useGame();
+  const [muted, setMuted] = useState(isMuted());
   const p = state.player;
   const stage = CULTIVATION_STAGES[Math.min(19, p.rank * 4 + (p.stage || 0))];
   const t = state.time || { day: 1, min: 420 };
@@ -59,6 +61,13 @@ export default function HUDTop() {
 
         {/* right cluster: resources, clock, location */}
         <div className="pointer-events-auto flex flex-wrap items-center justify-end gap-1.5">
+          <button
+            onClick={() => { const m = toggleMuted(); setMuted(m); if (!m) sfx('ui'); }}
+            title={muted ? 'Sound off' : 'Sound on'}
+            className="text-[11px] px-2.5 py-1.5 rounded-full bg-black/45 backdrop-blur border border-stone-700 text-stone-300 hover:text-amber-300"
+          >
+            {muted ? '🔇' : '🔊'}
+          </button>
           <div className="text-[11px] px-2.5 py-1.5 rounded-full bg-black/45 backdrop-blur border border-amber-500/30 text-amber-200" title="Primordial Stones">💎 {p.spiritStones}</div>
           <div className="text-[11px] px-2.5 py-1.5 rounded-full bg-black/45 backdrop-blur border border-stone-700 text-stone-300" title={`Day ${t.day}`}>
             Day {t.day} · {PHASE_ICON[phaseOf(t.min)]} {timeLabel(t.min)}

@@ -1,4 +1,5 @@
 import React from 'react';
+import { sfx } from '@/game/audio/sfx';
 
 const ITEMS = [
   { id: 'cultivation', icon: '🧘', label: 'Cultivation', key: 'C' },
@@ -17,7 +18,7 @@ export default function Hotbar({ active, onSelect, onPause }) {
       {ITEMS.map(it => (
         <button
           key={it.id}
-          onClick={() => onSelect(it.id)}
+          onClick={() => { sfx('ui'); onSelect(it.id); }}
           title={`${it.label} (${it.key})`}
           className={`w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex flex-col items-center justify-center transition border ${
             active === it.id
@@ -31,7 +32,7 @@ export default function Hotbar({ active, onSelect, onPause }) {
       ))}
       <div className="w-px self-stretch bg-stone-600/50 mx-0.5" />
       <button
-        onClick={onPause}
+        onClick={() => { sfx('open'); onPause(); }}
         title="System Menu (Esc)"
         className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex flex-col items-center justify-center bg-white/5 border border-white/10 hover:bg-white/15 transition"
       >
