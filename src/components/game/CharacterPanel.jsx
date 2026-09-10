@@ -2,7 +2,7 @@ import React from 'react';
 import { useGame } from '@/game/state/GameContext';
 import { useT } from '@/game/i18n/LangContext';
 import { CULTIVATION_STAGES, BREAKTHROUGH_REQS } from '@/game/data/cultivation';
-import { BALANCE, recoveryRatePerSec } from '@/game/config/balance';
+import { BALANCE, recoveryBreakdown } from '@/game/config/balance';
 import { breakthroughChecklist } from '@/game/state/gameReducer';
 import { TERRACE } from '@/game/data/world';
 import { tierOf, scoreOf, constitutionName } from '@/game/config/aptitude';
@@ -39,12 +39,16 @@ export default function CharacterPanel({ onRecover }) {
   const peak = g >= 19;
   const req = peak ? null : BREAKTHROUGH_REQS[g];
   const cfg = BALANCE.cultivation;
-  const cost = cfg.essenceCostBase + cfg.essenceCostPerRank * p.rank;
+  const cost = cfg.essenceCostBase + cfg.essenceCostPerStage * g;
   const atSect = p.x === TERRACE[0] && p.y === TERRACE[1];
   const checklist = peak ? null : breakthroughChecklist(state);
   const ready = checklist?.ok;
   const breakthroughReady = !peak && p.cultivationProgress >= 100;
-  const recoveryRate = (recoveryRatePerSec(p, state.recovery?.mode || 'normal') * 60).toFixed(1);
+  const bd = recoveryBreakdown(p, state.recovery?.mode || 'normal');
+  const missingEss = p.maxPrimevalEssence - p.primevalEssence;
+  const recSecs = missingEss > 0 ? missingEss / bd.total : 0;
+  const estFull = missingEss <= 0 ? 'Full'
+    : recSecs >= 60 ? `${Math.floor(recSecs / 60)}m ${Math.round(recSecs % 60)}s` : `${Math.round(recSecs)}s`;
 
   return (
     <div className="pt-3 space-y-4 animate-fade-in">
@@ -74,8 +78,20 @@ export default function CharacterPanel({ onRecover }) {
           />
           <div className="text-xs text-sky-100">{Math.floor(p.primevalEssence)} / {p.maxPrimevalEssence} {t('ui.essence')}</div>
           <div className="text-[11px] text-stone-400">
-            {t('sp.recovery')}: <span className="text-sky-300">{t('sp.perMin', { n: recoveryRate })}</span>
+            {t('sp.recovery')}: <span className="text-sky-300">+{bd.total.toFixed(2)}/s</span>
           </div>
+          <div className="text-[11px] text-stone-400">
+            Est. full recovery: <span className="text-sky-300">{estFull}</span>
+          </div>
+          {missingEss > 0 && (
+            <div className="w-full text-[10px] text-stone-500 space-y-0.5 rounded-lg bg-black/30 px-2.5 py-1.5">
+              <div className="flex justify-between"><span>Base Recovery</span><span>+{bd.base.toFixed(2)}/s</span></div>
+              <div className="flex justify-between"><span>Aptitude Bonus</span><span className={bd.aptBonus >= 0 ? 'text-emerald-400/90' : 'text-rose-300/80'}>+{bd.aptBonus.toFixed(2)}/s</span></div>
+              {bd.unstableMul < 1 && <div className="flex justify-between text-rose-300/80"><span>Vital-Gu instability</span><span>×{bd.unstableMul.toFixed(2)}</span></div>}
+              {bd.accelMul > 1 && <div className="flex justify-between text-sky-300/80"><span>Accelerated</span><span>×{bd.accelMul}</span></div>}
+              <div className="flex justify-between border-t border-white/5 pt-0.5 text-sky-300/90"><span>Total</span><span>+{bd.total.toFixed(2)}/s</span></div>
+            </div>
+          )}
           <div className="text-[11px] text-stone-400">{t('ui.stones')}: <span className="text-amber-300">💎 {p.spiritStones}</span></div>
           {p.vitalUnstableMin > 0 && (
             <div className="text-[10px] text-rose-300/80 text-center">

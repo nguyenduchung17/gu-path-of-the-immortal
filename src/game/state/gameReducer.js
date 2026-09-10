@@ -10,7 +10,7 @@ import { advanceTime, phaseOf } from '../engine/time';
 import { applyEffects } from '../engine/effects';
 import { grantMastery, learnRecipe, bonusOf, learnClue, CLUE_RANK } from '../engine/mastery';
 import { CULTIVATION_STAGES, BREAKTHROUGH_REQS } from '../data/cultivation';
-import { BALANCE, DIFFICULTIES, diffOf, shopPrice } from '../config/balance';
+import { BALANCE, DIFFICULTIES, diffOf, shopPrice, recoveryCosts } from '../config/balance';
 import { RECIPE_BY_ID } from '../data/recipes';
 import {
   WORLD, zoneAt, isWalkable, DEFAULT_ZONE, LANDMARKS, WORLD_RESOURCES,
@@ -36,7 +36,7 @@ export function createNewGame(name, gender, age, difficulty, slot, appearance, a
   const essenceCap = essenceCapFor(START_STAGE.maxEssence, apt);
   const starterFood = foodOf(starter);
   return {
-    version: 9,
+    version: 10,
     difficulty: DIFFICULTIES[difficulty] ? difficulty : 'standard',
     slot: slot || 1,
     time: { day: BALANCE.time.startDay, min: BALANCE.time.startMinutes },
@@ -580,7 +580,7 @@ export function gameReducer(state, action) {
       if (state.combat || state.recovery) return state;
       const cfg = BALANCE.cultivation;
       const p = state.player;
-      const cost = cfg.essenceCostBase + cfg.essenceCostPerRank * p.rank;
+      const cost = cfg.essenceCostBase + cfg.essenceCostPerStage * (p.rank * 4 + (p.stage || 0));
       if (p.primevalEssence < cost) return { ...state, log: [...state.log, 'Not enough essence to cultivate.'] };
       const atSect = WORLD.tiles[p.y] && WORLD.tiles[p.y][p.x] === '*';
       const gain = Math.min(cfg.progressCap, Math.floor((cfg.progressBase + p.intelligence * cfg.progressPerInt) * cultivateMulOf(p.aptitude) * (atSect ? cfg.sectBonus : 1)));
@@ -645,11 +645,13 @@ export function gameReducer(state, action) {
       const p = state.player;
       if (p.primevalEssence >= p.maxPrimevalEssence) return state;
       let s = state;
+      let accelCost = 0;
       if (action.mode === 'accelerated') {
-        if (p.spiritStones < BALANCE.recovery.acceleratedCost) return { ...state, log: [...state.log, 'Not enough primordial stones.'] };
-        s = { ...s, player: { ...p, spiritStones: p.spiritStones - BALANCE.recovery.acceleratedCost } };
+        accelCost = recoveryCosts(p).accelerated;
+        if (p.spiritStones < accelCost) return { ...state, log: [...state.log, 'Not enough primordial stones.'] };
+        s = { ...s, player: { ...p, spiritStones: p.spiritStones - accelCost } };
       }
-      return { ...s, recovery: { mode: action.mode, startedAt: Date.now() }, log: [...s.log, action.mode === 'accelerated' ? 'You settle into accelerated recovery. (-100 primordial stones)' : 'You settle into slow meditation to recover essence.'] };
+      return { ...s, recovery: { mode: action.mode, startedAt: Date.now() }, log: [...s.log, action.mode === 'accelerated' ? `You settle into accelerated recovery. (-${accelCost} primordial stones)` : 'You settle into slow meditation to recover essence.'] };
     }
     case 'RECOVERY_TICK': {
       if (!state.recovery) return state;
@@ -680,12 +682,14 @@ export function gameReducer(state, action) {
       return { ...state, recovery: null, log: [...state.log, 'You cease recovering. The essence gained is kept.'] };
     case 'INSTANT_RECOVERY': {
       const p = state.player;
-      if (p.spiritStones < BALANCE.recovery.instantCost) return { ...state, log: [...state.log, 'Not enough primordial stones for instant recovery.'] };
+      const costs = recoveryCosts(p);
+      if (costs.missing <= 0) return state;
+      if (p.spiritStones < costs.instant) return { ...state, log: [...state.log, 'Not enough primordial stones for instant recovery.'] };
       return {
         ...state,
-        player: { ...p, spiritStones: p.spiritStones - BALANCE.recovery.instantCost, primevalEssence: p.maxPrimevalEssence },
+        player: { ...p, spiritStones: p.spiritStones - costs.instant, primevalEssence: p.maxPrimevalEssence },
         recovery: null,
-        log: [...state.log, `You burn ${BALANCE.recovery.instantCost} primordial stones — essence floods back to full. (-${BALANCE.recovery.instantCost} stones)`],
+        log: [...state.log, `You burn ${costs.instant} primordial stones — essence floods back to full. (-${costs.instant} stones)`],
       };
     }
 

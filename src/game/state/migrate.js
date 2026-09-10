@@ -158,5 +158,19 @@ export function migrateSave(old) {
     s = { ...s, version: 9, recipeKnowledge: s.recipeKnowledge || {} };
   }
 
+  // v10: essence rebalance — the aperture widens (realm base × aptitude),
+  // aptitude shapes recovery speed, and recovery prices follow missing essence.
+  if (s.version < 10) {
+    const p = s.player || {};
+    const st = CULTIVATION_STAGES[Math.min(19, (p.rank || 0) * 4 + (p.stage || 0))];
+    const cap = essenceCapFor(st.maxEssence, normalizeAptitude(p.aptitude));
+    s = {
+      ...s,
+      version: 10,
+      player: { ...p, maxPrimevalEssence: cap, primevalEssence: Math.min(p.primevalEssence ?? cap, cap) },
+      log: [...(s.log || []), 'Your aperture widens — primeval essence flows deeper and truer to your aptitude.'],
+    };
+  }
+
   return s;
 }

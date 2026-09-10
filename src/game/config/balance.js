@@ -3,8 +3,8 @@ import { recoveryMulOf } from './aptitude';
 
 export const BALANCE = {
   cultivation: {
-    essenceCostBase: 8,      // cultivate cost = base + perRank * rank
-    essenceCostPerRank: 4,
+    essenceCostBase: 5,       // cultivate cost = base + perStage × global stage
+    essenceCostPerStage: 1,   // Rank 1: 5→8 essence; later ranks cost more
     progressBase: 5,         // % progress per session before modifiers
     progressPerInt: 0.2,     // % per point of intelligence
     progressCap: 12,         // max % per session
@@ -207,14 +207,34 @@ export function shopPrice(base, state) {
   return Math.max(1, Math.floor(base * diffOf(state).priceMul * (1 - rep * 0.02)));
 }
 
-export function recoveryRatePerSec(player, mode) {
+export function recoveryRatePerSec(player, mode = 'normal') {
+  return recoveryBreakdown(player, mode).total;
+}
+
+// Why the recovery rate is what it is — shown in the Cultivation menu so the
+// player sees aptitude has a real, mechanical effect.
+export function recoveryBreakdown(player, mode = 'normal') {
   const cfg = BALANCE.recovery;
   const stage = player.rank * 4 + (player.stage || 0);
-  const secs = Math.max(cfg.minRecoverySeconds, cfg.fullRecoverySeconds * (1 - cfg.rankEfficiencyPerStage * stage));
+  const secs = cfg.fullRecoverySeconds * (1 + cfg.rankTimePerStage * stage);
+  const base = player.maxPrimevalEssence / secs;
   // aptitude (and any Special Constitution) speeds essence recovery
   const apt = player.aptitude && typeof player.aptitude === 'object' ? player.aptitude : null;
   const aptMul = apt ? recoveryMulOf(apt) : 1;
   // re-binding the Vital Gu leaves the aperture unstable for a while
-  const unstable = player.vitalUnstableMin > 0 ? (1 - BALANCE.vital.switchPenaltyPct / 100) : 1;
-  return (player.maxPrimevalEssence / secs) * aptMul * unstable * (mode === 'accelerated' ? cfg.acceleratedMultiplier : 1);
+  const unstableMul = player.vitalUnstableMin > 0 ? (1 - BALANCE.vital.switchPenaltyPct / 100) : 1;
+  const accelMul = mode === 'accelerated' ? cfg.acceleratedMultiplier : 1;
+  return { base, aptBonus: base * (aptMul - 1), unstableMul, accelMul, total: base * aptMul * unstableMul * accelMul };
+}
+
+// Dynamic recovery prices: 1 stone per missing essence (instant), ½ stone
+// per missing essence (accelerated) — recomputed live from the current pool.
+export function recoveryCosts(player) {
+  const cfg = BALANCE.recovery;
+  const missing = Math.max(0, Math.ceil(player.maxPrimevalEssence - player.primevalEssence));
+  return {
+    missing,
+    instant: Math.ceil(missing * cfg.instantStonesPerMissing),
+    accelerated: Math.ceil(missing * cfg.acceleratedStonesPerMissing),
+  };
 }

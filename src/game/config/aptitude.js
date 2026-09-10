@@ -7,12 +7,15 @@ export const APTITUDE = {
   scoreMin: 2,
   scoreMax: 10,
   // Ordered high → low; a score belongs to the first tier whose `min` it meets.
+  // essenceMul × Rank 1 Early realm base (55): D≈44 · C=55 · B≈66 · A≈80 · Perfect≈96.
+  // recoveryMul divides the 150s baseline full-recovery time at Rank 1 Early:
+  // D ~2m56 · C 2m30 · B ~1m43 · A ~1m28 · Perfect 1m15.
   tiers: [
-    { id: 'perfect', min: 9.5, essenceMul: 1.5, recoveryMul: 1.5, cultivateMul: 1.4 },
-    { id: 'a', min: 8, essenceMul: 1.25, recoveryMul: 1.25, cultivateMul: 1.18 },
-    { id: 'b', min: 6, essenceMul: 1.1, recoveryMul: 1.1, cultivateMul: 1.06 },
-    { id: 'c', min: 4, essenceMul: 0.95, recoveryMul: 0.95, cultivateMul: 0.96 },
-    { id: 'd', min: 2, essenceMul: 0.85, recoveryMul: 0.85, cultivateMul: 0.9 },
+    { id: 'perfect', min: 9.5, essenceMul: 1.75, recoveryMul: 2.0, cultivateMul: 1.4 },
+    { id: 'a', min: 8, essenceMul: 1.45, recoveryMul: 1.7, cultivateMul: 1.18 },
+    { id: 'b', min: 6, essenceMul: 1.2, recoveryMul: 1.45, cultivateMul: 1.06 },
+    { id: 'c', min: 4, essenceMul: 1.0, recoveryMul: 1.0, cultivateMul: 0.96 },
+    { id: 'd', min: 2, essenceMul: 0.8, recoveryMul: 0.85, cultivateMul: 0.9 },
   ],
   // Weighted base-roll distribution: D/C common, B moderate, A rare,
   // Perfect extremely rare. Values are relative weights.
