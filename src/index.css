@@ -1,4 +1,5 @@
-@import url('https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600;700&family=VT323&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -78,6 +79,13 @@
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
+
+  /* Vietnamese — the pixel heading font lacks Vietnamese diacritics (ă â đ ê
+     ô ơ ư + tone marks); switch to a terminal-pixel font that carries the
+     full Vietnamese subset. Set by LangContext on <html>. */
+  .lang-vi {
+    --font-heading: 'VT323', 'Be Vietnam Pro', ui-sans-serif, system-ui, sans-serif;
+  }
 }
 
 
@@ -91,10 +99,6 @@
     @apply bg-background text-foreground font-body;
   }
 }
-
-/* Vietnamese: Pixelify Sans has no Vietnamese glyphs — VT323 (a pixel font
-   with full Vietnamese diacritic support) renders headings uniformly instead. */
-.lang-vi { --font-heading: 'VT323', ui-sans-serif, system-ui, sans-serif; }
 
 /* Game styles */
 .scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }

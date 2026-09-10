@@ -334,6 +334,22 @@ export const DICT_LOG = {
     'weather.line.gale': 'A wild gale howls — {mods} to Gu power.',
     'weather.line.mist': 'Thick spirit-mist coils about — {mods} to Gu power.',
 
+    // ---- requirement checklists ----
+    'chk.progress': '100% Cultivation Progress',
+    'chk.essence': 'Essence: {cur}/{req}',
+    'chk.stones': 'Primordial Stones: {cur}/{req}',
+    'chk.item': '{name}: {cur}/{req}',
+    'chk.mastery': 'Any Dao Path at Mastery Level {n}',
+    'chk.maxRank': 'Rank below {n}',
+    'chk.rank': 'Your cultivation: needs {need}+ (you are {cur})',
+    'chk.injured': 'Injured — recovers Day {d}',
+    'chk.blocked': 'Cannot refine again until Day {d}',
+    'chk.healthy': 'Not injured or recovering',
+    'chk.site': 'At a settlement (refinement grounds)',
+    'chk.stage': 'Cultivation: {stage}',
+    'chk.pathMastery': '{path} Mastery Level {n}',
+    'cap.joins': '{name} joins you.',
+
     // ---- Gu types ----
     'guType.Attack': 'Attack', 'guType.Defense': 'Defense', 'guType.Movement': 'Movement',
     'guType.Control': 'Control', 'guType.Healing': 'Healing', 'guType.Summon': 'Summon',
@@ -669,6 +685,22 @@ export const DICT_LOG = {
     'weather.line.heatwave': 'Không khí nhấp nháy sức nóng — {mods} với sức mạnh Cổ Trùng.',
     'weather.line.gale': 'Gió lốc gào thét — {mods} với sức mạnh Cổ Trùng.',
     'weather.line.mist': 'Sương linh dày đặc cuộn quanh — {mods} với sức mạnh Cổ Trùng.',
+
+    // ---- danh sách điều kiện ----
+    'chk.progress': '100% Tiến Độ Tu Luyện',
+    'chk.essence': 'Chân Nguyên: {cur}/{req}',
+    'chk.stones': 'Nguyên Thạch: {cur}/{req}',
+    'chk.item': '{name}: {cur}/{req}',
+    'chk.mastery': 'Bất kỳ Lưu Phái nào ở Thông Thạo Cấp {n}',
+    'chk.maxRank': 'Cảnh giới dưới {n}',
+    'chk.rank': 'Tu vi của bạn: cần {need} trở lên (bạn đang ở {cur})',
+    'chk.injured': 'Bị thương — hồi phục Ngày {d}',
+    'chk.blocked': 'Không thể luyện lại cho đến Ngày {d}',
+    'chk.healthy': 'Không bị thương hay đang hồi phục',
+    'chk.site': 'Tại trấn/xã (địa điểm luyện chế)',
+    'chk.stage': 'Tu vi: {stage}',
+    'chk.pathMastery': '{path} Thông Thạo Cấp {n}',
+    'cap.joins': '{name} theo bạn.',
 
     // ---- loại cổ trùng ----
     'guType.Attack': 'Tấn Công', 'guType.Defense': 'Phòng Ngự', 'guType.Movement': 'Thân Pháp',
