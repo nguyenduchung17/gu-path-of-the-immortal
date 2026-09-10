@@ -25,7 +25,7 @@ import { essenceCapFor, cultivateMulOf, normalizeAptitude, rollAptitudeScore, ro
 import { starterGuOf } from '../data/starterGu';
 import { syncVitality, strengthLevelOf } from '../engine/strength';
 import { SPECIES_BY_ID, wildCombatDef, captureChanceOf, initialWildGu } from '../data/wildGu';
-import { revealFog, seedFog, foodOf } from '../engine/guLife';
+import { revealFog, seedFog, foodOf, foodEntryOf } from '../engine/guLife';
 import { applyExploreGu, carryIntoCombat, visionRadiusOf, checkHiddenPaths, hazardStep, moveOverride, exploreActive, ambushOf } from '../engine/exploration';
 import { startInstability } from '../engine/vitalGu';
 import { QS, acceptQuest, turnInQuest, toggleTrack, abandonQuest, applyQuestEvent, emptyQuests, markDiscovered } from '../engine/questEngine';
@@ -1123,17 +1123,26 @@ function baseReducer(state, action) {
 
     // ---------- Gu feeding & care ----------
     case 'FEED_GU': {
+      // any item on the Gu's menu feeds it (preferred OR acceptable), scaled
+      // by that food's satiety value — never a single hard-coded item
       const inst = state.ownedGu.find(g => g.instanceId === action.instanceId);
+      const entry = inst ? foodEntryOf(GU_BY_ID[inst.guId], action.itemId) : null;
       const it = ITEM_BY_ID[action.itemId];
-      if (!inst || !it || action.itemId !== foodOf(GU_BY_ID[inst.guId])) return state;
+      if (!inst || !entry || !it) return state;
       if ((state.inventory[it.category]?.[it.id] || 0) <= 0) return state;
-      let s = applyEffects(state, { removeItems: { [it.id]: 1 }, message: T('gl.fed', { name: locGuName(GU_BY_ID[inst.guId]) }) });
-      s = { ...s, ownedGu: s.ownedGu.map(g => g.instanceId === inst.instanceId ? { ...g, satiety: BALANCE.hunger.maxSatiety, criticalSinceDay: null, warnDay: null } : g) };
+      const from = Math.round(inst.satiety ?? BALANCE.hunger.maxSatiety);
+      const to = Math.min(BALANCE.hunger.maxSatiety, from + entry.satiety);
+      let s = applyEffects(state, { removeItems: { [it.id]: 1 }, message: T('feed.fed', { gu: locGuName(GU_BY_ID[inst.guId]), item: locItemName(it), from, to }) });
+      s = { ...s, ownedGu: s.ownedGu.map(g => g.instanceId === inst.instanceId ? { ...g, satiety: to, criticalSinceDay: null, warnDay: null } : g) };
       return advanceTime(s, BALANCE.time.talkMinutes);
     }
     case 'TOGGLE_AUTO_FEED': {
       const autoFeed = !(state.settings?.autoFeed);
       return { ...state, settings: { ...(state.settings || {}), autoFeed }, log: [...state.log, autoFeed ? T('gl.autoOn') : T('gl.autoOff')] };
+    }
+    case 'TOGGLE_ALLOW_RARE_FOOD': {
+      const allowRareFood = !(state.settings?.allowRareFood);
+      return { ...state, settings: { ...(state.settings || {}), allowRareFood }, log: [...state.log, T(allowRareFood ? 'feed.rareOn' : 'feed.rareOff')] };
     }
     case 'CURE_GU': {
       const inst = state.ownedGu.find(g => g.instanceId === action.instanceId);

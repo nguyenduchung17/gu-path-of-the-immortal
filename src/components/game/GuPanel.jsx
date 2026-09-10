@@ -4,7 +4,7 @@ import { useT } from '@/game/i18n/LangContext';
 import { GU_BY_ID } from '@/game/data/gu';
 import { PATH_BY_ID, SYNERGIES } from '@/game/data/paths';
 import { BALANCE } from '@/game/config/balance';
-import { HUNGER_META, hungerBand, isVital } from '@/game/engine/guLife';
+import { HUNGER_META, hungerBand, isVital, pickAutoFeedFood } from '@/game/engine/guLife';
 import { vitalStatusOf, fmtRemaining } from '@/game/engine/vitalGu';
 import GuCard from './gu/GuCard';
 import RefineGuModal from './RefineGuModal';
@@ -28,6 +28,23 @@ export default function GuPanel() {
   const soon = state.ownedGu.filter(g => !isVital(state, g) && hungerBand(g.satiety) === 'hungry').length;
   const starving = state.ownedGu.filter(g => !isVital(state, g) && ['starving', 'critical'].includes(hungerBand(g.satiety))).length;
   const autoFeed = !!state.settings?.autoFeed;
+  const allowRare = !!state.settings?.allowRareFood;
+  // hungry Gu with no valid food in the pack — the panel-level warning (#23)
+  const missingFed = state.ownedGu.filter(g => {
+    if (isVital(state, g)) return false;
+    const b = hungerBand(g.satiety);
+    return (b === 'hungry' || b === 'starving' || b === 'critical') && !pickAutoFeedFood(state, GU_BY_ID[g.guId]);
+  });
+  const missingCats = [...new Set(missingFed.map(g => PATH_BY_ID[GU_BY_ID[g.guId].path].name))];
+  const feedable = state.ownedGu.filter(g => !isVital(state, g)
+    && (g.satiety ?? 100) < BALANCE.hunger.autoFeedThreshold
+    && pickAutoFeedFood(state, GU_BY_ID[g.guId]));
+  const feedAll = () => {
+    for (const g of feedable) {
+      const pick = pickAutoFeedFood(state, GU_BY_ID[g.guId]);
+      if (pick) dispatch({ type: 'FEED_GU', instanceId: g.instanceId, itemId: pick.id });
+    }
+  };
 
   return (
     <div className="pt-3 animate-fade-in">
@@ -42,6 +59,18 @@ export default function GuPanel() {
           className={`text-[10px] px-2.5 py-1.5 rounded-lg border ${autoFeed ? 'border-emerald-600/60 bg-emerald-900/30 text-emerald-200' : 'border-stone-700 bg-black/30 text-stone-400'}`}>
           {autoFeed ? '🍖 ' + t('hun.autoFeedOn') : '💤 ' + t('hun.autoFeedOff')}
         </button>
+        <button
+          onClick={() => dispatch({ type: 'TOGGLE_ALLOW_RARE_FOOD' })}
+          title={allowRare ? t('feed.rareOn') : t('feed.rareOff')}
+          className={`text-[10px] px-2.5 py-1.5 rounded-lg border ${allowRare ? 'border-amber-600/60 bg-amber-900/30 text-amber-200' : 'border-stone-700 bg-black/30 text-stone-400'}`}>
+          {allowRare ? '🔓' : '🔒'} {t('feed.allowRare')}
+        </button>
+        {feedable.length > 0 && (
+          <button onClick={feedAll}
+            className="text-[10px] px-2.5 py-1.5 rounded-lg border border-lime-700/60 bg-lime-900/30 text-lime-200">
+            🍖 {t('feed.feedAll')} ({feedable.length})
+          </button>
+        )}
         {soon > 0 && (
           <span className="text-[10px] px-2 py-1 rounded-lg bg-amber-900/25 border border-amber-700/50 text-amber-200">
             ⚠️ {t('hun.warnSoon', { n: soon })}
@@ -50,6 +79,11 @@ export default function GuPanel() {
         {starving > 0 && (
           <span className="text-[10px] px-2 py-1 rounded-lg bg-rose-900/30 border border-rose-700/60 text-rose-200">
             ☠️ {t('hun.warnStarving', { n: starving })}
+          </span>
+        )}
+        {autoFeed && missingFed.length > 0 && (
+          <span className="text-[10px] px-2 py-1 rounded-lg bg-rose-900/30 border border-rose-700/60 text-rose-200">
+            ⚠️ {t('feed.missingSummary', { n: missingFed.length, cats: missingCats.join(', ') })}
           </span>
         )}
       </div>

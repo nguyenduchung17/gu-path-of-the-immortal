@@ -8,6 +8,7 @@ import { GU_BY_ID } from '../data/gu';
 import { ITEM_BY_ID } from '../data/items';
 import { WORLD } from '../data/world';
 import { SPECIES_BY_ID } from '../data/wildGu';
+import { PATH_FOODS } from '../data/guFood';
 import { totalGameMin } from './vitalGu';
 import { T, locGuName, locItemName } from '../i18n/tr';
 
@@ -36,7 +37,51 @@ export function hungerBand(satiety, cfg = BALANCE.hunger) {
   return 'critical';
 }
 
-export function foodOf(gu) { return BALANCE.hunger.pathFoods[gu.path] || null; }
+// ---- feeding menus ----
+// A Gu's full menu derives from its path (a species-level `gu.foods` override
+// wins when present): preferred staple first, acceptable substitutes after.
+// The requirement is known from the moment the Gu is obtained — never a mystery.
+export function foodsOf(gu) {
+  const list = gu.foods || PATH_FOODS[gu.path]
+    || (BALANCE.hunger.pathFoods[gu.path] ? [{ id: BALANCE.hunger.pathFoods[gu.path], satiety: 40, tier: 'preferred' }] : []);
+  return list.map(f => ({ ...f, item: ITEM_BY_ID[f.id] }));
+}
+
+export function foodOf(gu) {
+  const fs = foodsOf(gu);
+  return (fs.find(f => f.tier === 'preferred') || fs[0])?.id || null;
+}
+
+export function foodEntryOf(gu, itemId) {
+  return foodsOf(gu).find(f => f.id === itemId) || null;
+}
+
+// Quest-critical or precious fare — never consumed automatically (#7).
+export function isProtectedFood(f) {
+  return !!f.protected || ITEM_BY_ID[f.id]?.rarity === 'rare';
+}
+
+// Auto Feed priority (#6): cheapest acceptable fare first, the preferred
+// staple only when necessary; protected/rare fare never (unless allowed).
+export function pickAutoFeedFood(state, gu) {
+  const allowRare = !!state.settings?.allowRareFood;
+  const list = foodsOf(gu).filter(f => allowRare || !isProtectedFood(f));
+  const byPriority = [...list].sort((a, b) => a.satiety - b.satiety);
+  for (const f of byPriority) if (foodCount(state, f.id) > 0) return f;
+  return null;
+}
+
+// One canonical Auto Feed status per Gu (#21): NOT REQUIRED (Vital), OFF,
+// READY (food stocked) or MISSING FOOD — cards, toasts and panel all read this.
+export function autoFeedStatus(state, inst) {
+  if (isVital(state, inst)) return 'notRequired';
+  if (!state.settings?.autoFeed) return 'disabled';
+  return pickAutoFeedFood(state, GU_BY_ID[inst.guId]) ? 'ready' : 'missing';
+}
+
+export function requiredFoodNames(gu, max = 3) {
+  return foodsOf(gu).slice(0, max).map(f => locItemName(f.item)).join(', ');
+}
 
 export function foodCount(state, itemId) {
   const it = ITEM_BY_ID[itemId];
@@ -125,7 +170,14 @@ export function tickGuLife(state, mins) {
             s = toast(s, { icon: '☠️', title: T('toast.criticalHunger'), lines: [T('gl.starving', { gu: locGuName(gu) }), T('gl.starving2')] });
             s = addLog(s, T('gl.starvingLog', { gu: locGuName(gu) }));
           } else {
-            s = toast(s, { icon: HUNGER_META[band].icon, title: T('toast.guHunger'), lines: [T('gl.hungerLine', { gu: locGuName(gu), band: T(`hun.${band}`) })] });
+            const noFood = autoFeed && !pickAutoFeedFood(s, gu);
+            s = toast(s, {
+              icon: HUNGER_META[band].icon, title: T('toast.guHunger'),
+              lines: [
+                T('gl.hungerLine', { gu: locGuName(gu), band: T(`hun.${band}`) }),
+                ...(noFood ? [T('feed.noValidFood')] : []),
+              ],
+            });
           }
         }
 
@@ -139,17 +191,34 @@ export function tickGuLife(state, mins) {
           continue; // removed from the collection
         }
 
-        // auto feed: consumes real food from the pack, never conjures it
+        // auto feed: consumes real food from the pack, never conjures it —
+        // cheapest fare first (#6), never protected fare (#7), and a loud,
+        // once-per-day failure notice when no valid food exists (#3)
         if (autoFeed && g.satiety < cfg.autoFeedThreshold) {
-          const food = foodOf(GU_BY_ID[g.guId]);
-          const have = food ? foodCount(s, food) : 0;
-          if (have > 0) {
-            const it = ITEM_BY_ID[food];
-            const cat = { ...inventory[it.category], [food]: have - 1 };
-            if (cat[food] <= 0) delete cat[food];
+          const pick = pickAutoFeedFood(s, GU_BY_ID[g.guId]);
+          if (pick) {
+            const it = ITEM_BY_ID[pick.id];
+            const have = foodCount(s, pick.id);
+            const cat = { ...inventory[it.category], [pick.id]: have - 1 };
+            if (cat[pick.id] <= 0) delete cat[pick.id];
             inventory = { ...inventory, [it.category]: cat };
-            g.satiety = cfg.maxSatiety; g.criticalSinceDay = null; g.warnDay = null;
-            s = addLog(s, T('gl.autoFed', { gu: locGuName(GU_BY_ID[g.guId]), item: locItemName(it) }));
+            const from = Math.round(g.satiety);
+            g.satiety = Math.min(cfg.maxSatiety, g.satiety + pick.satiety);
+            g.criticalSinceDay = null; g.warnDay = null;
+            s = addLog(s, T('feed.autoFedLog', { gu: locGuName(GU_BY_ID[g.guId]), item: locItemName(it), from, to: Math.round(g.satiety) }));
+            touched = true;
+          } else if (g.autoFeedWarnDay !== day) {
+            g.autoFeedWarnDay = day;
+            const gu = GU_BY_ID[g.guId];
+            s = toast(s, {
+              icon: '⚠️', title: T('feed.autoFailedTitle'),
+              lines: [
+                T('gl.hungerLine', { gu: locGuName(gu), band: T(`hun.${band}`) }),
+                T('feed.autoFailedReason'),
+                T('feed.required', { list: requiredFoodNames(gu) }),
+              ],
+            });
+            s = addLog(s, T('feed.autoFailedLog', { gu: locGuName(gu), list: requiredFoodNames(gu) }));
             touched = true;
           }
         }
