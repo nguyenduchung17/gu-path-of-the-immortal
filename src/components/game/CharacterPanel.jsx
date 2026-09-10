@@ -170,6 +170,9 @@ export default function CharacterPanel({ onRecover }) {
               <div className="space-y-0.5 mb-2">
                 {checklist.checks.map(c => <ReqLine key={c.key} met={c.met} text={c.text} />)}
               </div>
+              {(p.realmInsight || 0) < req.insight && (
+                <div className="text-[10px] text-amber-200/70 leading-snug mb-2">✧ {t('cult.insightHint')}</div>
+              )}
               <button onClick={() => dispatch({ type: 'BREAKTHROUGH' })} disabled={!ready}
                 className={`w-full py-2.5 rounded-lg text-sm font-semibold transition ${ready ? 'bg-amber-500 hover:bg-amber-400 text-black animate-pulse' : 'bg-stone-800 text-stone-500 cursor-not-allowed'}`}>
                 ✦ Break Through

@@ -141,6 +141,7 @@ export const DICT_EXTRA = {
     // ---- realm insight & cultivation rebalance ----
     'cult.insight': 'Realm Insight',
     'cult.btReq': 'BREAKTHROUGH REQUIREMENTS',
+    'cult.insightHint': 'Realm Insight is earned out in the world — entering new zones and finding landmarks, quests, battle victories, missions, refinement, wild captures and master trials. Cultivating alone never raises it.',
     'cult.diminished': 'Focus wanes — cultivation efficiency {p}%. Explore, fight or complete quests to refresh it.',
     'chk.insight': 'Realm Insight {cur} / {req}',
     'cmt.crit': '{gu} finds a vulnerable point — the blow lands true!',
@@ -304,6 +305,7 @@ export const DICT_EXTRA = {
     // ---- cảm ngộ & cân bằng tu luyện ----
     'cult.insight': 'Cảm Ngộ',
     'cult.btReq': 'YÊU CẦU ĐỘT PHÁ',
+    'cult.insightHint': 'Cảm Ngộ tích lũy từ trải nghiệm ngoài kia — tiến vào vùng đất mới, tìm danh thắng, nhiệm vụ, chiến thắng, công lao, luyện chế, thu phục cổ trùng hoang dã và thí đấu. Riêng tu luyện không bao giờ tăng được nó.',
     'cult.diminished': 'Tâm ý nhạt nhòa — hiệu suất tu luyện {p}%. Hãy khám phá, chiến đấu hoặc hoàn thành nhiệm vụ để lấy lại cảm ngộ.',
     'chk.insight': 'Cảm Ngộ {cur} / {req}',
     'cmt.crit': '{gu} tìm ra nhược huyệt — đòn đánh trúng thật chuẩn!',
