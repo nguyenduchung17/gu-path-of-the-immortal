@@ -31,7 +31,10 @@ if (typeof window !== 'undefined') adoptLegacySave();
 // After a page refresh: clear stale UI state, settle any unfinished sleep, and
 // grant essence accrued while recovery was running offline (capped at max).
 function normalize(raw) {
-  let s = raw.version >= 7 ? raw : migrateSave(raw);
+  // migrateSave is version-gated and idempotent — it must run on EVERY load so
+  // saves from any older build (v7 boss-era, v8 living-Gu-era, …) pick up the
+  // fields the current game expects. The old `>= 7` guard froze saves at v7.
+  let s = migrateSave(raw);
   s = { ...s, toasts: [], breakthrough: null, dialogue: null, pendingEvent: null, combat: null };
   if (s.sleeping && (!s.sleeping.wakeAt || Date.now() >= s.sleeping.wakeAt)) s = { ...s, sleeping: null };
   // respawn any world enemies whose timer elapsed while away

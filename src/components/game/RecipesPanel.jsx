@@ -66,7 +66,7 @@ function RumorCard({ r, level }) {
         </>
       ) : (
         <>
-          <div className="text-sm text-stone-400">🔒 {gu?.name || 'Unknown'} Gu Recipe</div>
+          <div className="text-sm text-stone-400">🔒 {gu ? `${gu.name} Recipe` : 'Unknown Recipe'}</div>
           <div className="text-[10px] text-stone-500 mt-0.5">{path ? `${path.icon} ${path.name} ` : 'Path: ???'}· requires Mastery Level {r.masteryReq} · not yet in your hands</div>
           <div className="text-[10px] text-stone-500 italic mt-1">Clue: {r.clue}</div>
           {level === 'located' && <div className="text-[10px] text-amber-300/70 mt-0.5">Lead: {r.lead}</div>}
