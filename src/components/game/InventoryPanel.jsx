@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useGame } from '@/game/state/GameContext';
 import { ITEM_BY_ID, ITEM_CATEGORIES } from '@/game/data/items';
 import InventoryToolbar from './inventory/InventoryToolbar';
+import QuickLoadout from './inventory/QuickLoadout';
 
 const CAT_LABEL = { materials: 'Materials', medicine: 'Medicine', food: 'Food', guFood: 'Gu Feed', guGear: 'Gu Gear', questItems: 'Quest Items', equipment: 'Equipment' };
 const FILTER_CATS = {
@@ -35,6 +36,7 @@ export default function InventoryPanel() {
 
   return (
     <div className="pt-2 space-y-4 animate-fade-in">
+      <QuickLoadout />
       <InventoryToolbar filter={filter} onFilter={setFilter} sort={sort} onSort={setSort} counts={counts} />
       {sections.map(({ cat, entries }) => (
         <div key={cat}>
