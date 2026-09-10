@@ -13,6 +13,7 @@ import CharacterPanel from './CharacterPanel';
 import GuPanel from './GuPanel';
 import KillerMovesPanel from './KillerMovesPanel';
 import { kmCanResearch } from '@/game/engine/killerMoves';
+import { hungerBand } from '@/game/engine/guLife';
 import RecipesPanel from './RecipesPanel';
 import DaoMasteryPanel from './DaoMasteryPanel';
 import InventoryPanel from './InventoryPanel';
@@ -143,7 +144,13 @@ export default function GameScreen() {
       <ScoutReport />
       <HazardBadge />
       <MiniMap />
-      <Hotbar active={panel} notify={kmCanResearch(state) && !state.tutorial?.active ? ['km'] : []} onSelect={(id) => (id === 'dashboard' ? setDashOpen(true) : openPanel(id))} onPause={() => setPaused(true)} />
+      {/* persistent urgent-state warning without toast spam (#23): a dot on the
+          Gu button while any companion is starving or critically hungry */}
+      <Hotbar active={panel} notify={[
+        ...(kmCanResearch(state) && !state.tutorial?.active ? ['km'] : []),
+        ...((state.ownedGu || []).some(g => g.instanceId !== state.vitalGu
+          && ['starving', 'critical'].includes(hungerBand(g.satiety))) ? ['gu'] : []),
+      ]} onSelect={(id) => (id === 'dashboard' ? setDashOpen(true) : openPanel(id))} onPause={() => setPaused(true)} />
 
       {/* in-game panel overlays (world stays visible underneath) */}
       {panel && (

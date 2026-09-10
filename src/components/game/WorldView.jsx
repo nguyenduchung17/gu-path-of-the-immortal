@@ -9,6 +9,8 @@ import { phaseOf } from '@/game/engine/time';
 import { drawWorld } from '@/game/gfx/worldRenderer';
 import { sfx, primeAudio } from '@/game/audio/sfx';
 import { setEnvironment, updateAudioPosition, footstep } from '@/game/audio/ambience';
+import { stepIntervalMs, moveDebugOf } from '@/game/engine/movement';
+import MoveDebugPanel from './hud/MoveDebugPanel';
 
 const DANGER_CHIP = {
   0: 'border-emerald-600/50 bg-emerald-900/30 text-emerald-300',
@@ -43,6 +45,8 @@ export default function WorldView({ paused, inputLocked, moveLocked }) {
   const zone = zoneAt(p.x, p.y) || DEFAULT_ZONE;
   const [banner, setBanner] = useState(null);
   const prevZone = useRef(zone.id);
+  // development-only movement readout — opt-in, invisible to players (#8)
+  const [moveDbgOn] = useState(() => { try { return localStorage.getItem('gu_move_debug') === '1'; } catch { return false; } });
 
   useEffect(() => {
     if (prevZone.current !== zone.id) {
@@ -166,19 +170,21 @@ export default function WorldView({ paused, inputLocked, moveLocked }) {
       // held-key movement — normalized input over delta time:
       // a diagonal step covers √2 tiles, so it must wait √2 × STEP_MS; total
       // travel speed is identical in all 8 directions (~1 tile / STEP_MS).
-      const STEP_MS = 170;
       const locked = isLocked(s);
       const step = stepRef.current;
       if (step.prev == null) step.prev = t;
       const dtMs = Math.min(100, t - step.prev); // cap gaps (tab switches) so no burst of steps
       step.prev = t;
+      const keys = keysRef.current;
+      const dx = (keys.has('d') || keys.has('arrowright') ? 1 : 0) - (keys.has('a') || keys.has('arrowleft') ? 1 : 0);
+      const dy = (keys.has('s') || keys.has('arrowdown') ? 1 : 0) - (keys.has('w') || keys.has('arrowup') ? 1 : 0);
       if (!locked) {
-        const keys = keysRef.current;
-        const dx = (keys.has('d') || keys.has('arrowright') ? 1 : 0) - (keys.has('a') || keys.has('arrowleft') ? 1 : 0);
-        const dy = (keys.has('s') || keys.has('arrowdown') ? 1 : 0) - (keys.has('w') || keys.has('arrowup') ? 1 : 0);
         if (dx || dy) {
           step.acc += dtMs;
-          const interval = STEP_MS * (dx && dy ? Math.SQRT2 : 1);
+          // THE one real-time step cadence — recomputed from current state on
+          // every step (engine/movement.js). Terrain, Gu and status modifiers
+          // are read live, never written back, so nothing can ever stack.
+          const interval = stepIntervalMs(s, dx, dy);
           if (step.acc >= interval) {
             step.acc = 0;
             dispatchRef.current({ type: 'MOVE', dx, dy });
@@ -189,20 +195,29 @@ export default function WorldView({ paused, inputLocked, moveLocked }) {
       } else {
         step.acc = 0;
       }
+      if (moveDbgOn) window.__guMoveDebug = { ...moveDebugOf(s, dx, dy), dtMs, acc: step.acc };
 
       // animate the player between cells (no grid snapping)
       const p2 = s.player;
       const anim = animRef.current;
       if (anim.toX !== p2.x || anim.toY !== p2.y) {
         const had = anim.toX !== null;
-        anim.fromX = had ? anim.toX : p2.x;
-        anim.fromY = had ? anim.toY : p2.y;
-        anim.toX = p2.x;
-        anim.toY = p2.y;
-        anim.t0 = t;
-        if (had && (anim.fromX !== p2.x || anim.fromY !== p2.y)) {
-          const inBounds = p2.y >= 0 && p2.y < WORLD.h && p2.x >= 0 && p2.x < WORLD.w;
-          footstep(inBounds ? WORLD.tiles[p2.y][p2.x] : '.');
+        if (had && Math.hypot(p2.x - anim.toX, p2.y - anim.toY) > 1.5) {
+          // A position JUMP (death respawn, teleport, map transition) is never
+          // animated as walking — the sprite snaps instead of gliding rapidly
+          // across the map. Normal single steps animate exactly as before.
+          anim.fromX = p2.x; anim.fromY = p2.y;
+          anim.toX = p2.x; anim.toY = p2.y; anim.t0 = t;
+        } else {
+          anim.fromX = had ? anim.toX : p2.x;
+          anim.fromY = had ? anim.toY : p2.y;
+          anim.toX = p2.x;
+          anim.toY = p2.y;
+          anim.t0 = t;
+          if (had && (anim.fromX !== p2.x || anim.fromY !== p2.y)) {
+            const inBounds = p2.y >= 0 && p2.y < WORLD.h && p2.x >= 0 && p2.x < WORLD.w;
+            footstep(inBounds ? WORLD.tiles[p2.y][p2.x] : '.');
+          }
         }
       }
       // tween time scales with step length — a diagonal eases over √2 × 150ms,
@@ -237,6 +252,9 @@ export default function WorldView({ paused, inputLocked, moveLocked }) {
       <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" style={{ imageRendering: 'pixelated' }} />
       {/* soft vignette to frame the world */}
       <div className="absolute inset-0 pointer-events-none" style={{ boxShadow: 'inset 0 0 140px 30px rgba(0,0,0,0.55)' }} />
+
+      {/* development-only movement readout (#8) */}
+      <MoveDebugPanel on={moveDbgOn} />
 
       {/* zone discovery banner */}
       {banner && (

@@ -24,7 +24,7 @@ export default function Toasts() {
   if (!state.toasts || state.toasts.length === 0) return null;
   return (
     <div className="fixed top-24 right-3 z-40 flex flex-col gap-2 pointer-events-none">
-      {state.toasts.slice(-4).map(t => <Toast key={t.id} toast={t} />)}
+      {state.toasts.slice(-3).map(t => <Toast key={t.id} toast={t} />)}
     </div>
   );
 }

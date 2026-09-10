@@ -44,8 +44,11 @@ import { createNewGame, globalStage } from './createGame';
 // createNewGame and globalStage live in ./createGame — imported below.
 
 let _toastN = 0;
+// Toast discipline (#15, #16): a keyed duplicate already on screen is never
+// stacked, and the stored queue stays short — the visible stack shows at most 3.
 function pushToast(s, t) {
-  return { ...s, toasts: [...(s.toasts || []), { id: `t${Date.now().toString(36)}${_toastN++}`, ...t }] };
+  if (t.key && (s.toasts || []).some(x => x.key === t.key)) return s;
+  return { ...s, toasts: [...(s.toasts || []), { id: `t${Date.now().toString(36)}${_toastN++}`, ...t }].slice(-5) };
 }
 
 // Centralized quest-event application: advance every matching ACTIVE quest
@@ -1133,7 +1136,9 @@ function baseReducer(state, action) {
       const from = Math.round(inst.satiety ?? BALANCE.hunger.maxSatiety);
       const to = Math.min(BALANCE.hunger.maxSatiety, from + entry.satiety);
       let s = applyEffects(state, { removeItems: { [it.id]: 1 }, message: T('feed.fed', { gu: locGuName(GU_BY_ID[inst.guId]), item: locItemName(it), from, to }) });
-      s = { ...s, ownedGu: s.ownedGu.map(g => g.instanceId === inst.instanceId ? { ...g, satiety: to, criticalSinceDay: null, warnDay: null } : g) };
+      // feeding resolves the warning state (#19): notification record, pending
+      // reminder and death clock all clear — a later relapse alerts anew
+      s = { ...s, ownedGu: s.ownedGu.map(g => g.instanceId === inst.instanceId ? { ...g, satiety: to, criticalSinceDay: null, warnDay: null, hungerNote: null, autoFeedWarnMin: 0 } : g) };
       return advanceTime(s, BALANCE.time.talkMinutes);
     }
     case 'TOGGLE_AUTO_FEED': {
@@ -1288,7 +1293,9 @@ function baseReducer(state, action) {
 export function gameReducer(state, action) {
   const next = baseReducer(state, action);
   if (!next || next === state) return next;
-  return tutorialObserve(next, action);
+  // The world log is bounded — repeated warnings can never grow it without end.
+  const capped = next.log && next.log.length > 150 ? { ...next, log: next.log.slice(-150) } : next;
+  return tutorialObserve(capped, action);
 }
 
 export { objectiveMet, globalStage };

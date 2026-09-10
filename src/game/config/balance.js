@@ -132,6 +132,10 @@ export const BALANCE = {
     giveUpDist: 5,                   // losing the player by this margin ends the chase
     activeRadius: 16,                // enemies beyond this distance idle (performance)
     wildGuRespawnMs: 10 * 60 * 1000, // wild Gu returns to its haunt after capture/kill
+    move: {
+      baseStepMs: 170,        // real-time ms per straight step — the ONE base overworld speed
+      minIntervalPct: 60,     // safety floor: no modifier may push a step below 60% of base
+    },
     pack: {
       assistRadius: 12,              // default join-the-fight radius (species overrides in packs.js)
       cohesion: 3,                   // tiles a member may stray from its pack before drifting back
@@ -168,6 +172,8 @@ export const BALANCE = {
     },
     criticalDaysToDeath: 2,          // days at 0 satiety before a Gu may die
     autoFeedThreshold: 35,           // auto-feed kicks in below this satiety
+    reminderMin: 360,                // hunger reminder cooldown, in game minutes
+    autofeedWarnMin: 360,            // Auto Feed failure notice cooldown, in game minutes
     pathFoods: {                     // what each Dao Path's Gu eats
       fire: 'flameGrass', water: 'spiritWater', earth: 'mineralEssence', poison: 'venomSac',
       wind: 'beastMeat', enslavement: 'beastMeat', sword: 'beastMeat', refinement: 'spiritGrass',

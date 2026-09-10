@@ -15,8 +15,17 @@ import { T, locGuName, locItemName } from '../i18n/tr';
 const DAY_MIN = 24 * 60;
 let _tid = 0;
 
-const toast = (s, t) => ({ ...s, toasts: [...(s.toasts || []), { id: `gl${Date.now().toString(36)}${_tid++}`, ...t }] });
-const addLog = (s, msg) => ({ ...s, log: [...s.log, msg] });
+// Toast discipline: a keyed duplicate already on screen is never stacked (#15),
+// and the stored queue stays short (#16) — the visible stack shows at most 3.
+const toast = (s, t) => {
+  if (t.key && (s.toasts || []).some(x => x.key === t.key)) return s;
+  return { ...s, toasts: [...(s.toasts || []), { id: `gl${Date.now().toString(36)}${_tid++}`, ...t }].slice(-5) };
+};
+// World-log dedupe: an identical line never repeats back-to-back (#22).
+const addLog = (s, msg) => {
+  if (s.log[s.log.length - 1] === msg) return s;
+  return { ...s, log: [...s.log, msg] };
+};
 
 // ---- hunger bands ----
 export const HUNGER_BANDS = ['wellFed', 'normal', 'hungry', 'starving', 'critical'];
@@ -140,6 +149,14 @@ export function tickGuLife(state, mins) {
   let inventory = state.inventory;
   const nextOwned = [];
   let dirty = false;
+  // Hunger notifications are EVENT-based (#12): collected during the tick and
+  // emitted once after it — one toast per band TRANSITION, a combined summary
+  // when several Gu worsen in the same tick (#17), never one per update.
+  const nowAbs = totalGameMin(state.time);
+  const reminderMin = cfg.reminderMin ?? 360;
+  const autoWarnMin = cfg.autofeedWarnMin ?? 360;
+  const hungerEvents = [];
+  const autoFeedFails = [];
 
   for (const inst of s.ownedGu) {
     let g = { ...inst };
@@ -161,24 +178,23 @@ export function tickGuLife(state, mins) {
         const band = hungerBand(g.satiety);
         if (Math.abs(g.satiety - inst.satiety) > 1e-9) touched = true;
 
-        // warnings — once per day, never silent when it matters
-        if (band !== prevBand && HUNGER_BANDS.indexOf(band) > HUNGER_BANDS.indexOf(prevBand) && g.warnDay !== day) {
-          g.warnDay = day;
-          const gu = GU_BY_ID[g.guId];
-          if (band === 'critical') {
-            g.criticalSinceDay = g.criticalSinceDay ?? day;
-            s = toast(s, { icon: '☠️', title: T('toast.criticalHunger'), lines: [T('gl.starving', { gu: locGuName(gu) }), T('gl.starving2')] });
-            s = addLog(s, T('gl.starvingLog', { gu: locGuName(gu) }));
-          } else {
-            const noFood = autoFeed && !pickAutoFeedFood(s, gu);
-            s = toast(s, {
-              icon: HUNGER_META[band].icon, title: T('toast.guHunger'),
-              lines: [
-                T('gl.hungerLine', { gu: locGuName(gu), band: T(`hun.${band}`) }),
-                ...(noFood ? [T('feed.noValidFood')] : []),
-              ],
-            });
-          }
+        // Notification state lives on the Gu record and persists with the
+        // save (#21): the band last notified + when. A missing record (fresh
+        // save, page refresh) baselines SILENTLY — no re-alert on load.
+        if (!g.hungerNote || !g.hungerNote.band) { g.hungerNote = { band: prevBand, min: nowAbs }; touched = true; }
+        const note = g.hungerNote;
+        const worsened = HUNGER_BANDS.indexOf(band) > HUNGER_BANDS.indexOf(note.band);
+        // the death clock starts the moment critical is reached — whether or
+        // not a toast fired for it
+        if (band === 'critical' && g.criticalSinceDay == null) { g.criticalSinceDay = day; touched = true; }
+        // an urgent state may REMIND, but only after a real cooldown in game
+        // minutes (#14) — never every update tick
+        const dueReminder = (band === 'starving' || band === 'critical')
+          && nowAbs - (note.min || 0) >= reminderMin;
+        if (worsened || dueReminder) {
+          g.hungerNote = { band, min: nowAbs };
+          touched = true;
+          hungerEvents.push({ inst: g, band, reminder: !worsened });
         }
 
         // starvation death — only after days at critical hunger, loudly
@@ -204,21 +220,14 @@ export function tickGuLife(state, mins) {
             inventory = { ...inventory, [it.category]: cat };
             const from = Math.round(g.satiety);
             g.satiety = Math.min(cfg.maxSatiety, g.satiety + pick.satiety);
-            g.criticalSinceDay = null; g.warnDay = null;
+            g.criticalSinceDay = null; g.warnDay = null; g.hungerNote = null; g.autoFeedWarnMin = 0;
             s = addLog(s, T('feed.autoFedLog', { gu: locGuName(GU_BY_ID[g.guId]), item: locItemName(it), from, to: Math.round(g.satiety) }));
             touched = true;
-          } else if (g.autoFeedWarnDay !== day) {
-            g.autoFeedWarnDay = day;
-            const gu = GU_BY_ID[g.guId];
-            s = toast(s, {
-              icon: '⚠️', title: T('feed.autoFailedTitle'),
-              lines: [
-                T('gl.hungerLine', { gu: locGuName(gu), band: T(`hun.${band}`) }),
-                T('feed.autoFailedReason'),
-                T('feed.required', { list: requiredFoodNames(gu) }),
-              ],
-            });
-            s = addLog(s, T('feed.autoFailedLog', { gu: locGuName(gu), list: requiredFoodNames(gu) }));
+          } else if (nowAbs - (g.autoFeedWarnMin || 0) >= autoWarnMin) {
+            // a real cooldown in game minutes (#20): the failure is said once,
+            // then rests — the Gu panel keeps a persistent MISSING FOOD chip
+            g.autoFeedWarnMin = nowAbs;
+            autoFeedFails.push(g);
             touched = true;
           }
         }
@@ -226,6 +235,55 @@ export function tickGuLife(state, mins) {
     }
     nextOwned.push(touched ? g : inst);
     if (touched) dirty = true;
+  }
+
+  // ---- emit the tick's hunger notifications (once, event-based) ----
+  const alive = new Set(nextOwned.map(g => g.instanceId));
+  const evs = hungerEvents.filter(e => alive.has(e.inst.instanceId));
+  if (evs.length === 1) {
+    const ev = evs[0];
+    const gu = GU_BY_ID[ev.inst.guId];
+    if (ev.band === 'critical' && !ev.reminder) {
+      s = toast(s, { key: `hunger:${ev.inst.instanceId}:critical`, icon: '☠️', title: T('toast.criticalHunger'), lines: [T('gl.starving', { gu: locGuName(gu) }), T('gl.starving2')] });
+      s = addLog(s, T('gl.starvingLog', { gu: locGuName(gu) }));
+    } else {
+      const noFood = autoFeed && !pickAutoFeedFood(s, gu);
+      s = toast(s, {
+        key: `hunger:${ev.inst.instanceId}:${ev.band}${ev.reminder ? ':rem' : ''}`,
+        icon: HUNGER_META[ev.band].icon, title: T('toast.guHunger'),
+        lines: [
+          ev.reminder
+            ? T('gl.stillLine', { gu: locGuName(gu), band: T(`hun.${ev.band}`) })
+            : T('gl.hungerLine', { gu: locGuName(gu), band: T(`hun.${ev.band}`) }),
+          ...(ev.band === 'critical' ? [T('gl.starving2')] : []),
+          ...(noFood ? [T('feed.noValidFood')] : []),
+        ],
+      });
+      if (ev.reminder) s = addLog(s, T('gl.stillLine', { gu: locGuName(gu), band: T(`hun.${ev.band}`) }));
+    }
+  } else if (evs.length > 1) {
+    // several Gu worsened in the same tick — one compact summary, never a
+    // wall of near-identical cards (#17)
+    const entries = evs.map(e => T('feed.summaryEntry', { gu: locGuName(GU_BY_ID[e.inst.guId]), band: T(`hun.${e.band}`) }));
+    s = toast(s, {
+      key: 'feed:summary', icon: '⚠️', title: T('toast.guHunger'),
+      lines: [T('feed.summaryLine', { n: evs.length }), ...entries.slice(0, 4)],
+    });
+    s = addLog(s, [T('feed.summaryLine', { n: evs.length }), ...entries].join(' · '));
+  }
+  for (const g of autoFeedFails) {
+    // never stacked on top of a hunger alert for the same Gu in the same tick (#20)
+    if (evs.some(e => e.inst.instanceId === g.instanceId) || !alive.has(g.instanceId)) continue;
+    const gu = GU_BY_ID[g.guId];
+    s = toast(s, {
+      key: `autofeed:${g.instanceId}`, icon: '⚠️', title: T('feed.autoFailedTitle'),
+      lines: [
+        T('gl.hungerLine', { gu: locGuName(gu), band: T(`hun.${hungerBand(g.satiety)}`) }),
+        T('feed.autoFailedReason'),
+        T('feed.required', { list: requiredFoodNames(gu) }),
+      ],
+    });
+    s = addLog(s, T('feed.autoFailedLog', { gu: locGuName(gu), list: requiredFoodNames(gu) }));
   }
 
   // Vital-Gu instability is an explicit record with a cause and an end time —
