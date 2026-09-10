@@ -5,6 +5,8 @@ import { ENEMY_BY_ID } from '../data/enemies';
 import { isWalkable, zoneAt, DEFAULT_ZONE, WORLD_NPCS } from '../data/world';
 import { initCombat, maxStabilityOf } from './combat';
 import { isNight } from './time';
+import { exploreActive, carryIntoCombat } from './exploration';
+import { totalGameMin } from './vitalGu';
 import { BALANCE } from '../config/balance';
 
 const ORTH = [[1, 0], [-1, 0], [0, 1], [0, -1]];
@@ -55,6 +57,22 @@ export function tickEnemies(state) {
 
   const pZone = zoneAt(p.x, p.y) || DEFAULT_ZONE;
   let combat = null;
+  // Exploration Gu: stealth shrinks every enemy's notice range, Wind Step
+  // haste makes pursuers miss half their steps, and a rooted/slowed enemy
+  // (e.fx) is gated below — it cannot reach you while bound.
+  const pfx = exploreActive(state);
+  const stealthMul = pfx.stealth ? Math.max(0, 1 - (pfx.stealth.power || 0) / 100) : 1;
+  const nowMin = totalGameMin(state.time);
+  const canEnemyMove = (ne) => {
+    const fx = ne.fx || {};
+    if (fx.root && fx.root.until > nowMin) return false;       // rooted in place
+    if (fx.slow && fx.slow.until > nowMin) {                   // half pace: every other step
+      ne.slowPulse = !ne.slowPulse;
+      if (ne.slowPulse) return false;
+    }
+    if (pfx.haste && Math.random() < 0.5) return false;        // outpaced by Wind Step
+    return true;
+  };
 
   enemies = enemies.map(e => {
     if (e.dead || combat) return e;
@@ -62,14 +80,14 @@ export function tickEnemies(state) {
     if (dist > BALANCE.world.activeRadius) return e;
     const def = ENEMY_BY_ID[e.defId];
     if (!def) return e;
-    const detect = (e.detect ?? (BALANCE.world.detect[e.behavior] ?? 4)) + (isNight(state.time) ? BALANCE.time.nightDetectBonus : 0);
+    const detect = ((e.detect ?? (BALANCE.world.detect[e.behavior] ?? 4)) + (isNight(state.time) ? BALANCE.time.nightDetectBonus : 0)) * stealthMul;
     const homeDist = cheb(e.x, e.y, e.home.x, e.home.y);
     let ne = { ...e };
 
     // inside a safe zone enemies lose interest and drift home
     if (pZone.safe) {
       if (ne.state !== 'idle') ne.state = 'idle';
-      if (homeDist > 1 && Math.random() < 0.5) {
+      if (homeDist > 1 && Math.random() < 0.5 && canEnemyMove(ne)) {
         const st = stepToward(ne, ne.home.x, ne.home.y, enemies, p);
         if (st) { ne.x = st.x; ne.y = st.y; }
       }
@@ -79,7 +97,7 @@ export function tickEnemies(state) {
     // passive creatures only fight when attacked
     if (e.behavior === 'passive') {
       ne.state = 'idle';
-      if (Math.random() < 0.25) { const st = wander(ne, enemies, p); if (st) { ne.x = st.x; ne.y = st.y; } }
+      if (Math.random() < 0.25 && canEnemyMove(ne)) { const st = wander(ne, enemies, p); if (st) { ne.x = st.x; ne.y = st.y; } }
       return ne;
     }
 
@@ -91,13 +109,15 @@ export function tickEnemies(state) {
       if (dist > detect + BALANCE.world.giveUpDist || homeDist > BALANCE.world.leash) {
         ne.state = 'idle';
       } else if (manhattan(ne.x, ne.y, p.x, p.y) === 1) {
-        combat = initCombat(e.defId, p, { hp: ne.hp, stability: ne.stability, statuses: ne.statuses, worldId: e.id, difficulty: state.difficulty, intro: `${def.name} catches you!` });
+        const carry = carryIntoCombat(state, ne);
+        combat = initCombat(e.defId, p, { hp: ne.hp, stability: ne.stability, statuses: carry.statuses, playerStatuses: carry.playerStatuses, worldId: e.id, difficulty: state.difficulty, intro: `${def.name} catches you!` });
         return ne;
-      } else {
+      } else if (canEnemyMove(ne)) {
         const st = stepToward(ne, p.x, p.y, enemies, p);
         if (st) { ne.x = st.x; ne.y = st.y; }
         if (manhattan(ne.x, ne.y, p.x, p.y) === 1) {
-          combat = initCombat(e.defId, p, { hp: ne.hp, stability: ne.stability, statuses: ne.statuses, worldId: e.id, difficulty: state.difficulty, intro: `${def.name} closes in!` });
+          const carry = carryIntoCombat(state, ne);
+          combat = initCombat(e.defId, p, { hp: ne.hp, stability: ne.stability, statuses: carry.statuses, playerStatuses: carry.playerStatuses, worldId: e.id, difficulty: state.difficulty, intro: `${def.name} closes in!` });
         }
       }
       return ne;
@@ -110,7 +130,7 @@ export function tickEnemies(state) {
       return ne;
     }
     if (ne.state === 'alert') ne.state = 'idle';
-    if (e.behavior !== 'guard' && Math.random() < 0.15) {
+    if (e.behavior !== 'guard' && Math.random() < 0.15 && canEnemyMove(ne)) {
       const st = homeDist > 2 ? stepToward(ne, ne.home.x, ne.home.y, enemies, p) : wander(ne, enemies, p);
       if (st) { ne.x = st.x; ne.y = st.y; }
     }

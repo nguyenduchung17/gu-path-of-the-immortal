@@ -106,7 +106,7 @@ export function initCombat(enemyId, player, opts = {}) {
     wildGuId: opts.wildGuId || null,
     arena: opts.arena || null,
     trial: opts.trial || null,
-    playerStatuses: [],
+    playerStatuses: (opts.playerStatuses || []).map(s => ({ ...s })),
     cooldowns: {},
     log: [opts.intro || `A ${def.name} blocks your path!`],
     revealed: false,

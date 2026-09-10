@@ -13,6 +13,7 @@ export const GU = [
     description: 'Your form blurs like the wind. Greatly raises evasion and escape chance.',
     energyCost: 5, cooldown: 3,
     effect: { evasion: { power: 45, duration: 2 }, self: { haste: { power: 25, duration: 2 } } },
+    explore: { kind: 'haste', essence: 4, cooldown: 12, duration: 10 },
   },
   {
     id: 'thunderPalm', name: 'Thunder Palm Gu', rank: 2, type: 'Attack', path: 'wind', element: 'lightning', rarity: 'rare',
@@ -94,12 +95,14 @@ export const GU = [
     description: 'Waters coil like chains around the foe, sapping its strength.',
     energyCost: 7, cooldown: 3,
     effect: { control: { power: 6, duration: 3 }, delay: { pct: 25 }, soak: true, stab: 6 },
+    explore: { kind: 'root', essence: 6, cooldown: 20, duration: 5, range: 8 },
   },
   {
     id: 'mistVeil', name: 'Mist Veil Gu', rank: 2, type: 'Movement', path: 'water', element: 'water', rarity: 'rare',
     description: 'A veil of cold mist hides your form and knits your wounds.',
     energyCost: 8, cooldown: 3,
     effect: { evasion: { power: 40, duration: 2 }, heal: { power: 8 }, soak: true },
+    explore: { kind: 'stealth', essence: 6, cooldown: 25, duration: 12, power: 50 },
   },
   {
     id: 'jadeMarrow', name: 'Jade Marrow Gu', rank: 2, type: 'Healing', path: 'water', element: 'wood', rarity: 'uncommon',
@@ -112,6 +115,7 @@ export const GU = [
     description: 'Tangles the enemy in threads of shadow, slowing and weakening their attacks.',
     energyCost: 6, cooldown: 3,
     effect: { control: { power: 5, duration: 3 }, slow: { power: 30, duration: 2 } },
+    explore: { kind: 'slow', essence: 5, cooldown: 15, duration: 8, power: 50, range: 8 },
   },
   // ---- Enslavement ----
   {
@@ -195,6 +199,7 @@ export const GU = [
     description: "Reveals the enemy's true intentions and weaknesses in combat.",
     energyCost: 3, cooldown: 2,
     effect: { investigate: true },
+    explore: { kind: 'vision', essence: 5, cooldown: 30, duration: 20, radius: 9 },
   },
   {
     id: 'spiritMoth', name: 'Spirit Moth Gu', rank: 1, type: 'Investigation', path: 'refinement', element: 'wood', rarity: 'common',
@@ -202,6 +207,7 @@ export const GU = [
     energyCost: 3, cooldown: 2,
     effect: { investigate: true },
     passive: { gatheringBonus: 1 },
+    explore: { kind: 'sense', essence: 3, cooldown: 20, duration: 15, radius: 8 },
   },
 ];
 

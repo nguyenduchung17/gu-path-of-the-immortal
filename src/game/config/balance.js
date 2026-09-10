@@ -181,6 +181,14 @@ export const BALANCE = {
     revealRadius: 5,                 // tiles revealed around the player as she moves
     visionRadius: 4,                 // "currently visible" bright radius on the map
   },
+  // Exploration Gu — dual-use effects outside battle. Costs are essence;
+  // durations/cooldowns are game minutes (≈1 real second at rest). Strong
+  // enemies partially resist control instead of being fully immune.
+  exploration: {
+    range: 8,                        // paces for control-Gu targeting
+    masteryXp: 10,                   // meaningful-use reward only
+    resist: { elite: 0.7, boss: 0.5 }, // duration factor on elite / high-danger foes
+  },
   // The accelerated game clock. Baseline: 1 real second = 1 in-game minute.
   time: {
     tickMs: 1000,             // real-time heartbeat of the clock

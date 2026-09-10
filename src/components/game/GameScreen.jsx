@@ -32,6 +32,8 @@ import SleepOverlay from './SleepOverlay';
 import MemorialPanel from './MemorialPanel';
 import Toasts from './Toasts';
 import QuestTracker from './hud/QuestTracker';
+import ExploreBar from './hud/ExploreBar';
+import ScoutReport from './hud/ScoutReport';
 import DashboardScreen from './DashboardScreen';
 
 const PANEL_META = {
@@ -110,6 +112,8 @@ export default function GameScreen() {
       {/* HUD overlays */}
       <HUDTop />
       <MessageLog />
+      {!inputLocked && <ExploreBar />}
+      <ScoutReport />
       <Hotbar active={panel} onSelect={(id) => (id === 'dashboard' ? setDashOpen(true) : setPanel(id))} onPause={() => setPaused(true)} />
 
       {/* in-game panel overlays (world stays visible underneath) */}

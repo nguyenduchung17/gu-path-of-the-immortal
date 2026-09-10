@@ -195,10 +195,10 @@ export function seedFog(x, y, r) {
   return keys;
 }
 
-export function revealFog(state, x, y) {
+export function revealFog(state, x, y, r = BALANCE.fog.revealRadius) {
   const ws = state.worldState;
   const have = new Set(ws.fog || []);
-  const add = seedFog(x, y, BALANCE.fog.revealRadius).filter(k => !have.has(k));
+  const add = seedFog(x, y, r).filter(k => !have.has(k));
   if (!add.length) return state;
   return { ...state, worldState: { ...ws, fog: [...(ws.fog || []), ...add] } };
 }

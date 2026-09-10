@@ -25,6 +25,7 @@ import { essenceCapFor, cultivateMulOf, normalizeAptitude, rollAptitudeScore, ro
 import { starterGuOf } from '../data/starterGu';
 import { SPECIES_BY_ID, wildCombatDef, captureChanceOf, initialWildGu } from '../data/wildGu';
 import { revealFog, seedFog, foodOf } from '../engine/guLife';
+import { applyExploreGu, carryIntoCombat, visionRadiusOf } from '../engine/exploration';
 import { startInstability } from '../engine/vitalGu';
 import { QS, acceptQuest, turnInQuest, toggleTrack, abandonQuest, applyQuestEvent, emptyQuests, markDiscovered } from '../engine/questEngine';
 
@@ -265,7 +266,7 @@ export function gameReducer(state, action) {
       const nx = p.x + action.dx, ny = p.y + action.dy;
       if (!isWalkable(nx, ny)) return state;
       const facing = action.dx === 1 ? 'right' : action.dx === -1 ? 'left' : action.dy === 1 ? 'down' : 'up';
-      let s = revealFog(advanceTime({ ...state, player: { ...p, x: nx, y: ny, facing } }, BALANCE.time.moveMinutes), nx, ny);
+      let s = revealFog(advanceTime({ ...state, player: { ...p, x: nx, y: ny, facing } }, BALANCE.time.moveMinutes), nx, ny, visionRadiusOf(state));
 
       const zone = zoneAt(nx, ny) || DEFAULT_ZONE;
       const ws = s.worldState;
@@ -337,7 +338,8 @@ export function gameReducer(state, action) {
       const e = (state.worldState.enemies || []).find(en => !en.dead && Math.abs(en.x - p.x) + Math.abs(en.y - p.y) === 1);
       if (!e) return state;
       const def = ENEMY_BY_ID[e.defId];
-      return { ...state, combat: initCombat(e.defId, p, { hp: e.hp, stability: e.stability, statuses: e.statuses, worldId: e.id, difficulty: state.difficulty, intro: `You strike first — the ${def.name} turns on you!` }) };
+      const carry = carryIntoCombat(state, e);
+      return { ...state, combat: initCombat(e.defId, p, { hp: e.hp, stability: e.stability, statuses: carry.statuses, playerStatuses: carry.playerStatuses, worldId: e.id, difficulty: state.difficulty, intro: `You strike first — the ${def.name} turns on you!` }) };
     }
 
     case 'SLEEP_INN': {
@@ -573,6 +575,17 @@ export function gameReducer(state, action) {
     case 'UNEQUIP_GU':
       return { ...state, player: { ...state.player, equippedGu: state.player.equippedGu.filter(id => id !== action.instanceId) } };
 
+    // ---------- Exploration Gu ----------
+    case 'USE_EXPLORE_GU': {
+      if (busy(state)) return state;
+      const inst = state.ownedGu.find(g => g.instanceId === action.instanceId);
+      const res = inst ? applyExploreGu(state, inst) : null;
+      if (!res || !res.ok) return { ...state, log: [...state.log, res ? res.reason : 'No such Gu.'] };
+      let s = res.state;
+      if (res.toast) s = pushToast(s, res.toast);
+      return advanceTime(s, BALANCE.time.talkMinutes);
+    }
+
     // ---------- Saved loadout presets ----------
     case 'SAVE_LOADOUT': {
       const loadouts = [...(state.loadouts || [])];
@@ -725,10 +738,11 @@ export function gameReducer(state, action) {
       const e = (state.worldState.enemies || []).find(en => en.id === action.enemyId && !en.dead);
       if (!e) return { ...state, recovery: null };
       const def = ENEMY_BY_ID[e.defId];
+      const carry = carryIntoCombat(state, e);
       return {
         ...state,
         recovery: null,
-        combat: initCombat(e.defId, state.player, { hp: e.hp, stability: e.stability, statuses: e.statuses, worldId: e.id, difficulty: state.difficulty, intro: `Your meditation shatters — the ${def.name} found you!` }),
+        combat: initCombat(e.defId, state.player, { hp: e.hp, stability: e.stability, statuses: carry.statuses, playerStatuses: carry.playerStatuses, worldId: e.id, difficulty: state.difficulty, intro: `Your meditation shatters — the ${def.name} found you!` }),
         log: [...state.log, `Your meditation shatters — the ${def.name} found you!`],
       };
     }
