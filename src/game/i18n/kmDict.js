@@ -1,0 +1,243 @@
+// Localization for the Killer Move system (Sát Chiêu). Merged into the
+// translation tables by tr.js (same pattern as caveDict).
+
+export const DICT_KM = {
+  en: {
+    'ui.km': 'Killer Moves',
+
+    // panel & tabs
+    'km.tagline': 'Forge your own techniques from the Gu you carry.',
+    'km.tab.known': 'Known',
+    'km.tab.research': 'Research',
+    'km.tab.blueprints': 'Blueprints',
+    'km.tab.loadout': 'Loadout',
+
+    // locked / empty state (#27)
+    'km.locked.title': 'KILLER MOVE RESEARCH',
+    'km.locked.body': 'You need at least: 1 Core Gu + 1 compatible Support Gu. Acquire more Gu to begin research.',
+    'km.locked.lessons': 'Finish the basic Gu lessons to unlock experimentation.',
+
+    // research
+    'km.research.title': 'CREATE KILLER MOVE',
+    'km.core': 'Core Gu',
+    'km.core.hint': 'The Core defines the move — its Path, damage and shape.',
+    'km.support': 'Support Gu',
+    'km.support.hint': 'Supports bend the Core: damage, speed, status, protection.',
+    'km.pickCore': 'Pick a Core Gu',
+    'km.pickSupport': 'Add Support Gu',
+    'km.cap': 'Component limit: {n} Gu total (rises with Path Mastery)',
+    'km.compat': 'Compatibility',
+    'km.tier.excellent': 'Excellent',
+    'km.tier.good': 'Good',
+    'km.tier.unstable': 'Unstable',
+    'km.tier.poor': 'Poor',
+    'km.tier.invalid': 'Invalid',
+    'km.est.damage': 'Estimated Damage',
+    'km.est.essence': 'Estimated Essence Cost',
+    'km.est.stability': 'Estimated Activation',
+    'km.est.role': 'Possible Role',
+    'km.est.cooldown': 'Cooldown',
+    'km.est.actions': 'actions',
+
+    // success chance breakdown (#10)
+    'km.chance.title': 'Research Success Chance',
+    'km.chance.base': 'Base',
+    'km.chance.mastery': 'Path Mastery',
+    'km.chance.compat': 'Compatibility',
+    'km.chance.mentor': 'Mentor Knowledge',
+    'km.chance.blueprint': 'Blueprint',
+    'km.chance.minigame': 'Minigame',
+    'km.chance.minigamePending': 'Pending',
+    'km.chance.total': 'Current Estimated',
+
+    // costs & buttons
+    'km.cost.essence': 'Essence',
+    'km.cost.stones': 'Stones',
+    'km.cost.time': 'Time',
+    'km.cooldownLeft': 'The resonance needs {n} more day(s) to settle.',
+    'km.btn.experiment': 'Experiment',
+    'km.btn.research': 'Research',
+    'km.btn.clear': 'Clear',
+
+    // minigame
+    'km.game.title': 'Resonance Calibration',
+    'km.game.hint': 'Strike when the pulse crosses the golden band — each hit steadies the fusion.',
+    'km.game.hit': 'In tune!',
+    'km.game.miss': 'Discordant…',
+    'km.game.round': 'Pulse {n}/{total}',
+
+    // results
+    'km.discovered.title': 'KILLER MOVE DISCOVERED',
+    'km.discovered.line1': '{name}',
+    'km.discovered.line2': 'Damage {dmg} · Essence {essence} · Activation {act}% · Cooldown {cd}',
+    'km.discovered.line3': 'Equip it from the Loadout tab.',
+    'km.discovered.log': 'Killer Move discovered: {name}.',
+    'km.fail.title': 'Experiment Failed',
+    'km.fail.line1': 'The essence disperses — nothing is destroyed, but the Gu are worn.',
+    'km.fail.line2': 'Retry after {n} day(s).',
+    'km.fail.log': 'The Killer Move experiment failed — the resonance needs time to settle.',
+
+    // known tab
+    'km.known.empty': 'No Killer Moves discovered yet. Open Research and forge your first technique.',
+    'km.known.count': '{n} discovered',
+
+    // blueprints
+    'km.bp.title': 'Blueprints',
+    'km.bp.none': 'No blueprints in hand. Rumors say the valley\'s Contribution Exchange keeps a few designs…',
+    'km.bp.unknown': 'Rarer designs exist — experiment, or earn the valley\'s trust.',
+    'km.bp.req': 'Requires',
+    'km.bp.reqCore': 'Core Path: {paths}',
+    'km.bp.reqSupport': 'Support Role: {roles}',
+    'km.bp.bonus': '+{r}% research success · +{s}% activation stability',
+    'km.bp.match': 'Selection matches',
+    'km.bp.noMatch': 'Selection does not match',
+    'km.bp.use': 'Use Blueprint',
+    'km.bp.inUse': 'Blueprint in use',
+
+    // loadout (#14–#16)
+    'km.loadout.title': 'Killer Move Loadout',
+    'km.loadout.slots': '{n} slots',
+    'km.loadout.slot': 'Slot {n}',
+    'km.loadout.empty': 'Empty slot',
+    'km.loadout.boundTo': 'BOUND TO',
+    'km.loadout.lockNote': 'A Gu bound to an equipped Killer Move cannot act individually in battle — dismantle the move to free it.',
+    'km.loadout.pick': 'Equip a Killer Move:',
+    'km.btn.equip': 'Equip',
+    'km.btn.unequip': 'Unequip',
+    'km.btn.dismantle': 'Dismantle',
+    'km.dismantle.confirm': 'Dismantle {name}? The component Gu are returned unharmed — only the technique is lost.',
+    'km.dismantle.log': 'Dismantled Killer Move: {name}. Its Gu are free once more.',
+    'km.equip.full': 'All Killer Move slots are in use.',
+    'km.incomplete': 'INCOMPLETE',
+    'km.incomplete.missing': 'Missing: {names}',
+    'km.strain': 'Strained — rests until day {n}',
+
+    // combat
+    'cmt.kmIncomplete': '{move} cannot be unleashed — missing: {miss}.',
+    'battle.kmBound': 'Bound to {name}',
+    'km.help.steps': '1. Open Killer Moves 2. Select Research 3. Choose a Core Gu 4. Add Support Gu 5. Review compatibility 6. Experiment or use a Blueprint 7. Equip your discovery',
+
+    // contextual tip (#23)
+    'tip.killerMoves.title': 'Killer Move Research',
+    'tip.killerMoves.body': 'You now own enough Gu to begin experimenting with Killer Moves. Combine a Core Gu with Support Gu to create advanced techniques — open ⚡ Killer Moves on the hotbar.',
+
+    // contribution & codex
+    'km.bp.acquired': 'Blueprint acquired: {name}.',
+    'codex.killerMove.title': 'Killer Moves',
+    'codex.killerMove.body': 'A Killer Move is a technique forged from your own Gu: one Core Gu defines it, 1–4 Support Gu bend it toward damage, speed, status or protection. Research costs essence, stones and time; failure never destroys Gu — it only strains them for a day. Higher Path Mastery allows more complex combinations.',
+    'codex.kmCreate.title': 'How to Create a Killer Move',
+  },
+
+  vi: {
+    'ui.km': 'Sát Chiêu',
+
+    'km.tagline': 'Tự tay rèn kỹ năng từ những con Cổ bạn mang theo.',
+    'km.tab.known': 'Đã Biết',
+    'km.tab.research': 'Nghiên Cứu',
+    'km.tab.blueprints': 'Bản Thiết Kế',
+    'km.tab.loadout': 'Trang Bị',
+
+    'km.locked.title': 'NGHIÊN CỨU SÁT CHIÊU',
+    'km.locked.body': 'Bạn cần tối thiểu: 1 Cổ Hạch Tâm + 1 Cổ Phụ Trợ tương thích. Hãy thu thập thêm Cổ để bắt đầu.',
+    'km.locked.lessons': 'Hoàn thành bài học Cổ cơ bản để mở khóa nghiên cứu.',
+
+    'km.research.title': 'NGHIÊN CỨU SÁT CHIÊU',
+    'km.core': 'Cổ Hạch Tâm',
+    'km.core.hint': 'Hạch tâm định hình sát chiêu — con đường, sát thương và hình thái.',
+    'km.support': 'Cổ Phụ Trợ',
+    'km.support.hint': 'Phụ trợ uốn nắn hạch tâm: sát thương, tốc độ, trạng thái, hộ thân.',
+    'km.pickCore': 'Chọn Cổ Hạch Tâm',
+    'km.pickSupport': 'Thêm Cổ Phụ Trợ',
+    'km.cap': 'Giới hạn: tối đa {n} Cổ (tăng theo bậc Đạo Pháp)',
+    'km.compat': 'Độ Tương Thích',
+    'km.tier.excellent': 'Xuất Sắc',
+    'km.tier.good': 'Tốt',
+    'km.tier.unstable': 'Bất Ổn',
+    'km.tier.poor': 'Kém',
+    'km.tier.invalid': 'Vô Hiệu',
+    'km.est.damage': 'Sát Thương (Ước Tính)',
+    'km.est.essence': 'Tinh Hoa (Ước Tính)',
+    'km.est.stability': 'Tỷ Lệ Thi Triển (Ước Tính)',
+    'km.est.role': 'Vai Trò Khả Dụng',
+    'km.est.cooldown': 'Hồi Chiêu',
+    'km.est.actions': 'hành động',
+
+    'km.chance.title': 'Tỷ Lệ Thành Công',
+    'km.chance.base': 'Cơ Bản',
+    'km.chance.mastery': 'Đạo Pháp',
+    'km.chance.compat': 'Tương Thích',
+    'km.chance.mentor': 'Tri Thức Sư Phụ',
+    'km.chance.blueprint': 'Bản Thiết Kế',
+    'km.chance.minigame': 'Tiểu Trò',
+    'km.chance.minigamePending': 'Chờ Đợi',
+    'km.chance.total': 'Tổng Ước Tính',
+
+    'km.cost.essence': 'Tinh Hoa',
+    'km.cost.stones': 'Linh Thạch',
+    'km.cost.time': 'Thời Gian',
+    'km.cooldownLeft': 'Cộng hưởng cần thêm {n} ngày để lắng lại.',
+    'km.btn.experiment': 'Thử Nghiệm',
+    'km.btn.research': 'Nghiên Cứu',
+    'km.btn.clear': 'Xóa Chọn',
+
+    'km.game.title': 'Điều Chỉnh Cộng Hưởng',
+    'km.game.hint': 'Xuất thủ khi xung đi qua dải vàng — mỗi lần trúng giúp dung hợp ổn định hơn.',
+    'km.game.hit': 'Hợp điệu!',
+    'km.game.miss': 'Trật nhịp…',
+    'km.game.round': 'Xung {n}/{total}',
+
+    'km.discovered.title': 'PHÁT HIỆN SÁT CHIÊU',
+    'km.discovered.line1': '{name}',
+    'km.discovered.line2': 'Sát thương {dmg} · Tinh hoa {essence} · Thi triển {act}% · Hồi chiêu {cd}',
+    'km.discovered.line3': 'Trang bị ngay trong mục Trang Bị.',
+    'km.discovered.log': 'Đã phát hiện Sát Chiêu: {name}.',
+    'km.fail.title': 'Thử Nghiệm Thất Bại',
+    'km.fail.line1': 'Tinh hoa tan biến — không mất Cổ nào, nhưng đàn Cổ đã kiệt sức.',
+    'km.fail.line2': 'Thử lại sau {n} ngày.',
+    'km.fail.log': 'Thử nghiệm Sát Chiêu thất bại — cộng hưởng cần thời gian lắng lại.',
+
+    'km.known.empty': 'Chưa phát hiện Sát Chiêu nào. Hãy mở Nghiên Cứu và rèn kỹ năng đầu tiên.',
+    'km.known.count': 'Đã phát hiện {n}',
+
+    'km.bp.title': 'Bản Thiết Kế',
+    'km.bp.none': 'Chưa có bản thiết kế nào. Nghe đồn Hội Đóng Góp của thung lũng giữ vài bản vẽ…',
+    'km.bp.unknown': 'Còn những bản vẽ hiếm hơn — cứ thử nghiệm, hoặc gi lấy lòng tin của thung lũng.',
+    'km.bp.req': 'Yêu Cầu',
+    'km.bp.reqCore': 'Hạch tâm con đường: {paths}',
+    'km.bp.reqSupport': 'Phụ trợ vai trò: {roles}',
+    'km.bp.bonus': '+{r}% tỷ lệ thành công · +{s}% độ ổn định',
+    'km.bp.match': 'Phối hợp đạt yêu cầu',
+    'km.bp.noMatch': 'Phối hợp chưa đạt',
+    'km.bp.use': 'Dùng Bản Vẽ',
+    'km.bp.inUse': 'Đang dùng bản vẽ',
+
+    'km.loadout.title': 'Trang Bị Sát Chiêu',
+    'km.loadout.slots': '{n} ô',
+    'km.loadout.slot': 'Ô {n}',
+    'km.loadout.empty': 'Ô trống',
+    'km.loadout.boundTo': 'RÀNG BUỘC VỚI',
+    'km.loadout.lockNote': 'Cổ bị ràng buộc với Sát Chiêu đang trang bị không thể đơn độc hành động trong chiến đấu — tháo sát chiêu để giải phóng.',
+    'km.loadout.pick': 'Trang bị Sát Chiêu:',
+    'km.btn.equip': 'Trang Bị',
+    'km.btn.unequip': 'Tháo',
+    'km.btn.dismantle': 'Phá Bỏ',
+    'km.dismantle.confirm': 'Phá bỏ {name}? Các Cổ thành phần được trả lại nguyên vẹn — chỉ kỹ năng này mất đi.',
+    'km.dismantle.log': 'Đã phá bỏ Sát Chiêu: {name}. Các Cổ được tự do trở lại.',
+    'km.equip.full': 'Mọi ô Sát Chiêu đã được dùng.',
+    'km.incomplete': 'KHÔNG HOÀN CHỈNH',
+    'km.incomplete.missing': 'Thiếu: {names}',
+    'km.strain': 'Kiệt sức — nghỉ đến ngày {n}',
+
+    'cmt.kmIncomplete': '{move} chưa thể triển khai — thiếu: {miss}.',
+    'battle.kmBound': 'Ràng buộc với {name}',
+    'km.help.steps': '1. Mở Sát Chiêu 2. Chọn Nghiên Cứu 3. Chọn Cổ Hạch Tâm 4. Thêm Cổ Phụ Trợ 5. Xem độ tương thích 6. Thử nghiệm hoặc dùng Bản Thiết Kế 7. Trang bị sát chiêu mới',
+
+    'tip.killerMoves.title': 'Nghiên Cứu Sát Chiêu',
+    'tip.killerMoves.body': 'Bạn đã có đủ Cổ để bắt đầu thử nghiệm Sát Chiêu. Kết hợp Cổ Hạch Tâm với Cổ Phụ Trợ để tạo kỹ năng cường hóa — mở ⚡ Sát Chiêu trên thanh công cụ.',
+
+    'km.bp.acquired': 'Nhận bản thiết kế: {name}.',
+    'codex.killerMove.title': 'Sát Chiêu',
+    'codex.killerMove.body': 'Sát Chiêu là kỹ năng được rèn từ chính đàn Cổ của bạn: một Cổ Hạch Tâm định hình, 1–4 Cổ Phụ Trợ uốn nắn theo hướng sát thương, tốc độ, trạng thái hoặc hộ thân. Nghiên cứu tốn tinh hoa, linh thạch và thời gian; thất bại không bao giờ hủy Cổ — chỉ khiến chúng kiệt sức một ngày. Đạo Pháp cao hơn cho phép phối hợp phức tạp hơn.',
+    'codex.kmCreate.title': 'Cách Tạo Sát Chiêu',
+  },
+};
