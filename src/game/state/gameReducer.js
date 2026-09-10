@@ -26,7 +26,7 @@ export function createNewGame(name, gender, age) {
       hp: 50, maxHp: 50, primevalEssence: 30, maxPrimevalEssence: 30, willpower: 10,
       strength: 6, agility: 6, perception: 6, intelligence: 6, luck: 6,
       x: 9, y: 6, currentArea: 'greenValley', facing: 'down',
-      spiritStones: 50, equippedGu: ['g_start'], exp: 0, expToNext: 100,
+      spiritStones: 50, equippedGu: ['g_start'], exp: 0, expToNext: 100, totalInsight: 0,
     },
     ownedGu: [{ instanceId: 'g_start', guId: 'swiftFang', rank: 1 }],
     inventory: { materials: { herb: 3 }, medicine: { medicine: 1 }, food: { ration: 2 }, questItems: {}, equipment: {} },
@@ -187,6 +187,7 @@ export function gameReducer(state, action) {
       const atSect = state.player.currentArea === 'cultivationSect';
       const gain = Math.floor((18 + state.player.intelligence * 1.5) * aptitudeMul(state.player.aptitude) * (atSect ? 1.5 : 1));
       p.exp += gain;
+      p.totalInsight = (p.totalInsight || 0) + gain;
       let log = [...state.log, `You cultivate. (+${gain} insight${atSect ? ' · sect bonus' : ''})`];
       let s = { ...state, player: p, log };
       // realm breakthrough (loop in case insight overflows the threshold by a lot)

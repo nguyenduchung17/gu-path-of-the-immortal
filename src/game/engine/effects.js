@@ -25,7 +25,7 @@ export function applyEffects(state, effects) {
   if (effects.hp) player.hp = Math.min(player.maxHp, Math.max(0, player.hp + effects.hp));
   if (effects.essence) player.primevalEssence = Math.min(player.maxPrimevalEssence, Math.max(0, player.primevalEssence + effects.essence));
   if (effects.spiritStones) player.spiritStones = Math.max(0, player.spiritStones + effects.spiritStones);
-  if (effects.exp) player.exp += effects.exp;
+  if (effects.exp) { player.exp += effects.exp; player.totalInsight = (player.totalInsight || 0) + effects.exp; }
   if (effects.items) for (const [id, qty] of Object.entries(effects.items)) {
     const it = ITEM_BY_ID[id]; if (it) add(it.category, id, qty);
   }

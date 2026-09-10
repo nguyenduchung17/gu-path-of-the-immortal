@@ -5,6 +5,7 @@ import { REALMS } from '@/game/state/gameReducer';
 const TABS = [
   { id: 'world', label: 'World', icon: '🗺️' },
   { id: 'character', label: 'Cultivator', icon: '🧘' },
+  { id: 'progress', label: 'Progress', icon: '📈' },
   { id: 'gu', label: 'Gu', icon: '🐉' },
   { id: 'inventory', label: 'Inventory', icon: '🎒' },
   { id: 'quests', label: 'Quests', icon: '📜' },

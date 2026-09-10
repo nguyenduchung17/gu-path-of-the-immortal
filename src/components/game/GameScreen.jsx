@@ -6,6 +6,7 @@ import CharacterPanel from './CharacterPanel';
 import GuPanel from './GuPanel';
 import InventoryPanel from './InventoryPanel';
 import QuestsPanel from './QuestsPanel';
+import ProgressDashboard from './ProgressDashboard';
 import MapPanel from './MapPanel';
 import CombatView from './CombatView';
 import EventModal from './EventModal';
@@ -29,6 +30,7 @@ export default function GameScreen() {
         {tab === 'gu' && <GuPanel />}
         {tab === 'inventory' && <InventoryPanel />}
         {tab === 'quests' && <QuestsPanel />}
+        {tab === 'progress' && <ProgressDashboard />}
         {tab === 'map' && <MapPanel />}
       </main>
       {state.combat && <CombatView />}
