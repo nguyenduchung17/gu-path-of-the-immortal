@@ -8,7 +8,6 @@ import {
   TERRACE, FORMATION, BUILDING_AT, BUILDING_LABELS,
 } from '@/game/data/world';
 import { darknessOf, warmthOf } from '@/game/engine/time';
-import ClockWidget from './ClockWidget';
 
 const TILE_BG = {
   '.': '#1c3226', ',': '#182a20', 'r': '#463d2c', 'f': '#33421f',
@@ -33,18 +32,34 @@ function TileDecor({ ch }) {
   if (ch === 'f') return <div className="absolute inset-0 opacity-50" style={{ background: 'repeating-linear-gradient(90deg, #55702f 0 3px, transparent 3px 8px), repeating-linear-gradient(0deg, #55702f 0 2px, transparent 2px 7px)' }} />;
   if (ch === 'c') return <div className="absolute inset-[18%] rounded-sm bg-amber-600/50 border border-amber-500/40" />;
   if (ch === 'F') return <div className="absolute inset-[15%] rounded-full border-2 border-cyan-400/50 animate-pulse" />;
-  if (ch === '*') return <div className="absolute inset-0 flex items-center justify-center text-violet-300 text-[9px] sm:text-[11px]">✦</div>;
+  if (ch === '*') return <div className="absolute inset-0 flex items-center justify-center text-violet-300">✦</div>;
   if (ch === 'r') return <div className="absolute inset-0 opacity-30" style={{ background: 'repeating-linear-gradient(0deg, #000 0 1px, transparent 1px 4px)' }} />;
   if (ch === 'b') return <div className="absolute inset-x-0 top-0 h-1/3 bg-amber-900/40" />;
   return null;
 }
 
-export default function WorldView() {
+// The world is the app's background layer: the camera viewport fills the browser,
+// the player stays near the center, and all HUD/menus float above it.
+export default function WorldView({ paused, inputLocked }) {
   const { state, dispatch } = useGame();
   const p = state.player;
   const zone = zoneAt(p.x, p.y) || DEFAULT_ZONE;
   const [banner, setBanner] = useState(null);
   const prevZone = useRef(zone.id);
+
+  // viewport camera: measure the browser and compute how many tiles fit
+  const [vp, setVp] = useState({ w: 1280, h: 800 });
+  useEffect(() => {
+    const onResize = () => setVp({ w: window.innerWidth, h: window.innerHeight });
+    onResize();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+  const tile = vp.w < 640 ? 24 : vp.w < 1024 ? 30 : 36;
+  const cols = Math.min(WORLD.w, Math.max(8, Math.ceil(vp.w / tile)));
+  const rows = Math.min(WORLD.h, Math.max(8, Math.ceil(vp.h / tile)));
+  const camX = Math.max(0, Math.min(WORLD.w - cols, p.x - (cols >> 1)));
+  const camY = Math.max(0, Math.min(WORLD.h - rows, p.y - (rows >> 1)));
 
   useEffect(() => {
     if (prevZone.current !== zone.id) {
@@ -53,14 +68,7 @@ export default function WorldView() {
       const t = setTimeout(() => setBanner(null), 2200);
       return () => clearTimeout(t);
     }
-  }, [zone.id, zone.name, zone.dangerLabel]);
-
-  // viewport camera follows the player across one large region
-  const isMobile = typeof window !== 'undefined' && window.innerWidth < 640;
-  const VW = isMobile ? 17 : 27;
-  const VH = isMobile ? 15 : 17;
-  const camX = Math.max(0, Math.min(WORLD.w - VW, p.x - ((VW / 2) | 0)));
-  const camY = Math.max(0, Math.min(WORLD.h - VH, p.y - ((VH / 2) | 0)));
+  }, [zone.id, zone.name, zone.dangerLabel, zone.danger]);
 
   // day/night: gradual darkness + warm dawn/dusk glow; settlements stay cozier
   const rawDark = darknessOf(state.time?.min);
@@ -89,6 +97,7 @@ export default function WorldView() {
   })();
 
   const interact = useCallback(() => {
+    if (inputLocked) return;
     const it = interactable;
     if (!it) return;
     if (it.type === 'npc') dispatch({ type: 'TALK_NPC', npcId: it.npc.id });
@@ -97,15 +106,15 @@ export default function WorldView() {
     else if (it.type === 'cultivate') dispatch({ type: 'CULTIVATE' });
     else if (it.type === 'formation') dispatch({ type: 'USE_FORMATION' });
     else if (it.type === 'enemy') dispatch({ type: 'ATTACK_ENEMY' });
-  }, [interactable, dispatch]);
+  }, [interactable, dispatch, inputLocked]);
 
   const handleKey = useCallback((e) => {
-    if (state.combat || state.pendingEvent || state.dialogue || state.recovery) return;
+    if (state.combat || state.pendingEvent || state.dialogue || state.recovery || inputLocked || paused) return;
     const k = e.key.toLowerCase();
     const map = { arrowup: [0, -1], w: [0, -1], arrowdown: [0, 1], s: [0, 1], arrowleft: [-1, 0], a: [-1, 0], arrowright: [1, 0], d: [1, 0] };
     if (map[k]) { e.preventDefault(); dispatch({ type: 'MOVE', dx: map[k][0], dy: map[k][1] }); }
     else if (k === 'e' || k === ' ' || k === 'enter') { e.preventDefault(); interact(); }
-  }, [state.combat, state.pendingEvent, state.dialogue, state.recovery, interact, dispatch]);
+  }, [state.combat, state.pendingEvent, state.dialogue, state.recovery, inputLocked, paused, interact, dispatch]);
 
   useEffect(() => {
     window.addEventListener('keydown', handleKey);
@@ -114,9 +123,12 @@ export default function WorldView() {
 
   const dpad = (dx, dy) => dispatch({ type: 'MOVE', dx, dy });
 
+  // font sizes scale with tile size so the world stays readable at any zoom
+  const fs = (ratio) => `${Math.max(5, Math.round(tile * ratio))}px`;
+
   const cells = [];
-  for (let y = camY; y < camY + VH; y++) {
-    for (let x = camX; x < camX + VW; x++) {
+  for (let y = camY; y < camY + rows; y++) {
+    for (let x = camX; x < camX + cols; x++) {
       const key = `${x},${y}`;
       const ch = WORLD.tiles[y][x];
       const b = BUILDING_AT.get(key);
@@ -130,10 +142,10 @@ export default function WorldView() {
       const detect = en ? (en.detect ?? (BALANCE.world.detect[en.behavior] ?? 4)) : 0;
       const alert = en ? (en.state === 'chase' ? '!' : (detect > 0 && dist <= detect + 2 ? '?' : null)) : null;
       cells.push(
-        <div key={key} className="relative aspect-square overflow-hidden" style={{ background: bg }}>
+        <div key={key} className="relative overflow-hidden" style={{ width: tile, height: tile, background: bg }}>
           <TileDecor ch={ch} />
           {BUILDING_LABELS.has(key) && (
-            <div className="absolute inset-0 flex items-center justify-center text-center text-[4.5px] sm:text-[6px] leading-[1.05] font-bold text-stone-100/90 px-px">
+            <div className="absolute inset-0 flex items-center justify-center text-center font-bold text-stone-100/90 px-px" style={{ fontSize: fs(0.16), lineHeight: 1.05 }}>
               {BUILDING_AT.get(key).label}
             </div>
           )}
@@ -143,27 +155,27 @@ export default function WorldView() {
           )}
           {res && !isPlayer && (
             <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-amber-300 text-[8px] sm:text-[10px] drop-shadow">✦</span>
+              <span className="text-amber-300 drop-shadow" style={{ fontSize: fs(0.3) }}>✦</span>
             </div>
           )}
           {npc && !isPlayer && (
             <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-[9px] sm:text-xs leading-none">{NPC_BY_ID[npc.id].avatar}</span>
-              <span className="absolute -bottom-0.5 text-[5px] sm:text-[6.5px] text-emerald-100/90 whitespace-nowrap">{NPC_BY_ID[npc.id].name.split(' ').slice(-1)}</span>
+              <span className="leading-none" style={{ fontSize: fs(0.5) }}>{NPC_BY_ID[npc.id].avatar}</span>
+              <span className="absolute -bottom-0.5 text-emerald-100/90 whitespace-nowrap" style={{ fontSize: fs(0.2) }}>{NPC_BY_ID[npc.id].name.split(' ').slice(-1)}</span>
             </div>
           )}
           {en && !isPlayer && (
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="w-[62%] h-[62%] rounded-full bg-gradient-to-br from-red-900 to-rose-600 border border-red-300/30 flex items-center justify-center">
-                <span className="text-[6px] sm:text-[7px] text-red-100">{enDef?.hp > 60 ? '◆◆' : '◆'}</span>
+                <span className="text-red-100" style={{ fontSize: fs(0.22) }}>{enDef?.hp > 60 ? '◆◆' : '◆'}</span>
               </div>
-              {alert && <div className={`absolute top-0 right-0 text-[8px] font-bold ${alert === '!' ? 'text-red-400' : 'text-amber-300'}`}>{alert}</div>}
-              {dist <= 6 && <div className="absolute -bottom-0.5 text-[5px] sm:text-[6px] text-rose-200/80 whitespace-nowrap">{enDef?.name.split(' ').slice(-1)}</div>}
+              {alert && <div className={`absolute top-0 right-0 font-bold ${alert === '!' ? 'text-red-400' : 'text-amber-300'}`} style={{ fontSize: fs(0.3) }}>{alert}</div>}
+              {dist <= 6 && <div className="absolute -bottom-0.5 text-rose-200/80 whitespace-nowrap" style={{ fontSize: fs(0.18) }}>{enDef?.name.split(' ').slice(-1)}</div>}
             </div>
           )}
           {isPlayer && (
             <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-[11px] sm:text-base drop-shadow">🧑‍🌾</span>
+              <span className="drop-shadow" style={{ fontSize: fs(0.6) }}>🧑‍🌾</span>
             </div>
           )}
         </div>
@@ -171,59 +183,66 @@ export default function WorldView() {
     }
   }
 
+  const gridW = cols * tile;
+  const gridH = rows * tile;
+
   return (
-    <div className="pt-3">
-      <div className="flex items-center justify-between mb-2 gap-2">
-        <div className="flex items-center gap-2">
-          <h2 className="text-lg font-semibold text-emerald-100">{zone.name}</h2>
-          <span className={`text-[9px] px-2 py-0.5 rounded-full border whitespace-nowrap ${DANGER_CHIP[zone.danger] ?? DANGER_CHIP[2]}`}>{zone.dangerLabel}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <ClockWidget />
-          <div className="text-[10px] text-stone-500 hidden sm:block">WASD / Arrows to move · E to interact</div>
-        </div>
+    <div className="absolute inset-0 overflow-hidden bg-[#0a120d]">
+      {/* camera viewport — centered if the world is narrower than the screen */}
+      <div
+        className="grid absolute shadow-2xl"
+        style={{
+          gridTemplateColumns: `repeat(${cols}, ${tile}px)`,
+          width: gridW,
+          height: gridH,
+          left: Math.max(0, (vp.w - gridW) / 2),
+          top: Math.max(0, (vp.h - gridH) / 2),
+        }}
+      >
+        {cells}
       </div>
 
-      <div className="relative rounded-xl overflow-hidden border border-emerald-900/50 shadow-2xl bg-[#101d15]">
-        {banner && (
-          <div className={`absolute top-2 left-1/2 -translate-x-1/2 z-10 px-3 py-1 rounded-full text-[10px] border backdrop-blur animate-fade-in ${DANGER_CHIP[banner.danger] ?? DANGER_CHIP[2]}`}>
-            Entering {banner.name} · {banner.label}
-          </div>
-        )}
-        <div className="grid w-full" style={{ gridTemplateColumns: `repeat(${VW}, 1fr)` }}>
-          {cells}
-        </div>
-        {/* day/night overlays — transition smoothly as the clock turns */}
-        <div className="absolute inset-0 pointer-events-none" style={{ background: 'rgb(8 12 44)', opacity: dark * 0.5, transition: 'opacity 1.2s linear' }} />
-        <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(180deg, rgba(255,140,50,0.9), rgba(255,90,40,0.6))', opacity: warm, transition: 'opacity 1.2s linear' }} />
-      </div>
+      {/* day/night overlays — transition smoothly as the clock turns */}
+      <div className="absolute inset-0 pointer-events-none" style={{ background: 'rgb(8 12 44)', opacity: dark * 0.5, transition: 'opacity 1.2s linear' }} />
+      <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(180deg, rgba(255,140,50,0.9), rgba(255,90,40,0.6))', opacity: warm, transition: 'opacity 1.2s linear' }} />
+      {/* soft vignette to frame the world */}
+      <div className="absolute inset-0 pointer-events-none" style={{ boxShadow: 'inset 0 0 140px 30px rgba(0,0,0,0.55)' }} />
 
-      {/* D-pad for mobile */}
-      <div className="mt-3 grid grid-cols-3 gap-1 max-w-[180px] mx-auto sm:hidden">
-        <div />
-        <button onClick={() => dpad(0, -1)} className="py-3 rounded-lg bg-white/10 active:bg-white/20">↑</button>
-        <div />
-        <button onClick={() => dpad(-1, 0)} className="py-3 rounded-lg bg-white/10 active:bg-white/20">←</button>
-        <button onClick={interact} className="py-3 rounded-lg bg-emerald-600 active:bg-emerald-500 text-white text-xs">E</button>
-        <button onClick={() => dpad(1, 0)} className="py-3 rounded-lg bg-white/10 active:bg-white/20">→</button>
-        <div />
-        <button onClick={() => dpad(0, 1)} className="py-3 rounded-lg bg-white/10 active:bg-white/20">↓</button>
-        <div />
-      </div>
-
-      {interactable && (
-        <div className="mt-3 text-center text-sm text-emerald-200 bg-emerald-900/20 border border-emerald-800/40 rounded-lg py-2 animate-fade-in">
-          {interactable.type === 'npc' && <>Press <b>E</b> to speak with {NPC_BY_ID[interactable.npc.id].name}</>}
-          {interactable.type === 'resource' && <>Press <b>E</b> to gather {interactable.node.name}</>}
-          {interactable.type === 'camp' && <>Press <b>E</b> to rest at the campsite</>}
-          {interactable.type === 'cultivate' && <>Press <b>E</b> to cultivate at the terrace (×1.5 progress)</>}
-          {interactable.type === 'formation' && <>Press <b>E</b> to examine the teleportation formation</>}
-          {interactable.type === 'enemy' && <>Press <b>E</b> to attack the {ENEMY_BY_ID[interactable.enemy.defId].name}</>}
+      {/* zone discovery banner */}
+      {banner && (
+        <div className={`absolute top-16 left-1/2 -translate-x-1/2 z-10 px-3 py-1 rounded-full text-[10px] border backdrop-blur animate-fade-in ${DANGER_CHIP[banner.danger] ?? DANGER_CHIP[2]}`}>
+          Entering {banner.name} · {banner.label}
         </div>
       )}
 
-      <div className="mt-3 h-24 overflow-y-auto scrollbar-thin text-xs text-stone-400 bg-black/30 rounded-lg p-2 border border-stone-800">
-        {state.log.slice(-8).reverse().map((l, i) => <div key={i} className={i === 0 ? 'text-emerald-200' : ''}>{l}</div>)}
+      {/* interaction hint — floats above the hotbar */}
+      {interactable && !inputLocked && (
+        <div className="absolute bottom-[72px] left-1/2 -translate-x-1/2 z-10 text-[11px] sm:text-xs text-emerald-100 bg-black/55 backdrop-blur border border-emerald-700/50 rounded-full px-3 py-1.5 animate-fade-in whitespace-nowrap">
+          {interactable.type === 'npc' && <>Press <b>E</b> — speak with {NPC_BY_ID[interactable.npc.id].name}</>}
+          {interactable.type === 'resource' && <>Press <b>E</b> — gather {interactable.node.name}</>}
+          {interactable.type === 'camp' && <>Press <b>E</b> — rest at the campsite</>}
+          {interactable.type === 'cultivate' && <>Press <b>E</b> — cultivate at the terrace (×1.5)</>}
+          {interactable.type === 'formation' && <>Press <b>E</b> — examine the formation</>}
+          {interactable.type === 'enemy' && <>Press <b>E</b> — attack the {ENEMY_BY_ID[interactable.enemy.defId].name}</>}
+        </div>
+      )}
+
+      {/* controls reminder */}
+      <div className="absolute top-16 right-2.5 z-10 text-[9px] text-stone-400 bg-black/40 backdrop-blur rounded-full px-2 py-0.5 hidden sm:block">
+        WASD / arrows move · E interact · Esc menu
+      </div>
+
+      {/* touch d-pad */}
+      <div className="absolute bottom-3 right-3 z-10 grid grid-cols-3 gap-1 sm:hidden">
+        <div />
+        <button onClick={() => dpad(0, -1)} className="w-11 h-11 rounded-lg bg-black/50 backdrop-blur border border-white/10 active:bg-white/20 text-stone-200">↑</button>
+        <div />
+        <button onClick={() => dpad(-1, 0)} className="w-11 h-11 rounded-lg bg-black/50 backdrop-blur border border-white/10 active:bg-white/20 text-stone-200">←</button>
+        <button onClick={interact} className="w-11 h-11 rounded-lg bg-emerald-600/90 active:bg-emerald-500 text-white text-sm">E</button>
+        <button onClick={() => dpad(1, 0)} className="w-11 h-11 rounded-lg bg-black/50 backdrop-blur border border-white/10 active:bg-white/20 text-stone-200">→</button>
+        <div />
+        <button onClick={() => dpad(0, 1)} className="w-11 h-11 rounded-lg bg-black/50 backdrop-blur border border-white/10 active:bg-white/20 text-stone-200">↓</button>
+        <div />
       </div>
     </div>
   );
