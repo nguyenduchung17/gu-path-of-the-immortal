@@ -1,6 +1,7 @@
 import { GU_BY_ID } from '../data/gu';
 import { ITEM_BY_ID } from '../data/items';
-import { grantMastery, learnRecipe, discoverPath } from './mastery';
+import { RECIPES } from '../data/recipes';
+import { learnRecipe, discoverPath, learnClue } from './mastery';
 
 let _idc = 0;
 const newInstanceId = () => 'g' + Date.now().toString(36) + (_idc++).toString(36);
@@ -55,7 +56,15 @@ export function applyEffects(state, effects) {
   if (effects.message) log.push(effects.message);
 
   let next = { ...state, player, inventory, ownedGu, reputation, quests, worldState, contribution, log };
-  if (effects.mastery) for (const [pid, xp] of Object.entries(effects.mastery)) next = grantMastery(next, pid, xp);
+  // Path mastery is NEVER granted from generic effects — weather, environment,
+  // enemy actions and region entry are not practice. Only the engine grants
+  // mastery, for the player's own Gu / refinement / study actions.
+  // Effects may carry recipe KNOWLEDGE instead — clues rise, never lower.
+  if (effects.clues) for (const [rid, lvl] of Object.entries(effects.clues)) next = learnClue(next, rid, lvl);
+  if (effects.randomRumor) {
+    const candidates = RECIPES.filter(r => !(next.knownRecipes || []).includes(r.id) && !next.recipeKnowledge?.[r.id]);
+    if (candidates.length) next = learnClue(next, candidates[(Math.random() * candidates.length) | 0].id, 'rumored');
+  }
   if (effects.recipes) for (const id of effects.recipes) next = learnRecipe(next, id);
   if (effects.unlockPath) next = discoverPath(next, effects.unlockPath);
   if (pendingCombat) next._pendingCombat = pendingCombat;

@@ -29,6 +29,7 @@ export const BALANCE = {
     ],
     xpCombatUse: 12,
     xpVictoryBonus: 25,
+    xpFleeAssist: 4,                 // Wind Step escape assist — small, and only when the Gu carried a successful escape
     xpRefineSuccess: 30,
     xpRefineFail: 6,
     xpRecipeDiscovery: 15,

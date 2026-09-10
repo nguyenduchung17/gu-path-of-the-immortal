@@ -186,7 +186,8 @@ function tick(statuses, push, target, who) {
 }
 
 function applyPendingMastery(s, pending) {
-  for (const m of pending) s = grantMastery(s, m.pathId, m.xp, 'guUsed');
+  // 'guUse' — mastery from combat comes only from the player's own Gu actions.
+  for (const m of pending) s = grantMastery(s, m.pathId, m.xp, 'guUsed', 'guUse');
   return s;
 }
 
@@ -208,8 +209,11 @@ function finishVictory(state, combat, player, pending) {
   b[enemy.id] = { ...rec, kills: rec.kills + 1 };
   s = { ...s, bestiary: b };
   const masteryGains = [];
+  // Victory mastery goes only to Paths the player's own Gu meaningfully
+  // turned against the enemy (combat.contributed is set exclusively by the
+  // player's Gu activations — never by weather, environment or enemy actions).
   for (const pathId of Object.keys(combat.contributed)) {
-    s = grantMastery(s, pathId, BALANCE.mastery.xpVictoryBonus, 'kills');
+    s = grantMastery(s, pathId, BALANCE.mastery.xpVictoryBonus, 'kills', 'guUse');
     masteryGains.push({ pathId, xp: BALANCE.mastery.xpVictoryBonus });
   }
   s = applyPendingMastery(s, pending);
@@ -259,7 +263,13 @@ export function executeRound(state, action) {
     const chance = 40 + player.agility * 2 + (hasWind ? 20 : 0) + (windFx.fleePct || 0);
     if (Math.random() * 100 < chance) {
       push('You slipped away into the mist!');
-      return { ...state, combat: { ...combat, log, over: true, result: 'flee' }, player };
+      // Escaping is a generic combat action — it grants NO mastery by itself.
+      // Only a Gu that actively shaped the escape (Wind Step) earns its Path
+      // a small reward, and only because the escape actually succeeded.
+      if (hasWind) push(`Wind Step carries your escape — Wind mastery +${BALANCE.mastery.xpFleeAssist}.`);
+      let s = { ...state, combat: { ...combat, log, over: true, result: 'flee' }, player };
+      if (hasWind) s = grantMastery(s, 'wind', BALANCE.mastery.xpFleeAssist, 'guUsed', 'guUse');
+      return s;
     }
     push('You failed to escape!');
   } else if (action.type === 'item') {
