@@ -31,7 +31,7 @@ if (typeof window !== 'undefined') adoptLegacySave();
 // After a page refresh: clear stale UI state, settle any unfinished sleep, and
 // grant essence accrued while recovery was running offline (capped at max).
 function normalize(raw) {
-  let s = raw.version >= 6 ? raw : migrateSave(raw);
+  let s = raw.version >= 7 ? raw : migrateSave(raw);
   s = { ...s, toasts: [], breakthrough: null, dialogue: null, pendingEvent: null, combat: null };
   if (s.sleeping && (!s.sleeping.wakeAt || Date.now() >= s.sleeping.wakeAt)) s = { ...s, sleeping: null };
   // respawn any world enemies whose timer elapsed while away

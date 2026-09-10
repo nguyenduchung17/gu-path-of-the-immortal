@@ -132,6 +132,25 @@ export const GU = [
     energyCost: 7, cooldown: 2,
     effect: { attack: { power: 12 } },
   },
+  // ---- Elite-boss Gu (spoils of the ancient horrors) ----
+  {
+    id: 'phantomTide', name: 'Phantom Tide Gu', rank: 3, type: 'Attack', path: 'water', element: 'water', rarity: 'legendary',
+    description: 'A tide of phantom mist-water torn from the Devourer\u2019s own breath. Strikes hard and leaves your form hidden in fog.',
+    energyCost: 13, cooldown: 3,
+    effect: { attack: { power: 15 }, evasion: { power: 40, duration: 2 } },
+  },
+  {
+    id: 'jadeColossus', name: 'Jade Colossus Gu', rank: 3, type: 'Defense', path: 'earth', element: 'earth', rarity: 'legendary',
+    description: 'Raises a colossus of living jade around you — a mighty barrier that hardens your guard while it stands.',
+    energyCost: 12, cooldown: 3,
+    effect: { barrier: { power: 34, duration: 3 }, defense: { power: 5, duration: 3 } },
+  },
+  {
+    id: 'nightSwarm', name: 'Night Swarm Gu', rank: 3, type: 'Summon', path: 'enslavement', element: 'shadow', rarity: 'epic',
+    description: 'Calls a swarm of shadow-fed beasts bound by the Matriarch\u2019s marrow. They maul your foe every turn they prowl.',
+    energyCost: 13, cooldown: 4,
+    effect: { summon: { power: 13, duration: 3 } },
+  },
   // ---- Starter Gu (chosen at character creation) ----
   {
     id: 'flameSpark', name: 'Flame Spark Gu', rank: 1, type: 'Attack', path: 'fire', element: 'fire', rarity: 'common',

@@ -112,6 +112,7 @@ export default function CombatView() {
       if ((m = l.match(/strikes .*? for (\d+) damage/)) || (m = l.match(/is cut by thorns for (\d+) damage/))) enemyDmg += +m[1];
       else if (m = l.match(/enslaved beast strikes .*? for (\d+) damage/)) { enemyDmg += +m[1]; kinds.summon = true; }
       else if (m = l.match(/attacks for (\d+) damage/)) playerDmg += +m[1];
+      else if (m = l.match(/hits you for (\d+) damage/)) playerDmg += +m[1];
       else if (m = l.match(/suffers (\d+) burn damage/)) { enemyDmg += +m[1]; }
       else if (m = l.match(/You suffer (\d+) poison damage/)) playerDmg += +m[1];
       else if (m = l.match(/restores (\d+) HP/)) heal += +m[1];
@@ -185,12 +186,18 @@ export default function CombatView() {
             <div className="text-[10px] text-stone-400 shrink-0">ATK {enemy.attack} · DEF {enemy.defense}</div>
           </div>
           <div className="text-[9px] text-stone-400 -mt-1 mb-1">
+            {enemy.elite && <span className="text-rose-400 font-semibold">☠ {t('battle.elite')} · </span>}
             {visualOf(enemy.id).rank}{!c.arena && !c.trial ? ` · ${DANGER_LABEL[visualOf(enemy.id).danger] || ''}` : ''}
           </div>
           <Bar value={enemy.hp} max={enemy.maxHp} from="#9f1239" to="#fb7185" label={t('ui.hp')} />
           {c.revealed && (
             <div className="text-[10px] text-amber-300/80 mt-1">
               {t('battle.weakness')}: <span className="capitalize">{enemy.weakness === 'none' ? t('ui.none') : `${PATH_BY_ID[enemy.weakness]?.name || enemy.weakness}`}</span>
+            </div>
+          )}
+          {c.revealed && enemy.resists?.length > 0 && (
+            <div className="text-[10px] text-sky-300/80 mt-0.5">
+              {t('battle.resists')}: {enemy.resists.map(p => PATH_BY_ID[p]?.name || p).join(' · ')}
             </div>
           )}
           <StatusChips statuses={enemy.statuses} />

@@ -198,6 +198,8 @@ export const DICT = {
     'battle.activationFailed': 'ACTIVATION FAILED',
     'battle.killerBanner': '⚡ KILLER MOVE — {name}',
     'battle.stonesGain': '💎 +{n} primordial stones · ✦ +{p}% cultivation',
+    'battle.elite': 'ELITE',
+    'battle.resists': 'Resists',
 
     // ---- battle effect summaries ----
     'fx.attack': 'Damage',
@@ -269,6 +271,7 @@ export const DICT = {
     'bestiary.stats': 'HP {hp} · ATK {atk} · DEF {def}',
     'bestiary.weakness': 'Weakness',
     'bestiary.drops': 'Spoils',
+    'bestiary.resists': 'Resists',
 
     // ---- weather ----
     'weather.clear': 'Clear Skies',
@@ -493,6 +496,8 @@ export const DICT = {
     'battle.activationFailed': 'KHAI TRUYỀN THẤT BẠI',
     'battle.killerBanner': '⚡ SÁT CHIÊU — {name}',
     'battle.stonesGain': '💎 +{n} nguyên thạch · ✦ +{p}% tu vi',
+    'battle.elite': 'QUÁI TRÙM',
+    'battle.resists': 'Kháng',
 
     // ---- battle effect summaries ----
     'fx.attack': 'Sát thương',
@@ -564,6 +569,7 @@ export const DICT = {
     'bestiary.stats': 'Máu {hp} · Tấn công {atk} · Phòng ngự {def}',
     'bestiary.weakness': 'Khắc Chế',
     'bestiary.drops': 'Chiến Lợi Phẩm',
+    'bestiary.resists': 'Kháng Chế',
 
     // ---- weather ----
     'weather.clear': 'Trời Trong',

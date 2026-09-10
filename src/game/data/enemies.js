@@ -72,6 +72,37 @@ export const ENEMIES = [
     drops: [{ itemId: 'beastBlood', chance: 100, qty: 2 }, { itemId: 'beastCore', chance: 100, qty: 2 }, { itemId: 'windCrystal', chance: 60, qty: 1 }],
     description: 'The alpha of the Ironfang pack. Its howl carries across the whole deep forest.',
   },
+  // ---- Elite bosses (ancient horrors; lairs in world.js BOSS_SPAWNS) ----
+  {
+    id: 'mistDevourer', name: 'Mist Devourer', hp: 160, attack: 14, defense: 5, speed: 4,
+    abilities: ['poison'], weakness: 'earth', elite: true, respawnMul: 6,
+    resists: ['water', 'wind'], immune: ['stun'],
+    charge: { name: 'the Devouring Maw', every: 3, power: 2.2 },
+    enrage: { at: 0.5, atkPct: 40, defPen: 2 },
+    drops: [{ itemId: 'mistHeart', chance: 100, qty: 1 }, { itemId: 'mistSilk', chance: 100, qty: 2 }, { itemId: 'beastCore', chance: 100, qty: 2 }],
+    recipeDrops: [{ recipeId: 'phantomTide', chance: 100 }],
+    description: 'An ancient mist-serpent grown vast on centuries of stray essence. It breathes the fog, and the fog obeys it.',
+  },
+  {
+    id: 'ruinWarden', name: 'Ruin Warden', hp: 210, attack: 17, defense: 9, speed: 2,
+    abilities: [], weakness: 'fire', elite: true, respawnMul: 6,
+    resists: ['earth', 'water'], immune: ['stun', 'control'],
+    charge: { name: 'the Colossus Slam', every: 4, power: 2.6 },
+    enrage: { at: 0.4, atkPct: 30, defPen: 4 },
+    drops: [{ itemId: 'wardenCore', chance: 100, qty: 1 }, { itemId: 'ironOre', chance: 100, qty: 2 }, { itemId: 'beastCore', chance: 100, qty: 2 }],
+    recipeDrops: [{ recipeId: 'jadeColossus', chance: 100 }],
+    description: 'The rune-bound colossus that has kept the ruins since before the sects were founded. It does not chase — it does not need to.',
+  },
+  {
+    id: 'dreadMatriarch', name: 'Dread Matriarch', hp: 190, attack: 16, defense: 4, speed: 8,
+    abilities: ['poison'], weakness: 'fire', elite: true, respawnMul: 6,
+    resists: ['wind', 'enslavement'], immune: ['control'],
+    charge: { name: 'a Rain of Venom', every: 3, power: 1.8 },
+    enrage: { at: 0.45, atkPct: 50, defPen: 1 },
+    drops: [{ itemId: 'dreadMarrow', chance: 100, qty: 1 }, { itemId: 'shadowSilk', chance: 100, qty: 2 }, { itemId: 'serpentGland', chance: 100, qty: 1 }, { itemId: 'beastCore', chance: 100, qty: 2 }],
+    recipeDrops: [{ recipeId: 'nightSwarm', chance: 100 }],
+    description: 'The mother of every spider in the mist. Her web spans the whole Ironfang hollow, and she remembers each strand.',
+  },
 ];
 
 export const ENEMY_BY_ID = Object.fromEntries(ENEMIES.map(e => [e.id, e]));
@@ -95,8 +126,12 @@ export const ENEMY_VISUALS = {
   // master trial opponents (fought only in mentor trials)
   trial_jian:      { kind: 'chief',    rank: 'Rank 5 · Peak Stage',   danger: 5, pace: 170 },
   trial_hound:     { kind: 'hound',    rank: 'Rank 3 · Late Stage',   danger: 3, pace: 130 },
-  trial_fang:      { kind: 'bandit',   rank: 'Rank 4 · Late Stage',   danger: 4, pace: 160 },
-};
+  trial_fang:        { kind: 'bandit', rank: 'Rank 4 · Late Stage', danger: 4, pace: 160 },
+  // elite bosses
+  mistDevourer:     { kind: 'devourer', rank: 'Rank 3 · Peak Stage', danger: 5, pace: 180 },
+  ruinWarden:       { kind: 'warden', rank: 'Rank 3 · Peak Stage', danger: 5, pace: 320 },
+  dreadMatriarch:   { kind: 'matriarch', rank: 'Rank 3 · Peak Stage', danger: 5, pace: 150 },
+  };
 
 export const DANGER_LABEL = { 1: 'Danger: Low', 2: 'Danger: Moderate', 3: 'Danger: High', 4: 'Danger: Severe', 5: 'Danger: Deadly' };
 export const DANGER_COLOR = { 1: '#6ee7a0', 2: '#f0c95a', 3: '#fb923c', 4: '#f87171', 5: '#ff4a5a' };

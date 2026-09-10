@@ -20,6 +20,10 @@ const PAL = {
   guardian: { body: '#6a7a6a', belly: '#9aaa9a', dark: '#44524f', eye: '#7fe8ff' },
   bandit:   { body: '#4a3a30', belly: '#8a6a43', dark: '#241a12', eye: '#ffe95a', skin: '#d9a878', blade: '#c8ccd8' },
   chief:    { body: '#5a2a24', belly: '#a85a3a', dark: '#331512', eye: '#ffe95a', skin: '#c99767', blade: '#e8ecf4' },
+  // elite bosses
+  devourer:  { body: '#6a7a8a', belly: '#a8c0c8', dark: '#3a4a5a', eye: '#7fe8ff' },
+  warden:    { body: '#7a6a4a', belly: '#b09a6a', dark: '#4a3f28', eye: '#ffb03a' },
+  matriarch: { body: '#3a2a4a', belly: '#6a4a7a', dark: '#1e1428', eye: '#ff4a5a' },
 };
 
 const sh = (c, a) => c; // palettes are pre-tuned; shading uses PAL.dark/belly
@@ -246,6 +250,27 @@ const DRAWERS = {
     px(g, 9, 7 + bob, '#c04040'); px(g, 10, 6 + bob, '#c04040'); // scar
     rect(g, 4, 13 + bob, 9, 2, P.belly);
   },
+  // ---- elite bosses: existing species, aged into something worse ----
+  devourer(g, pose, f, P) {
+    DRAWERS.snake(g, pose, f, P);
+    const ph = pose === 'move' && f === 1 ? 1 : 0;
+    // drifting mist wisps + a second cold eye
+    px(g, 4, 6 - ph, '#cfe6f4'); px(g, 12, 5 + ph, '#cfe6f4'); px(g, 10, 12, '#9fbecf');
+    px(g, 2, 2 + ph, '#9fbecf'); px(g, 1, 8 + ph, P.eye);
+  },
+  warden(g, pose, f, P) {
+    DRAWERS.guardian(g, pose, f, P);
+    const bob = pose === 'move' && f === 1 ? 1 : 0;
+    // gold crown + rune glyphs — the ruin's eternal custodian
+    px(g, 5, 0 + bob, '#ffd45a'); px(g, 7, 0 + bob, '#ffd45a'); px(g, 9, 0 + bob, '#ffd45a');
+    px(g, 5, 6 + bob, '#ffd45a'); px(g, 9, 8 + bob, '#ffd45a'); px(g, 11, 5 + bob, '#ffd45a');
+  },
+  matriarch(g, pose, f, P) {
+    DRAWERS.spider(g, pose, f, P);
+    // crown of bone + a ring of extra eyes
+    px(g, 9, 4, '#e8e4d8'); px(g, 10, 5, '#e8e4d8'); px(g, 11, 4, '#e8e4d8');
+    px(g, 7, 8, P.eye); px(g, 5, 9, P.eye);
+  },
 };
 
 // ---------------------------------------------------------------- defeat poses
@@ -255,6 +280,7 @@ function drawDefeat(g, kind, P) {
   const dark = P.dark || P.body;
   const flat = (x, y, w, h, c) => rect(g, x, y, w, h, c);
   switch (kind) {
+    case 'devourer':
     case 'snake':
       rect(g, 1, 12, 14, 2, P.body);
       rect(g, 0, 11, 3, 2, P.body);
@@ -266,6 +292,7 @@ function drawDefeat(g, kind, P) {
       px(g, 3, 11, '#e8a03a');
       px(g, 5, 12, P.eye);
       break;
+    case 'warden':
     case 'guardian':
       rect(g, 3, 12, 10, 4, P.body);         // crumbled slab
       rect(g, 5, 11, 4, 2, P.body);

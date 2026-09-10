@@ -17,6 +17,10 @@ export const RECIPES = [
   { id: 'serpentSwarm', guId: 'serpentSwarm', path: 'enslavement', masteryReq: 3, stageReq: 6, materials: { serpentGland: 3, beastCore: 4 }, essence: 35, stones: 110, milestoneLevel: 3, hint: 'Grants itself to the Skilled of the Enslavement Path.' },
   { id: 'flyingSword', guId: 'flyingSword', path: 'sword', masteryReq: 2, stageReq: 4, materials: { ironOre: 4, windCrystal: 2 }, essence: 30, stones: 90, hint: 'Taught by Master Jian, the hidden sword cultivator by the waterfall.' },
   { id: 'insightEye', guId: 'insightEye', path: 'refinement', masteryReq: 2, stageReq: 2, materials: { herb: 3, beastCore: 1 }, essence: 15, stones: 40, hint: 'Taught by Elder Mo, the refinement master of Green Valley Town.' },
+  // Elite-boss recipes — the knowledge is carried by the horrors themselves.
+  { id: 'phantomTide', guId: 'phantomTide', path: 'water', masteryReq: 3, stageReq: 6, materials: { mistHeart: 1, mistSilk: 3, moonPetal: 3 }, essence: 40, stones: 150, hint: 'Carried within the heart of the Mist Devourer, deep in the Mist Forest.' },
+  { id: 'jadeColossus', guId: 'jadeColossus', path: 'earth', masteryReq: 3, stageReq: 6, materials: { wardenCore: 1, ironOre: 4, ore: 4 }, essence: 38, stones: 140, hint: 'The rune-glyphs are pried from the Ruin Warden\u2019s core.' },
+  { id: 'nightSwarm', guId: 'nightSwarm', path: 'enslavement', masteryReq: 3, stageReq: 6, materials: { dreadMarrow: 1, serpentGland: 2, beastBlood: 4 }, essence: 36, stones: 130, hint: 'A pact written in the Dread Matriarch\u2019s own marrow.' },
 ];
 
 export const RECIPE_BY_ID = Object.fromEntries(RECIPES.map(r => [r.id, r]));

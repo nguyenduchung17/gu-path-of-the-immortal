@@ -33,7 +33,7 @@ export function createNewGame(name, gender, age, difficulty, slot, appearance, a
   );
   const essenceCap = essenceCapFor(START_STAGE.maxEssence, apt);
   return {
-    version: 6,
+    version: 7,
     difficulty: DIFFICULTIES[difficulty] ? difficulty : 'standard',
     slot: slot || 1,
     time: { day: BALANCE.time.startDay, min: BALANCE.time.startMinutes },
@@ -665,7 +665,7 @@ export function gameReducer(state, action) {
             enemies: s.worldState.enemies.map(e => {
               if (e.id !== c.worldId) return e;
               if (c.result === 'victory') {
-                return { ...e, dead: true, respawnAt: Date.now() + BALANCE.world.respawnMs, x: e.home.x, y: e.home.y, state: 'idle', hp: ENEMY_BY_ID[e.defId].hp };
+                return { ...e, dead: true, respawnAt: Date.now() + BALANCE.world.respawnMs * (ENEMY_BY_ID[e.defId]?.respawnMul || 1), x: e.home.x, y: e.home.y, state: 'idle', hp: ENEMY_BY_ID[e.defId].hp };
               }
               return { ...e, hp: Math.max(1, Math.min(ENEMY_BY_ID[e.defId].hp, Math.round(c.enemy.hp / (c.hpScale || 1)))), state: 'idle' };
             }),

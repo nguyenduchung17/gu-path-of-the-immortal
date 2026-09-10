@@ -34,7 +34,7 @@ export default function BestiaryPanel() {
           return (
             <div key={e.id} className="rounded-xl border bg-[#131b16] p-3" style={{ borderColor: `${DANGER_COLOR[v.danger]}55` }}>
               <div className="flex items-center justify-between gap-2">
-                <div className="text-sm font-semibold text-stone-100">{e.name}</div>
+                <div className="text-sm font-semibold text-stone-100">{e.elite && <span className="text-rose-400">☠ </span>}{e.name}</div>
                 <span className="text-[10px] shrink-0" style={{ color: DANGER_COLOR[v.danger] }}>{DANGER_LABEL[v.danger]}</span>
               </div>
               <div className="text-[10px] text-stone-400 mb-2">
@@ -50,6 +50,13 @@ export default function BestiaryPanel() {
                         : `${PATH_BY_ID[e.weakness]?.icon || ''} ${PATH_BY_ID[e.weakness]?.name || e.weakness}`}
                     </span>
                   </div>
+                  {e.resists?.length > 0 && (
+                    <div>
+                      🛡 {t('bestiary.resists')}: <span className="text-sky-300">
+                        {e.resists.map(p => `${PATH_BY_ID[p]?.icon || ''} ${PATH_BY_ID[p]?.name || p}`).join(' · ')}
+                      </span>
+                    </div>
+                  )}
                   <div>
                     🎁 {t('bestiary.drops')}: <span className="text-stone-400">
                       {(e.drops || []).map(d => `${d.chance}% ${ITEM_BY_ID[d.itemId]?.name || d.itemId}`).join(' · ')}

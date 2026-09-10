@@ -56,6 +56,10 @@ export const LANDMARKS = [
   { id: 'banditCampLm', name: 'Bandit Camp', x: 65, y: 17, r: 4, hidden: true },
   { id: 'ruinsLm', name: 'Mist-Wreathed Ruins', x: 72, y: 41, r: 4, hidden: true },
   { id: 'ironfangLm', name: 'Ironfang Territory', x: 8, y: 5, r: 4, hidden: true },
+  // elite boss lairs
+  { id: 'mistLair', name: 'Devourer Hollow', x: 13, y: 6, r: 3, hidden: true },
+  { id: 'wardenLair', name: 'Warden Court', x: 73, y: 41, r: 3, hidden: true },
+  { id: 'matriarchLair', name: 'Matriarch Web', x: 5, y: 3, r: 3, hidden: true },
 ];
 
 // Buildings are solid blocks ('#' tiles) with a label rendered on their centre.
@@ -135,7 +139,7 @@ export const WORLD_RESOURCES = RESOURCES;
 
 // Visible world enemies — behaviour drives detection radius and aggression.
 // detect: optional per-spawn override of the behaviour default.
-export const INITIAL_ENEMIES = [
+const NORMAL_ENEMIES = [
   { defId: 'wildBoar', x: 34, y: 31, behavior: 'passive' },
   { defId: 'wildBoar', x: 49, y: 34, behavior: 'passive' },
   { defId: 'wildWolf', x: 28, y: 16, behavior: 'aggressive' },
@@ -177,6 +181,15 @@ export const INITIAL_ENEMIES = [
   { defId: 'poisonSpider', x: 76, y: 52, behavior: 'territorial' },
   { defId: 'forestSerpent', x: 68, y: 54, behavior: 'predator' },
 ];
+
+// Elite bosses — ancient horrors rooted in the most dangerous corners of the
+// region. Each holds a lair, resists common Paths, and is slow to return.
+export const BOSS_SPAWNS = [
+  { defId: 'mistDevourer', x: 13, y: 6, behavior: 'guard', detect: 6 },
+  { defId: 'ruinWarden', x: 73, y: 41, behavior: 'guard', detect: 6 },
+  { defId: 'dreadMatriarch', x: 5, y: 3, behavior: 'guard', detect: 6 },
+];
+export const INITIAL_ENEMIES = [...NORMAL_ENEMIES, ...BOSS_SPAWNS];
 
 export function initialEnemies() {
   return INITIAL_ENEMIES.map((e, i) => ({

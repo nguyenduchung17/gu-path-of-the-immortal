@@ -12,6 +12,10 @@ export const ITEMS = [
   { id: 'beastBlood', name: 'Beast Blood', category: 'materials', description: 'Vital blood of a wild beast, still warm with qi.', value: 8 },
   { id: 'serpentGland', name: 'Serpent Gland', category: 'materials', description: 'A venom gland prized by Gu refiners.', value: 16 },
   { id: 'mistSilk', name: 'Mist Silk', category: 'materials', description: 'Gossamer silk spun from drifting mist.', value: 12 },
+  // Rare spoils of the elite bosses
+  { id: 'mistHeart', name: 'Mist Heart', category: 'materials', rarity: 'rare', description: 'The still heart of the Mist Devourer, heavy with centuries of essence.', value: 60 },
+  { id: 'wardenCore', name: 'Warden Core', category: 'materials', rarity: 'rare', description: 'A rune-carved core pried from the Ruin Warden\u2019s chest.', value: 70 },
+  { id: 'dreadMarrow', name: 'Dread Marrow', category: 'materials', rarity: 'rare', description: 'Marrow drawn from the Dread Matriarch, thrumming with venom and shadow.', value: 65 },
   // Medicine
   { id: 'medicine', name: 'Healing Salve', category: 'medicine', description: 'Restores 25 HP.', value: 15, use: { hp: 25 } },
   { id: 'healingPill', name: 'Greater Healing Pill', category: 'medicine', description: 'Restores 55 HP.', value: 35, use: { hp: 55 } },

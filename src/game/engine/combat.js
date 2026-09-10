@@ -73,6 +73,11 @@ function applyGu(gu, player, enemy, pSt, eSt, combat, push, fx, syn, weather) {
     for (let h = 0; h < hits; h++) {
       let dmg = e.attack.power + Math.floor(player.strength * 0.5);
       dmg = Math.floor(dmg * elementBuffMul(pSt, gu.element));
+      // elite bosses shrug off their resisted Paths — plan around it
+      if (enemy.resists?.includes(gu.path)) {
+        dmg = Math.floor(dmg * (1 - BALANCE.combat.elite.resistPct / 100));
+        push(`${enemy.name} shrugs off the ${PATH_BY_ID[gu.path].name} essence.`);
+      }
       dmg = Math.floor(dmg * (1 + weatherModOf(weather, gu.path) / 100));
       dmg = Math.floor(dmg * (1 + (fx.damagePct || 0) / 100));
       if (gu.path === enemy.weakness) {
@@ -86,7 +91,10 @@ function applyGu(gu, player, enemy, pSt, eSt, combat, push, fx, syn, weather) {
       push(`${gu.name} strikes ${enemy.name} for ${dmg} damage.`);
       meaningful = true;
     }
-    if (e.attack.stun && Math.random() * 100 < e.attack.stun) { eSt.push({ type: 'stun', power: 0, duration: 1 }); push(`${enemy.name} is stunned!`); meaningful = true; }
+    if (e.attack.stun && Math.random() * 100 < e.attack.stun) {
+      if (enemy.immune?.includes('stun')) push(`${enemy.name}'s will is iron — it cannot be stunned.`);
+      else { eSt.push({ type: 'stun', power: 0, duration: 1 }); push(`${enemy.name} is stunned!`); meaningful = true; }
+    }
   }
   if (e.burn) {
     eSt.push({ type: 'burn', power: e.burn.power, duration: e.burn.duration + (fx.burnTurns || 0) });
@@ -108,7 +116,10 @@ function applyGu(gu, player, enemy, pSt, eSt, combat, push, fx, syn, weather) {
   }
   if (e.heal) { const h = Math.floor(e.heal.power * (1 + (fx.healPct || 0) / 100)); player.hp = Math.min(player.maxHp, player.hp + h); push(`${gu.name} restores ${h} HP.`); }
   if (e.essence) { const r = e.essence.power; player.primevalEssence = Math.min(player.maxPrimevalEssence, player.primevalEssence + r); push(`${gu.name} restores ${r} essence.`); }
-  if (e.control) { eSt.push({ type: 'control', power: Math.floor(e.control.power * (1 + (fx.controlPct || 0) / 100)), duration: e.control.duration }); push(`${gu.name} binds ${enemy.name}, weakening its strikes.`); meaningful = true; }
+  if (e.control) {
+    if (enemy.immune?.includes('control')) push(`${enemy.name} breaks the binding — its mind is not its own to seize.`);
+    else { eSt.push({ type: 'control', power: Math.floor(e.control.power * (1 + (fx.controlPct || 0) / 100)), duration: e.control.duration }); push(`${gu.name} binds ${enemy.name}, weakening its strikes.`); meaningful = true; }
+  }
   if (e.buff) { pSt.push({ type: 'buff', element: e.buff.element, power: e.buff.power, duration: e.buff.duration }); push(`${gu.name} empowers your ${e.buff.element} Gu.`); }
   if (e.investigate) { combat.revealed = true; push(`${gu.name} reveals the enemy's intent.`); }
   return meaningful;
@@ -128,6 +139,19 @@ function enemyAct(enemy, player, pSt, push, windEvasion, thorns) {
   if (enemy.abilities && enemy.abilities.includes('poison') && Math.random() < 0.4) {
     pSt.push({ type: 'poison', power: 3, duration: 3 }); push('You are poisoned!');
   }
+}
+
+// A boss's telegraphed heavy blow — announced a turn ahead so Defend,
+// barriers or evasion can blunt it. Guard defense counts one-and-a-half.
+function enemyChargeAct(enemy, player, pSt, push) {
+  const ev = effValue(pSt, 'evasion');
+  if (ev > 0 && Math.random() * 100 < Math.max(0, ev - 15)) { push(`You slip clear of ${enemy.charge.name}!`); return; }
+  let dmg = Math.round(enemy.attack * (enemy.charge.power || 2)) + Math.floor(Math.random() * 6);
+  dmg = Math.max(1, dmg - Math.floor(effValue(pSt, 'defense') * 1.5));
+  const bar = pSt.find(s => s.type === 'barrier' && s.power > 0);
+  if (bar) { const absorb = Math.min(bar.power, dmg); bar.power -= absorb; dmg -= absorb; push(`Your barrier absorbs ${absorb} of the blow.`); }
+  player.hp -= dmg;
+  push(`${enemy.charge.name} hits you for ${dmg} damage.`);
 }
 
 function tick(statuses, push, target, who) {
@@ -278,7 +302,31 @@ export function executeRound(state, action) {
     return finishVictory(state, done, player, pending);
   }
 
+  // elite enrage — once per battle, crossing the threshold sends the boss into a fury
+  if (enemy.enrage && !combat.enraged && enemy.hp > 0 && enemy.hp <= enemy.maxHp * enemy.enrage.at) {
+    combat.enraged = true;
+    enemy.attack = Math.max(1, Math.round(enemy.attack * (1 + (enemy.enrage.atkPct || 0) / 100)));
+    enemy.defense = Math.max(0, enemy.defense - (enemy.enrage.defPen || 0));
+    push(`${enemy.name} ENRAGES — its blows fall like landslides, but its guard drops!`);
+  }
+
   if (hasStatus(eSt, 'stun')) { push(`${enemy.name} is stunned and cannot move!`); }
+  else if (enemy.charge) {
+    if (combat.charging) {
+      combat.charging = false;
+      push(`${enemy.name} unleashes ${enemy.charge.name}!`);
+      enemyChargeAct(enemy, player, pSt, push);
+    } else {
+      combat.chargeCycle = (combat.chargeCycle || 0) + 1;
+      if (combat.chargeCycle >= enemy.charge.every) {
+        combat.chargeCycle = 0;
+        combat.charging = true;
+        push(`${enemy.name} gathers monstrous power — ${enemy.charge.name} comes next turn! Brace yourself!`);
+      } else {
+        enemyAct(enemy, player, pSt, push, windFx.evasionPct || 0, earthFx.thorns || 0);
+      }
+    }
+  }
   else { enemyAct(enemy, player, pSt, push, windFx.evasionPct || 0, earthFx.thorns || 0); }
 
   eSt = tick(eSt, push, enemy, 'enemy');

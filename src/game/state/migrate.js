@@ -1,9 +1,11 @@
 // Save migrations: v1 (realm/exp) → v2 (stages/mastery) → v3 (large world)
 //                 → v4 (game clock, difficulty modes, save slots)
-//                 → v5 (numeric cultivation aptitude + special constitutions).
+//                 → v5 (numeric cultivation aptitude + special constitutions)
+//                 → v7 (elite boss lairs appear in the dangerous wilds).
 import { CULTIVATION_STAGES } from '../data/cultivation';
 import { GU_BY_ID } from '../data/gu';
-import { initialEnemies } from '../data/world';
+import { ENEMY_BY_ID } from '../data/enemies';
+import { initialEnemies, BOSS_SPAWNS } from '../data/world';
 import { normalizeAptitude, essenceCapFor } from '../config/aptitude';
 
 // v4 aptitudes were flat strings — map them onto the v5 numeric scale.
@@ -107,6 +109,22 @@ export function migrateSave(old) {
       version: 6,
       masters: s.masters || {},
       log: [...(s.log || []), 'Word spreads of reclusive masters in the wilds — and the shops of Green Valley settle into honest trades.'],
+    };
+  }
+
+  if (s.version < 7) {
+    const enemies = s.worldState?.enemies || [];
+    const have = new Set(enemies.map(e => e.defId));
+    const bosses = BOSS_SPAWNS.filter(b => !have.has(b.defId)).map(b => ({
+      id: `boss_${b.defId}`, defId: b.defId, x: b.x, y: b.y, home: { x: b.x, y: b.y },
+      behavior: b.behavior, detect: b.detect, hp: ENEMY_BY_ID[b.defId].hp,
+      state: 'idle', alertTicks: 0, dead: false, respawnAt: 0,
+    }));
+    s = {
+      ...s,
+      version: 7,
+      worldState: { ...s.worldState, enemies: [...enemies, ...bosses] },
+      log: [...(s.log || []), 'Rumor spreads of ancient horrors stirring in the deepest wilds — elite beasts whose spoils forge legendary Gu.'],
     };
   }
 

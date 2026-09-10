@@ -42,6 +42,7 @@ export const BALANCE = {
   combat: {
     victoryProgress: 2,     // % cultivation progress per victory
     weaknessBonusPct: 25,   // damage bonus when Gu path matches enemy weakness
+    elite: { resistPct: 50 }, // share of damage a boss negates from its resisted Paths
     killerActivation: {     // Killer-Move activation chance (normal Gu: 100%)
       base: 85,
       perMasteryLevel: 3,   // + per path mastery level
