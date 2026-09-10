@@ -35,6 +35,7 @@ export default function PauseMenu({ open, onClose, onOpenPanel }) {
           <Entry onClick={() => onOpenPanel('inventory')}>{t('pause.inventory')}</Entry>
           <Entry onClick={() => onOpenPanel('map')}>{t('pause.map')}</Entry>
           <Entry onClick={() => onOpenPanel('bestiary')}>{t('pause.bestiary')}</Entry>
+          <Entry onClick={() => onOpenPanel('help')}>{t('pause.help')}</Entry>
           <div className="flex items-center justify-between px-1 pt-1.5">
             <span className="text-[10px] text-stone-500">{t('ui.language')}</span>
             <LangSwitch />

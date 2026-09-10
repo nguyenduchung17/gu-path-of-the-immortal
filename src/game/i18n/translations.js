@@ -3,6 +3,7 @@
 // English for now; adding a language means adding one table here.
 
 import { DICT_EXTRA } from './extra';
+import { DICT_TUTORIAL } from './tutorialDict';
 
 export const LANGUAGES = [
   { id: 'en', label: 'English' },
@@ -667,5 +668,5 @@ export const DICT = {
 };
 
 // v8 systems — wild Gu, hunger, Vital Gu, risky refinement, fog of war
-DICT.en = { ...DICT.en, ...DICT_EXTRA.en };
-DICT.vi = { ...DICT.vi, ...DICT_EXTRA.vi };
+DICT.en = { ...DICT.en, ...DICT_EXTRA.en, ...DICT_TUTORIAL.en };
+DICT.vi = { ...DICT.vi, ...DICT_EXTRA.vi, ...DICT_TUTORIAL.vi };

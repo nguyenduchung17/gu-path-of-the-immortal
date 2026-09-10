@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useGame } from '@/game/state/GameContext';
 import { BALANCE } from '@/game/config/balance';
 import { useT } from '@/game/i18n/LangContext';
+import { tutorialStepMet, dueTip } from '@/game/engine/tutorial';
 import WorldView from './WorldView';
 import HUDTop from './hud/HUDTop';
 import Hotbar from './hud/Hotbar';
@@ -25,6 +26,7 @@ import MissionBoard from './MissionBoard';
 import ContributionShopPanel from './ContributionShopPanel';
 import ArenaPanel from './ArenaPanel';
 import TutorialOverlay from './TutorialOverlay';
+import HelpCodexPanel from './HelpCodexPanel';
 import RecoveryModal from './RecoveryModal';
 import BreakthroughOverlay from './BreakthroughOverlay';
 import InnModal from './InnModal';
@@ -47,6 +49,7 @@ const PANEL_META = {
   quests: { titleKey: 'ui.quests', icon: '📜' },
   map: { titleKey: 'ui.map', icon: '🧭', wide: true },
   bestiary: { titleKey: 'ui.bestiary', icon: '🐾' },
+  help: { titleKey: 'codex.title', icon: '❓' },
 };
 
 export default function GameScreen() {
@@ -60,10 +63,16 @@ export default function GameScreen() {
   const [paused, setPaused] = useState(false);
   const [dashOpen, setDashOpen] = useState(false);
 
+  // open a side panel — the staged tutorial hears which panel opened
+  const openPanel = (id) => {
+    setPanel(id);
+    if (state.tutorial?.active && !state.tutorial.completed) dispatch({ type: 'TUTORIAL_PANEL', panel: id });
+  };
+
   // real-time heartbeat of the accelerated game clock (1s = 1 in-game minute).
   // Paused while sleeping or while the system menu is open.
   useEffect(() => {
-    if (state.sleeping || state.deceased || paused || dashOpen) return;
+    if (state.sleeping || state.deceased || paused || dashOpen || state.tutorial?.welcome) return;
     const t = setInterval(() => dispatch({ type: 'TIME_TICK' }), BALANCE.time.tickMs);
     return () => clearInterval(t);
   }, [state.sleeping, state.deceased, paused, dashOpen, dispatch]);
@@ -71,10 +80,19 @@ export default function GameScreen() {
   // essence recovery started → surface the cultivation panel
   useEffect(() => { if (state.recovery) setPanel('cultivation'); }, [state.recovery?.startedAt]);
 
+  // tutorial: advance guided lessons whose trigger is met; surface contextual tips
+  useEffect(() => {
+    if (tutorialStepMet(state)) dispatch({ type: 'TUTORIAL_STEP' });
+    if (!state.tutorial?.currentTip) {
+      const tip = dueTip(state);
+      if (tip) dispatch({ type: 'TUTORIAL_TIP', id: tip.id });
+    }
+  }, [state]);
+
   // game-style Esc behavior: close the topmost overlay; if nothing is open, open the system menu.
   const escRef = useRef({});
   escRef.current = {
-    panel, paused, shop, service, inn, recoveryOpen, dashOpen,
+    panel, paused, shop, service, inn, recoveryOpen, dashOpen, openPanel,
     busy: !!(state.combat || state.pendingEvent || state.dialogue || state.sleeping || state.deceased || state.breakthrough || state.wildEncounter),
   };
   useEffect(() => {
@@ -97,13 +115,13 @@ export default function GameScreen() {
       if (!id || e.repeat) return;
       const s = escRef.current;
       if (s.busy) return;
-      setPanel(id);
+      s.openPanel(id);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  const inputLocked = !!panel || paused || dashOpen;
+  const inputLocked = !!panel || paused || dashOpen || !!state.tutorial?.welcome;
   const meta = panel ? PANEL_META[panel] : null;
 
   return (
@@ -118,7 +136,7 @@ export default function GameScreen() {
       <ScoutReport />
       <HazardBadge />
       <MiniMap />
-      <Hotbar active={panel} onSelect={(id) => (id === 'dashboard' ? setDashOpen(true) : setPanel(id))} onPause={() => setPaused(true)} />
+      <Hotbar active={panel} onSelect={(id) => (id === 'dashboard' ? setDashOpen(true) : openPanel(id))} onPause={() => setPaused(true)} />
 
       {/* in-game panel overlays (world stays visible underneath) */}
       {panel && (
@@ -131,6 +149,7 @@ export default function GameScreen() {
           {panel === 'quests' && <QuestsPanel />}
           {panel === 'map' && <MapPanel />}
           {panel === 'bestiary' && <BestiaryPanel />}
+          {panel === 'help' && <HelpCodexPanel />}
         </OverlayWindow>
       )}
 
@@ -161,7 +180,7 @@ export default function GameScreen() {
       {dashOpen && <DashboardScreen onClose={() => setDashOpen(false)} />}
 
       {/* system menu overlay */}
-      <PauseMenu open={paused} onClose={() => setPaused(false)} onOpenPanel={(id) => { setPaused(false); setPanel(id); }} />
+      <PauseMenu open={paused} onClose={() => setPaused(false)} onOpenPanel={(id) => { setPaused(false); openPanel(id); }} />
 
       <Toasts />
       <QuestTracker />

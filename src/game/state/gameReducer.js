@@ -28,6 +28,8 @@ import { revealFog, seedFog, foodOf } from '../engine/guLife';
 import { applyExploreGu, carryIntoCombat, visionRadiusOf, checkHiddenPaths, hazardStep, moveOverride, exploreActive, ambushOf, nearbyPackCount } from '../engine/exploration';
 import { startInstability } from '../engine/vitalGu';
 import { QS, acceptQuest, turnInQuest, toggleTrack, abandonQuest, applyQuestEvent, emptyQuests, markDiscovered } from '../engine/questEngine';
+import { TUTORIAL_STEPS, TUTORIAL_SUPPLIES, TUTORIAL_STONES } from '../data/tutorial';
+import { tutorialObserve } from '../engine/tutorial';
 
 const START_STAGE = CULTIVATION_STAGES[0];
 
@@ -39,7 +41,8 @@ export function createNewGame(name, gender, age, difficulty, slot, appearance, a
   const essenceCap = essenceCapFor(START_STAGE.maxEssence, apt);
   const starterFood = foodOf(starter);
   return {
-    version: 12,
+    version: 13,
+    tutorial: { welcome: true, active: false, completed: false, skipped: false, step: 0, moves: 0, tipsSeen: {} },
     difficulty: DIFFICULTIES[difficulty] ? difficulty : 'standard',
     slot: slot || 1,
     time: { day: BALANCE.time.startDay, min: BALANCE.time.startMinutes },
@@ -248,7 +251,7 @@ function wildGuAfterEncounter(state, worldId, gone) {
   };
 }
 
-export function gameReducer(state, action) {
+function coreReducer(state, action) {
   // a deceased (True Cultivation) character can no longer act — only leave or reset
   if (state && state.deceased && !['LOAD', 'RESET', 'END_COMBAT'].includes(action.type)) return state;
   switch (action.type) {
@@ -1163,9 +1166,53 @@ export function gameReducer(state, action) {
     case 'DISMISS_TOAST':
       return { ...state, toasts: (state.toasts || []).filter(t => t.id !== action.id) };
 
+    // ---------- Tutorial ----------
+    case 'TUTORIAL_START':
+      return { ...state, tutorial: { ...state.tutorial, welcome: false, active: true, step: 0 } };
+    case 'TUTORIAL_SKIP': {
+      // skippers receive the same starter supplies — the tutorial is help, never a toll
+      let s = applyEffects(state, {
+        items: TUTORIAL_SUPPLIES, spiritStones: TUTORIAL_STONES,
+        message: 'Starter supplies received — rations, herbs, a beast core and a few stones.',
+      });
+      return { ...s, tutorial: { ...s.tutorial, welcome: false, active: false, skipped: true } };
+    }
+    case 'TUTORIAL_STEP':
+      if (!state.tutorial?.active) return state;
+      return { ...state, tutorial: { ...state.tutorial, step: Math.min(TUTORIAL_STEPS.length - 1, state.tutorial.step + 1) } };
+    case 'TUTORIAL_PANEL': {
+      if (!state.tutorial?.active) return state;
+      const step = TUTORIAL_STEPS[state.tutorial.step];
+      return (step && step.panel === action.panel)
+        ? { ...state, tutorial: { ...state.tutorial, step: Math.min(TUTORIAL_STEPS.length - 1, state.tutorial.step + 1) } }
+        : state;
+    }
+    case 'TUTORIAL_COMPLETE': {
+      let s = applyEffects(state, {
+        items: TUTORIAL_SUPPLIES, spiritStones: TUTORIAL_STONES,
+        message: 'Tutorial complete — starter supplies received.',
+      });
+      return { ...s, tutorial: { ...s.tutorial, active: false, completed: true } };
+    }
+    case 'TUTORIAL_TIP':
+      if (!state.tutorial || state.tutorial.currentTip) return state;
+      return { ...state, tutorial: { ...state.tutorial, currentTip: action.id } };
+    case 'TUTORIAL_TIP_SEEN':
+      if (!state.tutorial) return state;
+      return { ...state, tutorial: { ...state.tutorial, currentTip: null, tipsSeen: { ...(state.tutorial.tipsSeen || {}), [action.id]: true } } };
+    case 'TUTORIAL_REPLAY':
+      return { ...state, tutorial: { ...state.tutorial, active: true, completed: false, skipped: false, step: 0, currentTip: null } };
+
     default:
       return state;
   }
 }
 
 export { objectiveMet };
+
+// Outer reducer: core game logic first, then the tutorial observer records
+// progression counters (steps walked, first talk, first battle, …) so the
+// guided lessons advance as the player actually plays.
+export function gameReducer(state, action) {
+  return tutorialObserve(coreReducer(state, action), action);
+}

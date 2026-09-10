@@ -197,6 +197,16 @@ export function migrateSave(old) {
     };
   }
 
+  // v13: staged tutorial — per-save tutorial progress. Existing characters are
+  // marked complete (never nagged); they still receive one-time contextual tips.
+  if (s.version < 13) {
+    s = {
+      ...s,
+      version: 13,
+      tutorial: s.tutorial || { welcome: false, active: false, completed: true, skipped: false, step: 0, moves: 0, tipsSeen: {} },
+    };
+  }
+
   // Self-heal the quest state on every load: legacy shapes become per-quest
   // records and hunt progress is rebuilt from the kill tally.
   return normalizeQuestState(s);
