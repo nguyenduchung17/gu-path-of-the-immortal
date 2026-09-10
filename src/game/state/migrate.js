@@ -207,6 +207,19 @@ export function migrateSave(old) {
     };
   }
 
+  // v14: Realm Insight (Cảm Ngộ) — a second progression resource spent on
+  // breakthroughs and earned out in the world, plus the cultivation
+  // diminishing-returns streak.
+  if (s.version < 14) {
+    const p = s.player || {};
+    s = {
+      ...s,
+      version: 14,
+      player: { ...p, realmInsight: p.realmInsight ?? 0, cultStreak: p.cultStreak ?? 0 },
+      log: [...(s.log || []), 'A deeper truth settles over the valley — breakthroughs now ask for Realm Insight, earned in battle, discovery and deed, never on a cushion alone.'],
+    };
+  }
+
   // Self-heal the quest state on every load: legacy shapes become per-quest
   // records and hunt progress is rebuilt from the kill tally.
   return normalizeQuestState(s);

@@ -38,13 +38,13 @@ export const GU = [
     id: 'emberGu', name: 'Ember Gu', rank: 1, type: 'Attack', path: 'fire', element: 'fire', rarity: 'common',
     description: 'A lash of living flame. Sets the enemy burning for several turns.',
     energyCost: 5, cooldown: 1,
-    effect: { attack: { power: 10 }, burn: { power: 3, duration: 3 } },
+    effect: { attack: { power: 8 }, burn: { power: 3, duration: 3 } },
   },
   {
     id: 'flameSerpent', name: 'Flame Serpent Gu', rank: 1, type: 'Attack', path: 'fire', element: 'fire', rarity: 'uncommon',
     description: 'Conjures a serpent of flame that bites one enemy and leaves it burning.',
     energyCost: 8, cooldown: 2,
-    effect: { attack: { power: 16 }, burn: { power: 4, duration: 3 } },
+    effect: { attack: { power: 11 }, burn: { power: 4, duration: 3 } },
   },
   {
     id: 'flameHeart', name: 'Flame Heart Gu', rank: 2, type: 'Support', path: 'fire', element: 'fire', rarity: 'rare',

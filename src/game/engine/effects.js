@@ -2,6 +2,7 @@ import { GU_BY_ID } from '../data/gu';
 import { ITEM_BY_ID } from '../data/items';
 import { RECIPES } from '../data/recipes';
 import { learnRecipe, discoverPath, learnClue } from './mastery';
+import { diffOf } from '../config/balance';
 import { T, locGuName } from '../i18n/tr';
 
 let _idc = 0;
@@ -42,6 +43,13 @@ export function applyEffects(state, effects) {
 
   if (effects.hp) player.hp = Math.min(player.maxHp, Math.max(0, player.hp + effects.hp));
   if (effects.essence) player.primevalEssence = Math.min(player.maxPrimevalEssence, Math.max(0, player.primevalEssence + effects.essence));
+  if (effects.insight) {
+    // Realm Insight — earned out in the world, scaled by difficulty. Gaining
+    // it is meaningful activity, so cultivation diminishing returns reset.
+    const n = effects.insight > 0 ? Math.max(1, Math.round(effects.insight * diffOf(state).insightMul)) : effects.insight;
+    player.realmInsight = Math.max(0, (player.realmInsight || 0) + n);
+    if (n > 0) { player.cultStreak = 0; log.push(T('cmt.insightGain', { n })); }
+  }
   if (effects.foodBuff) player = applyFoodBuff(player, effects.foodBuff, state.time);
   if (effects.spiritStones) player.spiritStones = Math.max(0, player.spiritStones + effects.spiritStones);
   if (effects.progress) {

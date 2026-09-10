@@ -138,6 +138,17 @@ export const DICT_EXTRA = {
     'seclude.needTown': 'Secluded cultivation requires the safety of a settlement.',
 
     // ---- enemy intent ----
+    // ---- realm insight & cultivation rebalance ----
+    'cult.insight': 'Realm Insight',
+    'cult.btReq': 'BREAKTHROUGH REQUIREMENTS',
+    'cult.diminished': 'Focus wanes — cultivation efficiency {p}%. Explore, fight or complete quests to refresh it.',
+    'chk.insight': 'Realm Insight {cur} / {req}',
+    'cmt.crit': '{gu} finds a vulnerable point — the blow lands true!',
+    'cmt.strikeCrit': 'Your strike finds a vulnerable point — it lands true!',
+    'cmt.strikeMiss': 'Your strike goes wide — {enemy} dodges!',
+    'cmt.insightGain': '✧ +{n} Realm Insight',
+    'battle.crit': 'Crit',
+
     'intent.title': 'NEXT INTENT',
     'intent.attack': 'Strikes at you',
     'intent.heavy': 'Charging a heavy attack',
@@ -290,6 +301,17 @@ export const DICT_EXTRA = {
     'seclude.needTown': 'Bế quan cần sự an toàn của trấn/xã.',
 
     // ---- ý định của địch ----
+    // ---- cảm ngộ & cân bằng tu luyện ----
+    'cult.insight': 'Cảm Ngộ',
+    'cult.btReq': 'YÊU CẦU ĐỘT PHÁ',
+    'cult.diminished': 'Tâm ý nhạt nhòa — hiệu suất tu luyện {p}%. Hãy khám phá, chiến đấu hoặc hoàn thành nhiệm vụ để lấy lại cảm ngộ.',
+    'chk.insight': 'Cảm Ngộ {cur} / {req}',
+    'cmt.crit': '{gu} tìm ra nhược huyệt — đòn đánh trúng thật chuẩn!',
+    'cmt.strikeCrit': 'Đòn đánh của bạn tìm ra nhược huyệt — trúng thật chuẩn!',
+    'cmt.strikeMiss': 'Đòn đánh của bạn đi chệch — {enemy} né tránh!',
+    'cmt.insightGain': '✧ +{n} Cảm Ngộ',
+    'battle.crit': 'Bạo Kích',
+
     'intent.title': 'Ý ĐỊNH TIẾP THEO',
     'intent.attack': 'Tấn công bạn',
     'intent.heavy': 'Chuẩn bị đòn nặng',

@@ -52,6 +52,27 @@ export function speedMulOf(statuses) {
 const effSpeed = (base, statuses) => Math.max(20, Math.round(base * speedMulOf(statuses)));
 const actDelay = (base, statuses) => G().act / effSpeed(base, statuses);
 
+// ---- Damage ranges & crits ----
+// Every damaging action rolls inside a visible min–max range (BALANCE), so
+// damage is variable, never fixed. The battle UI shows these same ranges.
+export function strikeRange(player) {
+  const sc = G().strike;
+  const b = (player.rank || 0) * sc.perRank + Math.floor((player.strength || 0) * sc.perStr);
+  return { min: sc.min + b, max: sc.max + b, accuracy: sc.accuracy };
+}
+export function guAttackRange(gu) {
+  const gv = G().guDamage;
+  const power = gu?.effect?.attack?.power || 0;
+  return { min: Math.max(1, Math.floor(power * gv.minMul)), max: Math.max(1, Math.floor(power * gv.maxMul)) };
+}
+const rollIn = (r) => r.min + Math.floor(Math.random() * (r.max - r.min + 1));
+// small crit system — some Gu carry their own odds (effect.attack.crit)
+function critMulOf(gu) {
+  const cc = G().crit;
+  const chance = gu?.effect?.attack?.crit ?? cc.baseChance;
+  return Math.random() * 100 < chance ? cc.dmgMul : 1;
+}
+
 // Visible action order: simulate the schedule ahead so the player can plan.
 export function timelineOf(combat, n = 6) {
   const items = [];
@@ -257,7 +278,7 @@ function applyGu(gu, player, enemy, pSt, eSt, combat, push, fx, syn, weather, mu
   if (e.attack) {
     const hits = e.attack.hits || 1;
     for (let h = 0; h < hits; h++) {
-      let dmg = Math.floor(e.attack.power * mul) + Math.floor(player.strength * 0.5);
+      let dmg = Math.floor(rollIn(guAttackRange(gu)) * mul) + Math.floor(player.strength * 0.5);
       dmg = Math.floor(dmg * elementBuffMul(pSt, gu.element));
       if (enemy.resists?.includes(gu.path)) {
         dmg = Math.floor(dmg * (1 - BALANCE.combat.elite.resistPct / 100));
@@ -285,6 +306,8 @@ function applyGu(gu, player, enemy, pSt, eSt, combat, push, fx, syn, weather, mu
       const guard = eSt.find(s => s.type === 'guard');
       if (guard) { dmg = Math.floor(dmg * (1 - (guard.power || 0) / 100)); push(T('cmt.guardHunker', { enemy: locEnemyName(enemy) })); }
       dmg = Math.max(1, dmg - Math.floor(effDefenseOf(enemy) * 0.5));
+      const critMul = critMulOf(gu);
+      if (critMul > 1) { dmg = Math.floor(dmg * critMul); push(T('cmt.crit', { gu: locGuName(gu) })); }
       enemy.hp -= dmg;
       push(T('cmt.guStrike', { gu: locGuName(gu), enemy: locEnemyName(enemy), dmg }));
       meaningful = true;
@@ -477,8 +500,14 @@ function finishVictory(state, combat, player, pending) {
   const spiritStones = Math.floor(enemy.maxHp / 4) + Math.floor(Math.random() * 5);
   const progress = BALANCE.combat.victoryProgress + Math.floor(enemy.maxHp / 40);
   const droppedRecipes = (enemy.recipeDrops || []).filter(d => Math.random() * 100 < (d.chance || 100)).map(d => d.recipeId);
-  let s = { ...state, player, combat: { ...combat, over: true, result: 'victory', rewards: { items, spiritStones, progress, mastery: [] } } };
-  s = applyEffects(s, { items, spiritStones, progress, recipes: droppedRecipes, message: T('cmt.victory', { stones: spiritStones, progress }) });
+  // Realm Insight — a species' first kill is a true lesson; grinding the
+  // same weak foe yields diminishing insight, never zero.
+  const icfg = BALANCE.insight;
+  const kills = state.bestiary?.[enemy.id]?.kills || 0;
+  const decay = Math.max(icfg.killDecayFloor, icfg.killDecay[Math.min(kills, icfg.killDecay.length - 1)]);
+  const insight = Math.max(1, Math.round((icfg.victoryBase + (kills === 0 ? icfg.firstKillBonus : 0)) * decay));
+  let s = { ...state, player, combat: { ...combat, over: true, result: 'victory', rewards: { items, spiritStones, progress, insight, mastery: [] } } };
+  s = applyEffects(s, { items, spiritStones, progress, insight, recipes: droppedRecipes, message: T('cmt.victory', { stones: spiritStones, progress }) });
   const b = { ...(state.bestiary || {}) };
   const rec = b[enemy.id] || { seen: 0, kills: 0 };
   b[enemy.id] = { ...rec, kills: rec.kills + 1 };
@@ -624,16 +653,24 @@ export function executeRound(state, action) {
     push(T('cmt.itemUse', { name: locItemName(it) }));
     combat.usedItem = action.itemId;
   } else if (action.type === 'strike') {
-    // free basic attack — preserves essence, chips the enemy's GUARD
+    // free basic attack — the weak emergency fallback (0 essence, chips GUARD).
+    // 95% accuracy; rolls inside the visible strike range, may crit.
     const sc = cfg.strike;
-    let dmg = Math.floor(sc.power + player.strength * sc.perStr);
-    dmg = Math.floor(dmg * damageTakenMul(enemy));
-    const guard = eSt.find(s => s.type === 'guard');
-    if (guard) { dmg = Math.floor(dmg * (1 - (guard.power || 0) / 100)); push(T('cmt.guardHunker', { enemy: locEnemyName(enemy) })); }
-    dmg = Math.max(1, dmg - Math.floor(effDefenseOf(enemy) * 0.5));
-    enemy.hp -= dmg;
-    push(T('cmt.strike', { enemy: locEnemyName(enemy), dmg }));
-    applyStabilityDamage(enemy, combat, Math.round(sc.stab + player.strength * sc.stabPerStr), push);
+    const rng = strikeRange(player);
+    if (Math.random() * 100 >= rng.accuracy) {
+      push(T('cmt.strikeMiss', { enemy: locEnemyName(enemy) }));
+    } else {
+      let dmg = rollIn(rng);
+      dmg = Math.floor(dmg * damageTakenMul(enemy));
+      const guard = eSt.find(s => s.type === 'guard');
+      if (guard) { dmg = Math.floor(dmg * (1 - (guard.power || 0) / 100)); push(T('cmt.guardHunker', { enemy: locEnemyName(enemy) })); }
+      dmg = Math.max(1, dmg - Math.floor(effDefenseOf(enemy) * 0.5));
+      const critMul = critMulOf(null);
+      if (critMul > 1) { dmg = Math.floor(dmg * critMul); push(T('cmt.strikeCrit')); }
+      enemy.hp -= dmg;
+      push(T('cmt.strike', { enemy: locEnemyName(enemy), dmg }));
+      applyStabilityDamage(enemy, combat, Math.round(sc.stab + player.strength * sc.stabPerStr), push);
+    }
   } else if (action.type === 'observe') {
     // free recon: reveal the foe and steady your Killer-Move focus
     const oc = cfg.observe;

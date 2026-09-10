@@ -1,14 +1,30 @@
 // Central game-balance configuration — every tunable number lives here.
-import { recoveryMulOf } from './aptitude';
+import { recoveryMulOf, cultivateMulOf } from './aptitude';
 
 export const BALANCE = {
   cultivation: {
-    essenceCostBase: 5,       // cultivate cost = base + perStage × global stage
-    essenceCostPerStage: 1,   // Rank 1: 5→8 essence; later ranks cost more
-    progressBase: 5,         // % progress per session before modifiers
-    progressPerInt: 0.2,     // % per point of intelligence
-    progressCap: 12,         // max % per session
-    sectBonus: 1.5,          // multiplier at the Azure Cloud Sect marker
+    essenceCostPct: 0.10,        // cultivate cost ≈ 10% of current max essence —
+    essenceCostMin: 5,           // scales WITH the aperture, never a flat +1
+    progressBase: 8,             // % progress per session before modifiers (stage 0)
+    progressPerInt: 0.4,        // % per point of intelligence
+    progressCap: 12,             // max % per session
+    sectBonus: 1.5,              // multiplier at the Azure Cloud Sect terrace
+    stageFactor: [1, 0.7, 0.55, 0.45], // realms slow down within a rank
+    rankFactor: 0.75,            // …and again per rank above Rank 1
+    streakFree: 3,               // back-to-back sessions at full efficiency
+    streakStep: 0.1,             // −10% efficiency per session beyond the free ones
+    streakMin: 0.6,              // efficiency floor — subtle, never a hard lock
+    minorEssenceRestorePct: 40,   // essence refill after a minor stage breakthrough
+    majorEssenceRestorePct: 100, // full refill only on a major rank breakthrough
+  },
+  // Realm Insight (Cảm Ngộ) — the second progression resource, earned by
+  // experiencing the world and spent on breakthroughs, so safe-zone
+  // cultivation alone can never carry a cultivator through the realms.
+  insight: {
+    victoryBase: 6, firstKillBonus: 6,   // per combat victory; a species' first kill
+    killDecay: [1, 1, 0.8, 0.65, 0.5], killDecayFloor: 0.35, // anti-grind on repeat kills
+    zone: 25, landmark: 12, quest: 15, mission: 10,
+    capture: 20, refineRecipe: 10, refineGu: 8, trial: 30, arenaWin: 8,
   },
   recovery: {
     // Baseline (C-Tier) seconds for a full 0 → max recovery at Rank 1 Early.
@@ -26,14 +42,14 @@ export const BALANCE = {
   },
   mastery: {
     tiers: [
-      { level: 1, title: 'Initiate', xp: 500 },
-      { level: 2, title: 'Apprentice', xp: 800 },
-      { level: 3, title: 'Skilled', xp: 1200 },
-      { level: 4, title: 'Expert', xp: 1800 },
-      { level: 5, title: 'Master', xp: 2600 },
+      { level: 1, title: 'Initiate', xp: 400 },
+      { level: 2, title: 'Apprentice', xp: 650 },
+      { level: 3, title: 'Skilled', xp: 1000 },
+      { level: 4, title: 'Expert', xp: 1500 },
+      { level: 5, title: 'Master', xp: 2100 },
     ],
-    xpCombatUse: 12,
-    xpVictoryBonus: 25,
+    xpCombatUse: 16,
+    xpVictoryBonus: 35,
     xpFleeAssist: 4,                 // Wind Step escape assist — small, and only when the Gu carried a successful escape
     xpRefineSuccess: 30,
     xpRefineFail: 6,
@@ -69,7 +85,11 @@ export const BALANCE = {
       catchUpFactor: 1.6,     // an enemy never falls more than 1.6× its delay behind
     },
     stability: { base: 40, perDefense: 6 },  // enemy GUARD pool = base + defense × perDefense
-    strike: { power: 4, perStr: 0.8, stab: 8, stabPerStr: 0.5 }, // free basic attack (0 essence)
+    // STRIKE — the weak emergency fallback (0 essence): finish wounded foes,
+    // chip GUARD, preserve essence. Never outperforms offensive Gu.
+    strike: { min: 3, max: 6, perRank: 1, perStr: 0.1, stab: 8, stabPerStr: 0.5, accuracy: 95 },
+    crit: { baseChance: 5, dmgMul: 1.5 },       // small critical-hit system — never dominant
+    guDamage: { minMul: 0.75, maxMul: 1.25 },   // every Gu attack rolls in a visible range
     observe: { essence: 4, focusPct: 10 },    // free recon + Killer-Move focus
     defend: { dmgRedPct: 40, essenceRegenPct: 8 },
     pack: { atkPct: 15, stabPct: 10 },     // packmates in sight embolden a fighter
@@ -188,7 +208,7 @@ export const BALANCE = {
   // enemies partially resist control instead of being fully immune.
   exploration: {
     range: 8,                        // paces for control-Gu targeting
-    masteryXp: 10,                   // meaningful-use reward only
+    masteryXp: 15,                   // meaningful-use reward only
     resist: { elite: 0.7, boss: 0.5 }, // duration factor on elite / high-danger foes
     hazardDmg: 3,                    // HP per unprotected step through miasma
     hazardSlowMinutes: { miasma: 2, unstable: 3 }, // extra game minutes per unprotected step
@@ -231,21 +251,25 @@ export const DIFFICULTIES = {
   easy: {
     key: 'easy', label: 'EASY',
     enemyHpMul: 0.75, enemyDmgMul: 0.75, dropMul: 1.3, priceMul: 0.85, refinePct: 0,
+    cultProgressMul: 1.25, insightMul: 1.2,
     progressLoss: 0, inventoryLoss: 0, stonesLoss: 0, respawn: 'nearestInn',
   },
   standard: {
     key: 'standard', label: 'STANDARD',
     enemyHpMul: 1, enemyDmgMul: 1, dropMul: 1, priceMul: 1, refinePct: 0,
+    cultProgressMul: 1, insightMul: 1,
     progressLoss: 0.3, inventoryLoss: 0.25, stonesLoss: 0.15, respawn: 'random',
   },
   hard: {
     key: 'hard', label: 'HARD',
     enemyHpMul: 1.2, enemyDmgMul: 1.2, dropMul: 1.15, priceMul: 1.15, refinePct: 0,
+    cultProgressMul: 0.9, insightMul: 0.9,
     progressLoss: 0.5, inventoryLoss: 0.5, stonesLoss: 0.3, respawn: 'random',
   },
   trueCultivation: {
     key: 'trueCultivation', label: 'TRUE CULTIVATION',
     enemyHpMul: 1.45, enemyDmgMul: 1.5, dropMul: 1.25, priceMul: 1.25, refinePct: -5,
+    cultProgressMul: 0.95, insightMul: 1,
     permadeath: true, respawn: 'none',
   },
 };
@@ -301,4 +325,32 @@ export function recoveryCosts(player) {
     instant: Math.ceil(missing * cfg.instantStonesPerMissing),
     accelerated: Math.ceil(missing * cfg.acceleratedStonesPerMissing),
   };
+}
+
+// Cultivate cost scales WITH the essence pool (≈10% of max) — the aperture
+// doubling no longer makes sessions nearly free.
+export function cultivationCost(player) {
+  const cfg = BALANCE.cultivation;
+  return Math.max(cfg.essenceCostMin, Math.round((player.maxPrimevalEssence || 0) * cfg.essenceCostPct));
+}
+
+// Diminishing-returns efficiency for back-to-back cultivation sessions —
+// meaningful activity (any Realm Insight gain) resets the streak.
+export function cultStreakEff(streak) {
+  const cfg = BALANCE.cultivation;
+  if ((streak || 0) <= cfg.streakFree) return 1;
+  return Math.max(cfg.streakMin, 1 - ((streak || 0) - cfg.streakFree) * cfg.streakStep);
+}
+
+// Progress % per cultivate session — readably combining stage, rank, streak,
+// aptitude, terrace, and difficulty. Returns { gain, eff, cost }.
+export function cultivationGain(state, atSect) {
+  const cfg = BALANCE.cultivation;
+  const p = state.player;
+  const base = cfg.progressBase + (p.intelligence || 0) * cfg.progressPerInt;
+  const factor = (cfg.stageFactor[p.stage || 0] ?? 0.45) * cfg.rankFactor ** (p.rank || 0);
+  const eff = cultStreakEff(p.cultStreak);
+  const gain = Math.max(1, Math.min(cfg.progressCap, Math.floor(
+    base * factor * cultivateMulOf(p.aptitude) * (atSect ? cfg.sectBonus : 1) * eff * diffOf(state).cultProgressMul)));
+  return { gain, eff, cost: cultivationCost(p) };
 }
