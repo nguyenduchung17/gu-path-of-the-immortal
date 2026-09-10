@@ -349,6 +349,8 @@ export const DICT_LOG = {
     'chk.stage': 'Cultivation: {stage}',
     'chk.pathMastery': '{path} Mastery Level {n}',
     'cap.joins': '{name} joins you.',
+    'guEl.fire': 'fire', 'guEl.water': 'water', 'guEl.earth': 'earth', 'guEl.wind': 'wind',
+    'guEl.metal': 'metal', 'guEl.lightning': 'lightning', 'guEl.shadow': 'shadow', 'guEl.wood': 'wood', 'guEl.none': 'none',
 
     // ---- Gu types ----
     'guType.Attack': 'Attack', 'guType.Defense': 'Defense', 'guType.Movement': 'Movement',
@@ -701,6 +703,8 @@ export const DICT_LOG = {
     'chk.stage': 'Tu vi: {stage}',
     'chk.pathMastery': '{path} Thông Thạo Cấp {n}',
     'cap.joins': '{name} theo bạn.',
+    'guEl.fire': 'Hỏa', 'guEl.water': 'Thủy', 'guEl.earth': 'Thổ', 'guEl.wind': 'Phong',
+    'guEl.metal': 'Kim', 'guEl.lightning': 'Lôi', 'guEl.shadow': 'Ảnh', 'guEl.wood': 'Mộc', 'guEl.none': 'vô',
 
     // ---- loại cổ trùng ----
     'guType.Attack': 'Tấn Công', 'guType.Defense': 'Phòng Ngự', 'guType.Movement': 'Thân Pháp',

@@ -28,6 +28,7 @@ import { SPECIES_BY_ID } from '../data/wildGu';
 import { ecoOf } from '../data/enemies';
 import { planIntent } from './intent';
 import { terrainModsOf, TERRAIN_LABELS } from '../data/terrain';
+import { T, TL, locGuName, locEnemyName, locPathName, locItemName, locTerrainLabel } from '../i18n/tr';
 
 const G = () => BALANCE.combat.gauge;
 
@@ -97,11 +98,11 @@ export function initCombat(enemyId, player, opts = {}) {
   let stability = opts.stability ?? maxStab;
   if (ambush === 'player') stability = Math.max(0, Math.round(stability - maxStab * BALANCE.combat.ambush.stabLossPct / 100));
   const terrain = opts.zoneId ? terrainModsOf(opts.zoneId) : null;
-  const log = [opts.intro || `A ${def.name} blocks your path!`];
-  if (ambush === 'player') log.push(`AMBUSH! You strike from cover — ${def.name}'s guard is thrown into disarray (−${BALANCE.combat.ambush.stabLossPct}% Stability, its action delayed).`);
-  if (ambush === 'enemy') log.push(`AMBUSHED! ${def.name} moves before you can steady yourself — it acts first!`);
-  if (allies) log.push(`${allies} packmate(s) within call — ${def.name} fights emboldened (+${BALANCE.combat.pack.atkPct}% ATK, +${BALANCE.combat.pack.stabPct}% guard).`);
-  if (terrain) log.push(`Terrain — ${TERRAIN_LABELS[opts.zoneId] || 'the land'}: ${Object.entries(terrain).map(([p, m]) => `${PATH_BY_ID[p]?.name || p} ${m > 0 ? '+' : ''}${m}%`).join(' · ')}.`);
+  const log = [opts.intro || T('cmt.intro', { enemy: locEnemyName(def) })];
+  if (ambush === 'player') log.push(T('cmt.ambushPlayer', { enemy: locEnemyName(def), pct: BALANCE.combat.ambush.stabLossPct }));
+  if (ambush === 'enemy') log.push(T('cmt.ambushEnemy', { enemy: locEnemyName(def) }));
+  if (allies) log.push(T('cmt.pack', { n: allies, enemy: locEnemyName(def), atk: BALANCE.combat.pack.atkPct, stab: BALANCE.combat.pack.stabPct }));
+  if (terrain) log.push(T('cmt.terrain', { label: locTerrainLabel(opts.zoneId), mods: Object.entries(terrain).map(([p, m]) => `${locPathName(PATH_BY_ID[p]) || p} ${m > 0 ? '+' : ''}${m}%`).join(' · ') }));
   const enemy = {
     ...def,
     activity: eco.activity,
@@ -234,15 +235,15 @@ function applyStabilityDamage(enemy, combat, amount, push, path) {
   // some hides are built to be broken — the right Path finds the flaw
   if (path && path === enemy.stabWeakness) {
     amt *= 1.5;
-    push(`The ${PATH_BY_ID[path].name} technique finds the flaw in ${enemy.name}'s stance — guard damage ×1.5!`);
+    push(T('cmt.flaw', { path: locPathName(PATH_BY_ID[path]), enemy: locEnemyName(enemy) }));
   }
   enemy.stability = Math.max(0, (enemy.stability ?? enemy.maxStability) - Math.round(amt));
   if (enemy.stability <= 0) {
     enemy.statuses.push({ type: 'broken', power: 0, duration: cfg.brokenDuration });
     enemy.stability = Math.round(enemy.maxStability * 0.4);
     combat.nextAct.enemy += actDelay(enemy.baseSpeed, enemy.statuses) * cfg.delayPct / 100;
-    if (enemy.telegraph) { enemy.telegraph = null; push(`The blow lands clean — ${enemy.name}'s charged attack is scattered!`); }
-    push(`⚡ ${enemy.name}'s guard SHATTERS — BROKEN! Its defense collapses and its next action is thrown into disarray.`);
+    if (enemy.telegraph) { enemy.telegraph = null; push(T('cmt.telegraphScattered', { enemy: locEnemyName(enemy) })); }
+    push(T('cmt.shatters', { enemy: locEnemyName(enemy) }));
   }
 }
 
@@ -260,44 +261,44 @@ function applyGu(gu, player, enemy, pSt, eSt, combat, push, fx, syn, weather, mu
       dmg = Math.floor(dmg * elementBuffMul(pSt, gu.element));
       if (enemy.resists?.includes(gu.path)) {
         dmg = Math.floor(dmg * (1 - BALANCE.combat.elite.resistPct / 100));
-        push(`${enemy.name} shrugs off the ${PATH_BY_ID[gu.path].name} essence.`);
+        push(T('cmt.resist', { enemy: locEnemyName(enemy), path: locPathName(PATH_BY_ID[gu.path]) }));
       }
       dmg = Math.floor(dmg * (1 + weatherModOf(weather, gu.path) / 100));
       // the ground lends its essence — battlefield terrain shifts Path power
       const terr = (combat.terrain || {})[gu.path] || 0;
       if (terr) {
         dmg = Math.floor(dmg * (1 + terr / 100));
-        if (h === 0) push(`The ${TERRAIN_LABELS[combat.zoneId] || 'terrain'} lends its essence — ${PATH_BY_ID[gu.path].name} power ${terr > 0 ? '+' : ''}${terr}%.`);
+        if (h === 0) push(T('cmt.terrainLends', { label: locTerrainLabel(combat.zoneId), path: locPathName(PATH_BY_ID[gu.path]), m: terr }));
       }
       dmg = Math.floor(dmg * (1 + (fx.damagePct || 0) / 100));
       if (gu.path === enemy.weakness) {
         dmg = Math.floor(dmg * (1 + BALANCE.combat.weaknessBonusPct / 100));
-        push(`The ${PATH_BY_ID[gu.path].name} roars — ${enemy.name} is vulnerable!`);
+        push(T('cmt.weaknessRoar', { path: locPathName(PATH_BY_ID[gu.path]), enemy: locEnemyName(enemy) }));
       }
       // path synergy — lightning races across a soaked hide
       if (gu.element === 'lightning' && hasStatus(eSt, 'soaked')) {
         dmg = Math.floor(dmg * 1.4);
-        push(`The lightning races across ${enemy.name}'s soaked hide!`);
+        push(T('cmt.lightningSoaked', { enemy: locEnemyName(enemy) }));
       }
       // setup pays off: broken/exposed targets take amplified damage
       dmg = Math.floor(dmg * damageTakenMul(enemy));
       const guard = eSt.find(s => s.type === 'guard');
-      if (guard) { dmg = Math.floor(dmg * (1 - (guard.power || 0) / 100)); push(`${enemy.name} hunkers behind its guard.`); }
+      if (guard) { dmg = Math.floor(dmg * (1 - (guard.power || 0) / 100)); push(T('cmt.guardHunker', { enemy: locEnemyName(enemy) })); }
       dmg = Math.max(1, dmg - Math.floor(effDefenseOf(enemy) * 0.5));
       enemy.hp -= dmg;
-      push(`${gu.name} strikes ${enemy.name} for ${dmg} damage.`);
+      push(T('cmt.guStrike', { gu: locGuName(gu), enemy: locEnemyName(enemy), dmg }));
       meaningful = true;
     }
     if (e.attack.stun && Math.random() * 100 < e.attack.stun) {
-      if (enemy.immune?.includes('stun')) push(`${enemy.name}'s will is iron — it cannot be stunned.`);
-      else { eSt.push({ type: 'stun', power: 0, duration: 1 }); push(`${enemy.name} is stunned!`); meaningful = true; }
+      if (enemy.immune?.includes('stun')) push(T('cmt.stunImmune', { enemy: locEnemyName(enemy) }));
+      else { eSt.push({ type: 'stun', power: 0, duration: 1 }); push(T('cmt.stunned', { enemy: locEnemyName(enemy) })); meaningful = true; }
     }
     // Killer fire feasts on burning foes — consuming the Burn for a burst
     if (killer && gu.element === 'fire' && hasStatus(eSt, 'burn')) {
       const feast = eSt.filter(s => s.type === 'burn').reduce((a, s) => a + s.power, 0) * 2;
       for (let i = eSt.length - 1; i >= 0; i--) if (eSt[i].type === 'burn') eSt.splice(i, 1);
       enemy.hp -= feast;
-      push(`The Killer flame feasts on the burning — +${feast} damage!`);
+      push(T('cmt.killerFeast', { n: feast }));
       meaningful = true;
     }
   }
@@ -307,48 +308,48 @@ function applyGu(gu, player, enemy, pSt, eSt, combat, push, fx, syn, weather, mu
     if (gu.element === 'fire' && hasStatus(eSt, 'soaked')) {
       power = Math.round(power * 1.5);
       for (let i = eSt.length - 1; i >= 0; i--) if (eSt[i].type === 'soaked') eSt.splice(i, 1);
-      push('The flames flash the water to scalding steam!');
+      push(T('cmt.burnSteam'));
     }
     addStatus(eSt, { type: 'burn', power, duration: dur });
-    push(`${enemy.name} is set ablaze!`);
+    push(T('cmt.ablaze', { enemy: locEnemyName(enemy) }));
     meaningful = true;
   }
   if (e.soak) {
     eSt.push({ type: 'soaked', power: 0, duration: 3 });
-    push(`${enemy.name} is drenched — lightning will bite deeper, and fire will scald.`);
+    push(T('cmt.soaked', { enemy: locEnemyName(enemy) }));
     meaningful = true;
   }
-  if (e.slow) { eSt.push({ type: 'slow', power: e.slow.power, duration: e.slow.duration }); push(`${enemy.name} is bogged down — its actions come slower.`); meaningful = true; }
+  if (e.slow) { eSt.push({ type: 'slow', power: e.slow.power, duration: e.slow.duration }); push(T('cmt.slowed', { enemy: locEnemyName(enemy) })); meaningful = true; }
   if (e.delay) {
     combat.nextAct.enemy += actDelay(enemy.baseSpeed, eSt) * (e.delay.pct / 100);
-    push(`The binding coils — ${enemy.name}'s next action is dragged back.`);
+    push(T('cmt.dragged', { enemy: locEnemyName(enemy) }));
     meaningful = true;
   }
-  if (e.expose) { eSt.push({ type: 'weakness', power: e.expose.power, duration: e.expose.duration }); push(`${enemy.name} is left exposed — it will take more damage.`); meaningful = true; }
-  if (e.armorBreak) { eSt.push({ type: 'armorBreak', power: e.armorBreak.power, duration: e.armorBreak.duration }); push(`${enemy.name}'s guard is cracked — its defense is weakened.`); meaningful = true; }
-  if (e.self?.haste) { pSt.push({ type: 'haste', power: e.self.haste.power, duration: e.self.haste.duration }); push(`${gu.name} quickens your form — your next actions come sooner.`); }
+  if (e.expose) { eSt.push({ type: 'weakness', power: e.expose.power, duration: e.expose.duration }); push(T('cmt.exposed', { enemy: locEnemyName(enemy) })); meaningful = true; }
+  if (e.armorBreak) { eSt.push({ type: 'armorBreak', power: e.armorBreak.power, duration: e.armorBreak.duration }); push(T('cmt.armorBreak', { enemy: locEnemyName(enemy) })); meaningful = true; }
+  if (e.self?.haste) { pSt.push({ type: 'haste', power: e.self.haste.power, duration: e.self.haste.duration }); push(T('cmt.selfHaste', { gu: locGuName(gu) })); }
   if (e.stab) applyStabilityDamage(enemy, combat, e.stab * (mul >= 1 ? 1 : 0.75), push, gu.path);
   if (e.summon) {
     const p = Math.max(1, Math.floor(e.summon.power * mul * (1 + (fx.summonPct || 0) / 100) * (syn.has('tamedTides') ? 1.15 : 1)));
     eSt.push({ type: 'summon', power: p, duration: (e.summon.duration || 3) + (fx.summonTurns || 0) });
-    push(`Your enslaved beast answers the pact — it will strike for ${p} each turn.`);
+    push(T('cmt.summon', { p }));
     meaningful = true;
   }
-  if (e.defense) { pSt.push({ type: 'defense', power: Math.max(1, Math.floor(e.defense.power * mul * (1 + (fx.defensePct || 0) / 100))), duration: e.defense.duration }); push(`${gu.name} hardens your defense.`); }
-  if (e.evasion) { pSt.push({ type: 'evasion', power: Math.max(1, Math.floor(e.evasion.power * mul * (1 + (fx.evasionPct || 0) / 100))), duration: e.evasion.duration }); push(`${gu.name} blurs your form.`); }
+  if (e.defense) { pSt.push({ type: 'defense', power: Math.max(1, Math.floor(e.defense.power * mul * (1 + (fx.defensePct || 0) / 100))), duration: e.defense.duration }); push(T('cmt.hardens', { gu: locGuName(gu) })); }
+  if (e.evasion) { pSt.push({ type: 'evasion', power: Math.max(1, Math.floor(e.evasion.power * mul * (1 + (fx.evasionPct || 0) / 100))), duration: e.evasion.duration }); push(T('cmt.blurs', { gu: locGuName(gu) })); }
   if (e.barrier) {
     const power = Math.max(1, Math.floor(e.barrier.power * mul * (1 + (fx.barrierPct || 0) / 100) * (syn.has('mountainSpring') ? 1.15 : 1)));
     pSt.push({ type: 'barrier', power, duration: e.barrier.duration });
-    push(`${gu.name} raises a barrier of ${power} strength.`);
+    push(T('cmt.barrier', { gu: locGuName(gu), p: power }));
   }
-  if (e.heal) { const h = Math.max(1, Math.floor(e.heal.power * mul * (1 + (fx.healPct || 0) / 100))); player.hp = Math.min(player.maxHp, player.hp + h); push(`${gu.name} restores ${h} HP.`); }
-  if (e.essence) { const r = Math.max(1, Math.round(e.essence.power * mul)); player.primevalEssence = Math.min(player.maxPrimevalEssence, player.primevalEssence + r); push(`${gu.name} restores ${r} essence.`); }
+  if (e.heal) { const h = Math.max(1, Math.floor(e.heal.power * mul * (1 + (fx.healPct || 0) / 100))); player.hp = Math.min(player.maxHp, player.hp + h); push(T('cmt.heal', { gu: locGuName(gu), n: h })); }
+  if (e.essence) { const r = Math.max(1, Math.round(e.essence.power * mul)); player.primevalEssence = Math.min(player.maxPrimevalEssence, player.primevalEssence + r); push(T('cmt.essence', { gu: locGuName(gu), n: r })); }
   if (e.control) {
-    if (enemy.immune?.includes('control')) push(`${enemy.name} breaks the binding — its mind is not its own to seize.`);
-    else { eSt.push({ type: 'control', power: Math.max(1, Math.floor(e.control.power * mul * (1 + (fx.controlPct || 0) / 100))), duration: e.control.duration }); push(`${gu.name} binds ${enemy.name}, weakening its strikes.`); meaningful = true; }
+    if (enemy.immune?.includes('control')) push(T('cmt.controlImmune', { enemy: locEnemyName(enemy) }));
+    else { eSt.push({ type: 'control', power: Math.max(1, Math.floor(e.control.power * mul * (1 + (fx.controlPct || 0) / 100))), duration: e.control.duration }); push(T('cmt.controlBound', { gu: locGuName(gu), enemy: locEnemyName(enemy) })); meaningful = true; }
   }
-  if (e.buff) { pSt.push({ type: 'buff', element: e.buff.element, power: Math.round(e.buff.power * mul), duration: e.buff.duration }); push(`${gu.name} empowers your ${e.buff.element} Gu.`); }
-  if (e.investigate) { combat.revealed = true; combat.scouted = true; push(`${gu.name} reveals the enemy's intent — weakness and stance laid bare.`); }
+  if (e.buff) { pSt.push({ type: 'buff', element: e.buff.element, power: Math.round(e.buff.power * mul), duration: e.buff.duration }); push(T('cmt.buff', { gu: locGuName(gu), element: TL(`guEl.${e.buff.element}`, e.buff.element) })); }
+  if (e.investigate) { combat.revealed = true; combat.scouted = true; push(T('cmt.investigate', { gu: locGuName(gu) })); }
   return meaningful;
 }
 
@@ -356,26 +357,26 @@ function playerGuardDr(pSt, dmg, push) {
   const g = pSt.find(s => s.type === 'guard');
   if (!g) return dmg;
   const out = Math.max(1, Math.floor(dmg * (1 - (g.power || 0) / 100)));
-  push(`Your guard blunts the blow (${dmg} → ${out}).`);
+  push(T('cmt.playerGuard', { dmg, out }));
   return out;
 }
 
 function enemyAct(enemy, player, pSt, push, windEvasion, thorns) {
   const ev = effValue(pSt, 'evasion') + windEvasion;
-  if (ev > 0 && Math.random() * 100 < ev) { push(`You dodge ${enemy.name}'s attack!`); return; }
+  if (ev > 0 && Math.random() * 100 < ev) { push(T('cmt.dodge', { enemy: locEnemyName(enemy) })); return; }
   let dmg = enemy.attack + Math.floor(Math.random() * 3);
   dmg = Math.max(1, dmg - effValue(enemy.statuses, 'control'));
   dmg = Math.max(1, dmg - effValue(pSt, 'defense'));
   dmg = playerGuardDr(pSt, dmg, push);
   const bar = pSt.find(s => s.type === 'barrier' && s.power > 0);
-  if (bar) { const absorb = Math.min(bar.power, dmg); bar.power -= absorb; dmg -= absorb; push(`Your barrier absorbs ${absorb} damage.`); }
+  if (bar) { const absorb = Math.min(bar.power, dmg); bar.power -= absorb; dmg -= absorb; push(T('cmt.barrierAbsorb', { n: absorb })); }
   player.hp -= dmg;
-  push(`${enemy.name} attacks for ${dmg} damage.`);
-  if (thorns) { enemy.hp -= thorns; push(`${enemy.name} is cut by thorns for ${thorns} damage.`); }
+  push(T('cmt.enemyAttack', { enemy: locEnemyName(enemy), dmg }));
+  if (thorns) { enemy.hp -= thorns; push(T('cmt.thorns', { enemy: locEnemyName(enemy), dmg: thorns })); }
   if (enemy.abilities && enemy.abilities.includes('poison')) {
     const resist = (player.foodBuffs || []).filter(b => b.type === 'poisonResist').reduce((a, b) => a + (b.power || 0), 0);
     if (Math.random() < 0.4 * (1 - Math.min(90, resist) / 100)) {
-      addStatus(pSt, { type: 'poison', power: 3, duration: 3 }); push('You are poisoned!');
+      addStatus(pSt, { type: 'poison', power: 3, duration: 3 }); push(T('cmt.youPoisoned'));
     }
   }
 }
@@ -386,14 +387,14 @@ function executeTelegraph(enemy, player, pSt, push) {
   const tg = enemy.telegraph;
   enemy.telegraph = null;
   const ev = effValue(pSt, 'evasion');
-  if (ev > 0 && Math.random() * 100 < Math.max(0, ev - 15)) { push(`You slip clear of ${tg.name}!`); return; }
+  if (ev > 0 && Math.random() * 100 < Math.max(0, ev - 15)) { push(T('cmt.slipClear', { name: tg.name })); return; }
   let dmg = Math.round(enemy.attack * (tg.power || 1.8)) + Math.floor(Math.random() * 6);
   dmg = Math.max(1, dmg - Math.floor(effValue(pSt, 'defense') * 1.5));
   dmg = playerGuardDr(pSt, dmg, push);
   const bar = pSt.find(s => s.type === 'barrier' && s.power > 0);
-  if (bar) { const absorb = Math.min(bar.power, dmg); bar.power -= absorb; dmg -= absorb; push(`Your barrier absorbs ${absorb} of the blow.`); }
+  if (bar) { const absorb = Math.min(bar.power, dmg); bar.power -= absorb; dmg -= absorb; push(T('cmt.barrierAbsorbHeavy', { n: absorb })); }
   player.hp -= dmg;
-  push(`${tg.name} hits you for ${dmg} damage!`);
+  push(T('cmt.telegraphHit', { name: tg.name, dmg }));
 }
 
 // Archetype AI — now driven by the INTENT system: the enemy commits its next
@@ -415,13 +416,13 @@ function enemyAI(enemy, player, pSt, eSt, push, windEvasion, thorns) {
   }
   if (plan.kind === 'guard') {
     eSt.push({ type: 'guard', power: 40, duration: 1 });
-    push(`${enemy.name} hunkers behind its bulk — its guard is up.`);
+    push(T('cmt.aiGuard', { enemy: locEnemyName(enemy) }));
     return;
   }
   if (plan.kind === 'buff') {
     c.hasted = true;
     eSt.push({ type: 'haste', power: 25, duration: 2 });
-    push(`${enemy.name} moves like quicksilver — its next actions come faster!`);
+    push(T('cmt.aiBuff', { enemy: locEnemyName(enemy) }));
     return;
   }
   if (plan.kind === 'poison') {
@@ -429,12 +430,12 @@ function enemyAI(enemy, player, pSt, eSt, push, windEvasion, thorns) {
     dmg = playerGuardDr(pSt, dmg, push);
     player.hp -= dmg;
     addStatus(pSt, { type: 'poison', power: 3, duration: 3 });
-    push(`${enemy.name} sinks its fangs in for ${dmg} damage — venom floods your veins!`);
+    push(T('cmt.aiPoison', { enemy: locEnemyName(enemy), dmg }));
     return;
   }
   if (plan.kind === 'heavy') {
     enemy.telegraph = { name: plan.name, power: plan.power || 1.8 };
-    push(`${enemy.name} gathers monstrous power — ${plan.name} comes next! BRACE YOURSELF!`);
+    push(T('cmt.aiHeavy', { enemy: locEnemyName(enemy), name: plan.name }));
     return;
   }
   enemyAct(enemy, player, pSt, push, windEvasion, thorns);
@@ -447,13 +448,13 @@ function tick(statuses, push, target, who) {
   for (const s of statuses) {
     if (s.type === 'poison') {
       target.hp -= s.power;
-      push(`${who === 'player' ? 'You suffer' : target.name + ' suffers'} ${s.power} poison damage.`);
+      push(who === 'player' ? T('cmt.poisonTickYou', { n: s.power }) : T('cmt.poisonTick', { enemy: locEnemyName(target), n: s.power }));
     } else if (s.type === 'burn') {
       target.hp -= s.power;
-      push(`${target.name} suffers ${s.power} burn damage.`);
+      push(T('cmt.burnTick', { enemy: locEnemyName(target), n: s.power }));
     } else if (s.type === 'summon') {
       target.hp -= s.power;
-      push(`Your enslaved beast strikes ${target.name} for ${s.power} damage.`);
+      push(T('cmt.summonTick', { enemy: locEnemyName(target), n: s.power }));
     }
     const nd = s.duration - 1;
     if (nd > 0 && !(s.type === 'barrier' && s.power <= 0)) out.push({ ...s, duration: nd });
@@ -477,7 +478,7 @@ function finishVictory(state, combat, player, pending) {
   const progress = BALANCE.combat.victoryProgress + Math.floor(enemy.maxHp / 40);
   const droppedRecipes = (enemy.recipeDrops || []).filter(d => Math.random() * 100 < (d.chance || 100)).map(d => d.recipeId);
   let s = { ...state, player, combat: { ...combat, over: true, result: 'victory', rewards: { items, spiritStones, progress, mastery: [] } } };
-  s = applyEffects(s, { items, spiritStones, progress, recipes: droppedRecipes, message: `Victory! +${spiritStones} primordial stones, +${progress}% cultivation progress.` });
+  s = applyEffects(s, { items, spiritStones, progress, recipes: droppedRecipes, message: T('cmt.victory', { stones: spiritStones, progress }) });
   const b = { ...(state.bestiary || {}) };
   const rec = b[enemy.id] || { seen: 0, kills: 0 };
   b[enemy.id] = { ...rec, kills: rec.kills + 1 };
@@ -501,8 +502,8 @@ function finishTrial(state, combat, player) {
 function finishDefeat(state, combat, player) {
   if (combat.arena) {
     const ap = { ...player, hp: Math.max(1, Math.floor(player.maxHp * 0.3)) };
-    const alog = [...combat.log, 'The arena master halts the duel. Your stake is forfeit.'];
-    return { ...state, player: ap, combat: { ...combat, log: alog, over: true, result: 'defeat' }, log: [...state.log, 'You were defeated in the arena.'] };
+    const alog = [...combat.log, T('cmt.arenaDefeat1')];
+    return { ...state, player: ap, combat: { ...combat, log: alog, over: true, result: 'defeat' }, log: [...state.log, T('cmt.arenaDefeatLog')] };
   }
   return applyDeath(state, combat, player, 'defeated in combat');
 }
@@ -598,15 +599,15 @@ export function executeRound(state, action) {
     const eSpd = effSpeed(enemy.baseSpeed, eSt);
     const chance = 38 + player.agility * 2 + (pSpd - eSpd) * 0.25 + (hasWind ? 20 : 0) + (windFx.fleePct || 0);
     if (Math.random() * 100 < chance) {
-      push('You slipped away into the mist!');
+      push(T('cmt.fleeOk'));
       // Escaping is a generic action — no mastery for Flee itself; only a Gu
       // that actively carried the escape (Wind Step) earns its Path a little.
-      if (hasWind) push(`Wind Step carries your escape — Wind mastery +${BALANCE.mastery.xpFleeAssist}.`);
+      if (hasWind) push(T('cmt.windCarry', { n: BALANCE.mastery.xpFleeAssist }));
       let s = { ...state, combat: { ...combat, enemy, playerStatuses: pSt, log, over: true, result: 'flee' }, player };
       if (hasWind) s = grantMastery(s, 'wind', BALANCE.mastery.xpFleeAssist, 'guUsed', 'guUse');
       return s;
     }
-    push('You failed to escape!');
+    push(T('cmt.fleeFail'));
     // a failed escape invites the enemy's next action immediately
     combat.nextAct.enemy = Math.min(combat.nextAct.enemy, combat.clock + 1);
   } else if (action.type === 'item') {
@@ -617,10 +618,10 @@ export function executeRound(state, action) {
     if (it.use.essence) player.primevalEssence = Math.min(player.maxPrimevalEssence, player.primevalEssence + it.use.essence);
     if (it.use.cure && pSt.some(s => it.use.cure.includes(s.type))) {
       pSt = pSt.filter(s => !it.use.cure.includes(s.type));
-      push('The toxins wash from your blood — the poison is cured.');
+      push(T('cmt.cured'));
     }
-    if (it.use.buff) { player = applyFoodBuff(player, it.use.buff, state.time); push(`${it.name}'s effect settles over you.`); }
-    push(`You use ${it.name}.`);
+    if (it.use.buff) { player = applyFoodBuff(player, it.use.buff, state.time); push(T('cmt.itemBuff', { name: locItemName(it) })); }
+    push(T('cmt.itemUse', { name: locItemName(it) }));
     combat.usedItem = action.itemId;
   } else if (action.type === 'strike') {
     // free basic attack — preserves essence, chips the enemy's GUARD
@@ -628,10 +629,10 @@ export function executeRound(state, action) {
     let dmg = Math.floor(sc.power + player.strength * sc.perStr);
     dmg = Math.floor(dmg * damageTakenMul(enemy));
     const guard = eSt.find(s => s.type === 'guard');
-    if (guard) { dmg = Math.floor(dmg * (1 - (guard.power || 0) / 100)); push(`${enemy.name} hunkers behind its guard.`); }
+    if (guard) { dmg = Math.floor(dmg * (1 - (guard.power || 0) / 100)); push(T('cmt.guardHunker', { enemy: locEnemyName(enemy) })); }
     dmg = Math.max(1, dmg - Math.floor(effDefenseOf(enemy) * 0.5));
     enemy.hp -= dmg;
-    push(`You strike ${enemy.name} for ${dmg} damage.`);
+    push(T('cmt.strike', { enemy: locEnemyName(enemy), dmg }));
     applyStabilityDamage(enemy, combat, Math.round(sc.stab + player.strength * sc.stabPerStr), push);
   } else if (action.type === 'observe') {
     // free recon: reveal the foe and steady your Killer-Move focus
@@ -641,7 +642,7 @@ export function executeRound(state, action) {
     const regen = Math.min(player.maxPrimevalEssence - player.primevalEssence, oc.essence);
     player.primevalEssence += regen;
     pSt.push({ type: 'focus', power: oc.focusPct, duration: 3 });
-    push(`You read ${enemy.name}'s intent — weaknesses and tells laid bare. (+${regen} essence, Killer Move focus +${oc.focusPct}%)`);
+    push(T('cmt.observe', { enemy: locEnemyName(enemy), n: regen, p: oc.focusPct }));
   } else if (action.type === 'defend') {
     const dc = cfg.defend;
     pSt.push({ type: 'guard', power: dc.dmgRedPct, duration: 1 });

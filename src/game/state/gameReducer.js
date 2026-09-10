@@ -662,16 +662,16 @@ export function gameReducer(state, action) {
       });
       const chance = Math.min(95, BALANCE.refinement.baseSuccess + p.intelligence * BALANCE.refinement.successPerInt + Math.floor(p.luck * BALANCE.refinement.successPerLuck) + (refFx.successPct || 0) + diffOf(state).refinePct);
       if (Math.random() * 100 < chance) {
-        s = applyEffects(s, { giveGu: r.guId, message: `Refinement succeeds! You create ${GU_BY_ID[r.guId].name}.` });
+        s = applyEffects(s, { giveGu: r.guId, message: T('refine.recipeOk', { gu: locGuName(GU_BY_ID[r.guId]) }) });
         s = withQuestEvents(s, { type: 'GU_REFINED', id: r.guId });
         s = grantMastery(s, 'refinement', BALANCE.mastery.xpRefineSuccess, 'refined', 'refine');
         s = grantMastery(s, r.path, Math.round(BALANCE.mastery.xpRefineSuccess * 0.6), 'refined', 'refine');
         if (Math.random() * 100 < (refFx.saveChancePct || 0)) {
           const firstMat = Object.keys(r.materials)[0];
-          if (firstMat) s = applyEffects(s, { items: { [firstMat]: 1 }, message: `Your refinement craft lets you keep one ${ITEM_BY_ID[firstMat]?.name}.` });
+          if (firstMat) s = applyEffects(s, { items: { [firstMat]: 1 }, message: T('refine.recipeKeep', { name: locItemName(ITEM_BY_ID[firstMat]) }) });
         }
       } else {
-        s = { ...s, log: [...s.log, 'Refinement failed. The materials are lost.'] };
+        s = { ...s, log: [...s.log, T('refine.recipeFail')] };
         s = grantMastery(s, 'refinement', BALANCE.mastery.xpRefineFail, 'refined', 'refine');
       }
       return advanceTime(s, BALANCE.time.refineMinutes);
@@ -681,11 +681,11 @@ export function gameReducer(state, action) {
     case 'CULTIVATE': {
       if (state.combat) return state;
       // recovery is a deliberate activity that blocks cultivation — never a silent ignore
-      if (state.recovery) return { ...state, log: [...state.log, 'You are recovering essence — cultivation resumes once you stop recovering.'] };
+      if (state.recovery) return { ...state, log: [...state.log, T('cult.blockedRecovery')] };
       const cfg = BALANCE.cultivation;
       const p = state.player;
       const cost = cfg.essenceCostBase + cfg.essenceCostPerStage * (p.rank * 4 + (p.stage || 0));
-      if (p.primevalEssence < cost) return { ...state, log: [...state.log, 'Not enough essence to cultivate.'] };
+      if (p.primevalEssence < cost) return { ...state, log: [...state.log, T('cult.noEssence')] };
       const atSect = WORLD.tiles[p.y] && WORLD.tiles[p.y][p.x] === '*';
       const gain = Math.min(cfg.progressCap, Math.floor((cfg.progressBase + p.intelligence * cfg.progressPerInt) * cultivateMulOf(p.aptitude) * (atSect ? cfg.sectBonus : 1)));
       const progress = Math.min(100, (p.cultivationProgress || 0) + gain);
@@ -695,10 +695,10 @@ export function gameReducer(state, action) {
         cultivationProgress: progress,
         totalInsight: (p.totalInsight || 0) + gain,
       };
-      let s = { ...state, player: np, log: [...state.log, `You cultivate. (+${gain}% progress${atSect ? ' · terrace bonus' : ''})`] };
+      let s = { ...state, player: np, log: [...state.log, atSect ? T('cult.cultivatedTerrace', { gain }) : T('cult.cultivated', { gain })] };
       // the moment the aperture fills, a milestone alert fires
       if (progress >= 100 && (p.cultivationProgress || 0) < 100) {
-        s = pushToast(s, { icon: '✦', title: 'BREAKTHROUGH READY', lines: ['Your aperture brims with essence — a new stage awaits.', 'Open Cultivation (C) to break through.'] });
+        s = pushToast(s, { icon: '✦', title: T('toast.breakthroughReady'), lines: [T('cult.breakthroughReady1'), T('cult.breakthroughReady2')] });
       }
       return advanceTime(s, BALANCE.time.cultivateMinutes);
     }
@@ -714,8 +714,8 @@ export function gameReducer(state, action) {
       const p = state.player;
       const g = globalStage(p);
       if (g >= 19) return state;
-      if ((p.cultivationProgress || 0) >= 100) return { ...state, log: [...state.log, 'Your aperture already brims with essence — break through first.'] };
-      if (!(zoneAt(p.x, p.y) || DEFAULT_ZONE).safe) return { ...state, log: [...state.log, 'Seclusion requires the safety of a settlement — wilds would tear your meditation apart.'] };
+      if ((p.cultivationProgress || 0) >= 100) return { ...state, log: [...state.log, T('cult.secludeFull')] };
+      if (!(zoneAt(p.x, p.y) || DEFAULT_ZONE).safe) return { ...state, log: [...state.log, T('cult.secludeNeedTown')] };
       const cfg = BALANCE.cultivation;
       const cost = cfg.essenceCostBase + cfg.essenceCostPerStage * g;
       const atSect = WORLD.tiles[p.y] && WORLD.tiles[p.y][p.x] === '*';
@@ -757,9 +757,9 @@ export function gameReducer(state, action) {
       }
       let s = { ...state, player: { ...p, primevalEssence: essence, cultivationProgress: progress, totalInsight: insight } };
       s = advanceTime(s, abs - startAbs);
-      s = { ...s, log: [...s.log, `You emerge from seclusion: ${sessions} cultivation sessions across ${nights} night(s)${atSect ? ' at the terrace' : ''}. Progress: ${Math.floor(progress)}%.`] };
+      s = { ...s, log: [...s.log, atSect ? T('cult.secluded', { sessions, nights, progress: Math.floor(progress) }) : T('cult.secludedPlain', { sessions, nights, progress: Math.floor(progress) })] };
       if (progress >= 100 && (p.cultivationProgress || 0) < 100) {
-        s = pushToast(s, { icon: '🏯', title: 'SECLUDED CULTIVATION COMPLETE', lines: [`${sessions} sessions · ${nights} night(s) of seclusion.`, 'Your aperture brims — a breakthrough awaits.'] });
+        s = pushToast(s, { icon: '🏯', title: T('toast.seclude'), lines: [T('cult.secludeToast1', { sessions, nights }), T('cult.secludeToast2')] });
       }
       return s;
     }
@@ -770,7 +770,7 @@ export function gameReducer(state, action) {
       const g = globalStage(p);
       if (g >= 19) return state;
       const list = breakthroughChecklist(state);
-      if (!list.ok) return { ...state, log: [...state.log, 'You are not ready to break through.'] };
+      if (!list.ok) return { ...state, log: [...state.log, T('cult.notReady')] };
       const req = BREAKTHROUGH_REQS[g];
       let s = applyEffects(state, {
         essence: -req.essence,
@@ -794,8 +794,8 @@ export function gameReducer(state, action) {
       s = {
         ...s,
         player: np,
-        breakthrough: { major, name: st.name },
-        log: [...s.log, major ? `MAJOR BREAKTHROUGH! You ascend to ${st.name}!` : `Breakthrough — you steady yourself at ${st.name}.`],
+        breakthrough: { major, name: locStageName(st) },
+        log: [...s.log, major ? T('cult.majorOk', { stage: locStageName(st) }) : T('cult.minorOk', { stage: locStageName(st) })],
       };
       return s;
     }
@@ -820,10 +820,10 @@ export function gameReducer(state, action) {
       let accelCost = 0;
       if (action.mode === 'accelerated') {
         accelCost = recoveryCosts(p).accelerated;
-        if (p.spiritStones < accelCost) return { ...state, log: [...state.log, 'Not enough primordial stones.'] };
+        if (p.spiritStones < accelCost) return { ...state, log: [...state.log, T('rec.noStones')] };
         s = { ...s, player: { ...p, spiritStones: p.spiritStones - accelCost } };
       }
-      return { ...s, recovery: { mode: action.mode, startedAt: Date.now() }, log: [...s.log, action.mode === 'accelerated' ? `You settle into accelerated recovery. (-${accelCost} primordial stones)` : 'You settle into slow meditation to recover essence.'] };
+      return { ...s, recovery: { mode: action.mode, startedAt: Date.now() }, log: [...s.log, action.mode === 'accelerated' ? T('rec.accel', { cost: accelCost }) : T('rec.slow')] };
     }
     case 'RECOVERY_TICK': {
       if (!state.recovery) return state;
@@ -834,7 +834,7 @@ export function gameReducer(state, action) {
         ...state,
         player: { ...p, primevalEssence: essence },
         recovery: done ? null : state.recovery,
-        log: done ? [...state.log, 'Your essence is fully restored.'] : state.log,
+        log: done ? [...state.log, T('rec.done')] : state.log,
       }, BALANCE.time.recoveryMinutesPerTick);
     }
     case 'RECOVERY_INTERRUPTED': {
@@ -845,8 +845,8 @@ export function gameReducer(state, action) {
       const carry = carryIntoCombat(state, e);
       const amb = ambushOf(state, e, false);
       const intro = amb.amb === 'enemy'
-        ? `Your meditation shatters — AMBUSHED! The ${def.name} found you!`
-        : `Your meditation shatters — the ${def.name} found you!`;
+        ? T('rec.ambushInterrupt', { enemy: locEnemyName(def) })
+        : T('rec.interrupt', { enemy: locEnemyName(def) });
       return {
         ...state,
         recovery: null,
@@ -860,17 +860,17 @@ export function gameReducer(state, action) {
     }
     case 'CANCEL_RECOVERY':
       if (!state.recovery) return state;
-      return { ...state, recovery: null, log: [...state.log, 'You cease recovering. The essence gained is kept.'] };
+      return { ...state, recovery: null, log: [...state.log, T('rec.cancel')] };
     case 'INSTANT_RECOVERY': {
       const p = state.player;
       const costs = recoveryCosts(p);
       if (costs.missing <= 0) return state;
-      if (p.spiritStones < costs.instant) return { ...state, log: [...state.log, 'Not enough primordial stones for instant recovery.'] };
+      if (p.spiritStones < costs.instant) return { ...state, log: [...state.log, T('rec.noStonesInstant')] };
       return {
         ...state,
         player: { ...p, spiritStones: p.spiritStones - costs.instant, primevalEssence: p.maxPrimevalEssence },
         recovery: null,
-        log: [...state.log, `You burn ${costs.instant} primordial stones — essence floods back to full. (-${costs.instant} stones)`],
+        log: [...state.log, T('rec.instant', { n: costs.instant })],
       };
     }
 
@@ -882,12 +882,12 @@ export function gameReducer(state, action) {
       if ((state.inventory[it.category]?.[action.itemId] || 0) <= 0) return state;
       // meals are sit-down fare — only eaten where it is safe to sit
       if (it.role === 'meal' && !(zoneAt(state.player.x, state.player.y) || DEFAULT_ZONE).safe) {
-        return { ...state, log: [...state.log, `${it.name} is sit-down fare — eat it at an inn or a settlement dining area.`] };
+        return { ...state, log: [...state.log, T('item.mealOnly', { name: locItemName(it) })] };
       }
       return applyEffects(state, {
         hp: it.use.hp || 0, essence: it.use.essence || 0,
         foodBuff: it.use.buff || null,
-        removeItems: { [action.itemId]: 1 }, message: `You use ${it.name}.`,
+        removeItems: { [action.itemId]: 1 }, message: T('item.used', { name: locItemName(it) }),
       });
     }
 
@@ -898,16 +898,16 @@ export function gameReducer(state, action) {
       const res = acceptQuest(state, action.questId);
       if (res.state === state) return state;
       let s = res.state;
-      s = pushToast(s, { icon: '📜', title: 'QUEST ACCEPTED', lines: [q.name, `Giver: ${NPC_BY_ID[q.giver]?.name || q.giver}`, res.autoTracked ? 'Now tracking on the HUD.' : 'Open Quests (Q) to track.'] });
-      return syncMasterSteps({ ...s, log: [...s.log, `Accepted quest: ${q.name}`] });
+      s = pushToast(s, { icon: '📜', title: T('toast.questAccepted'), lines: [locQuestName(q), T('qs.giver', { name: NPC_BY_ID[q.giver]?.name || q.giver }), res.autoTracked ? T('qs.trackedNow') : T('qs.trackHint')] });
+      return syncMasterSteps({ ...s, log: [...s.log, T('qs.accepted', { name: locQuestName(q) })] });
     }
     case 'TURN_IN_QUEST': {
       if (state.combat || state.recovery) return state;
       const q = QUEST_BY_ID[action.questId];
       const res = turnInQuest(state, action.questId);
       if (res.state === state) return state;
-      let s = applyEffects(res.state, { ...(q.rewards || {}), ...(Object.keys(res.removeItems).length ? { removeItems: res.removeItems } : {}) });
-      s = pushToast(s, { icon: '🎉', title: 'QUEST COMPLETE', lines: [q.name, q.rewards?.message || 'Rewards received.'] });
+      let s = applyEffects(res.state, { ...(q.rewards || {}), message: locQuestRewardMsg(q) || undefined, ...(Object.keys(res.removeItems).length ? { removeItems: res.removeItems } : {}) });
+      s = pushToast(s, { icon: '🎉', title: T('toast.questComplete'), lines: [locQuestName(q), locQuestRewardMsg(q) || T('qs.rewards')] });
       return syncMasterSteps(s);
     }
     case 'TRACK_QUEST': {
@@ -918,7 +918,7 @@ export function gameReducer(state, action) {
       const q = QUEST_BY_ID[action.questId];
       const s = abandonQuest(state, action.questId);
       if (s === state) return state;
-      return { ...s, log: [...s.log, `Abandoned quest: ${q?.name} — it can be taken up again.`] };
+      return { ...s, log: [...s.log, T('qs.abandoned', { name: q ? locQuestName(q) : '?' })] };
     }
     case 'QUEST_CHOICE': {
       if (state.combat || state.recovery) return state;
@@ -1010,7 +1010,7 @@ export function gameReducer(state, action) {
     case 'CHOOSE_EVENT': {
       const ev = EVENT_BY_ID[state.pendingEvent];
       const opt = ev.options[action.optionIndex];
-      let s = applyEffects(state, opt.effects);
+      let s = applyEffects(state, { ...opt.effects, message: locEventMsg(ev, action.optionIndex) || undefined });
       const pending = s._pendingCombat;
       delete s._pendingCombat;
       s = { ...s, pendingEvent: null };
@@ -1047,18 +1047,18 @@ export function gameReducer(state, action) {
       const chance = captureChanceOf(state, wg, e, action.itemId);
       let s = action.itemId ? applyEffects(state, { removeItems: { [action.itemId]: 1 } }) : state;
       if (Math.random() * 100 < chance) {
-        s = applyEffects(s, { giveGu: sp.guId, message: `Capture succeeds — ${sp.name} settles into your keeping. It will need to be fed.` });
+        s = applyEffects(s, { giveGu: sp.guId, message: T('cap.ok', { name: locSpeciesName(sp) }) });
         s = withQuestEvents(s, { type: 'GU_CAPTURED', id: sp.guId });
         s = wildGuAfterEncounter(s, wg.id, true);
-        s = pushToast(s, { icon: '🐉', title: 'WILD GU CAPTURED', lines: [`${sp.name} joins you.`, `Feeds on: ${ITEM_BY_ID[sp.foodType]?.name || sp.foodType}.`] });
+        s = pushToast(s, { icon: '🐉', title: T('toast.wildCaptured'), lines: [T('cap.joins', { name: locSpeciesName(sp) }), T('cap.feedsOn', { food: ITEM_BY_ID[sp.foodType] ? locItemName(ITEM_BY_ID[sp.foodType]) : sp.foodType })] });
         return advanceTime({ ...s, wildEncounter: null }, BALANCE.capture.attemptMinutes);
       }
       if (sp.behavior === 'passive' && Math.random() * 100 < BALANCE.capture.fleeChance) {
         s = wildGuAfterEncounter(s, wg.id, true);
-        s = { ...s, log: [...s.log, `The ${sp.name} slips away into the wilds — the capture failed.`] };
+        s = { ...s, log: [...s.log, T('cap.fled', { name: locSpeciesName(sp) })] };
         return advanceTime({ ...s, wildEncounter: null }, BALANCE.capture.attemptMinutes);
       }
-      return advanceTime({ ...s, wildEncounter: null, combat: initCombat(null, s.player, { def: wildCombatDef(sp), difficulty: s.difficulty, wildGuId: wg.id, hp: wg.hp, intro: `The ${sp.name} breaks free of the seal — it turns on you!` }) }, BALANCE.capture.attemptMinutes);
+      return advanceTime({ ...s, wildEncounter: null, combat: initCombat(null, s.player, { def: wildCombatDef(sp), difficulty: s.difficulty, wildGuId: wg.id, hp: wg.hp, intro: T('cap.brokeFree', { name: locSpeciesName(sp) }) }) }, BALANCE.capture.attemptMinutes);
     }
     case 'ENCOUNTER_ATTACK': {
       const e = state.wildEncounter;
@@ -1066,7 +1066,7 @@ export function gameReducer(state, action) {
       const wg = (state.worldState.wildGu || []).find(w => w.id === e.worldId && !w.gone);
       if (!wg) return { ...state, wildEncounter: null };
       const sp = SPECIES_BY_ID[wg.speciesId];
-      return { ...state, wildEncounter: null, combat: initCombat(null, state.player, { def: wildCombatDef(sp), difficulty: state.difficulty, wildGuId: wg.id, hp: wg.hp, intro: `You strike at the ${sp.name}!` }) };
+      return { ...state, wildEncounter: null, combat: initCombat(null, state.player, { def: wildCombatDef(sp), difficulty: state.difficulty, wildGuId: wg.id, hp: wg.hp, intro: T('cap.attackIntro', { name: locSpeciesName(sp) }) }) };
     }
 
     // ---------- Gu feeding & care ----------
@@ -1075,18 +1075,18 @@ export function gameReducer(state, action) {
       const it = ITEM_BY_ID[action.itemId];
       if (!inst || !it || action.itemId !== foodOf(GU_BY_ID[inst.guId])) return state;
       if ((state.inventory[it.category]?.[it.id] || 0) <= 0) return state;
-      let s = applyEffects(state, { removeItems: { [it.id]: 1 }, message: `You feed ${GU_BY_ID[inst.guId].name} — it settles contentedly.` });
+      let s = applyEffects(state, { removeItems: { [it.id]: 1 }, message: T('gl.fed', { name: locGuName(GU_BY_ID[inst.guId]) }) });
       s = { ...s, ownedGu: s.ownedGu.map(g => g.instanceId === inst.instanceId ? { ...g, satiety: BALANCE.hunger.maxSatiety, criticalSinceDay: null, warnDay: null } : g) };
       return advanceTime(s, BALANCE.time.talkMinutes);
     }
     case 'TOGGLE_AUTO_FEED': {
       const autoFeed = !(state.settings?.autoFeed);
-      return { ...state, settings: { ...(state.settings || {}), autoFeed }, log: [...state.log, `Auto Feed ${autoFeed ? 'enabled' : 'disabled'}.`] };
+      return { ...state, settings: { ...(state.settings || {}), autoFeed }, log: [...state.log, autoFeed ? T('gl.autoOn') : T('gl.autoOff')] };
     }
     case 'CURE_GU': {
       const inst = state.ownedGu.find(g => g.instanceId === action.instanceId);
       if (!inst || (state.inventory.guGear?.restorationPellet || 0) <= 0) return state;
-      let s = applyEffects(state, { removeItems: { restorationPellet: 1 }, message: `You feed ${GU_BY_ID[inst.guId].name} a Spirit Restoration Pellet — its injuries mend.` });
+      let s = applyEffects(state, { removeItems: { restorationPellet: 1 }, message: T('gl.cured', { name: locGuName(GU_BY_ID[inst.guId]) }) });
       s = { ...s, ownedGu: s.ownedGu.map(g => g.instanceId === inst.instanceId ? { ...g, injuredUntilDay: 0, injurySeverity: null, refineBlockedUntilDay: 0 } : g) };
       return advanceTime(s, BALANCE.time.talkMinutes);
     }
@@ -1099,7 +1099,7 @@ export function gameReducer(state, action) {
       const day = state.time?.day || 1;
       const cooldownEnd = (state.vitalSwitchDay ?? -99) + cfg.switchCooldownDays;
       if (day < cooldownEnd) {
-        return { ...state, log: [...state.log, `Your aperture has not settled — you cannot bind a new Vital Gu for ${cooldownEnd - day} more day(s).`] };
+        return { ...state, log: [...state.log, T('vit.cd', { n: cooldownEnd - day })] };
       }
       const gu = GU_BY_ID[inst.guId];
       const prev = state.vitalGu ? state.ownedGu.find(g => g.instanceId === state.vitalGu) : null;
@@ -1109,18 +1109,18 @@ export function gameReducer(state, action) {
       let s = { ...state, vitalGu: inst.instanceId, vitalSwitchDay: day };
       if (switching) s = startInstability(s, 'switched', cfg.switchPenaltyPct, cfg.switchPenaltyDays * 24 * 60);
       s = pushToast(s, {
-        icon: '🩸', title: 'CỔ BẢN MỆNH — VITAL GU',
+        icon: '🩸', title: T('toast.vital'),
         lines: [
-          `${gu.name} is bound as your Vital Gu.`,
-          ...(prev ? [`The bond with ${GU_BY_ID[prev.guId].name} is released.`] : []),
-          ...(switching
-            ? [`Cause: Changed Vital Gu — Essence recovery −${cfg.switchPenaltyPct}% for ${cfg.switchPenaltyDays} day(s).`]
-            : ['The bond is stable — no penalties.']),
+          T('vit.bound', { gu: locGuName(gu) }),
+          ...(prev ? [T('vit.released', { gu: locGuName(GU_BY_ID[prev.guId]) })] : []),
+          switching
+            ? T('vit.causeSwitch', { p: cfg.switchPenaltyPct, d: cfg.switchPenaltyDays })
+            : T('vit.stableLine'),
         ],
       });
       s = { ...s, log: [...s.log, switching
-        ? `${gu.name} becomes your Vital Gu (Cổ Bản Mệnh). The re-binding leaves the aperture unstable — essence recovery −${cfg.switchPenaltyPct}% for ${cfg.switchPenaltyDays} day(s).`
-        : `${gu.name} becomes your Vital Gu (Cổ Bản Mệnh) — a stable bond from the very start. It never needs feeding, and refinement can never destroy it.`] };
+        ? T('vit.reboundLog', { gu: locGuName(gu), p: cfg.switchPenaltyPct, d: cfg.switchPenaltyDays })
+        : T('vit.firstLog', { gu: locGuName(gu) })] };
       return advanceTime(s, BALANCE.time.talkMinutes);
     }
 
@@ -1131,33 +1131,33 @@ export function gameReducer(state, action) {
       const gu = GU_BY_ID[inst.guId];
       const cfg = BALANCE.guRefine;
       const list = refineGuChecklist(state, inst);
-      if (!list.ok) return { ...state, log: [...state.log, 'Refinement refused — requirements are unmet.'] };
+      if (!list.ok) return { ...state, log: [...state.log, T('refinegu.refused')] };
       const day = state.time?.day || 1;
       let s = applyEffects(state, { essence: -list.essenceCost, spiritStones: -list.stonesCost, removeItems: list.materials });
       if (Math.random() * 100 < list.chance) {
         s = { ...s, ownedGu: s.ownedGu.map(g => g.instanceId === inst.instanceId ? { ...g, rank: list.target } : g) };
         s = withQuestEvents(s, { type: 'GU_REFINED', id: gu.id });
         s = grantMastery(s, 'refinement', BALANCE.mastery.xpRefineSuccess, 'refined', 'refine');
-        s = pushToast(s, { icon: '✦', title: 'GU REFINED', lines: [`${gu.name} rises to Rank ${list.target}.`, `Effect power +${cfg.rankPowerStep}%`] });
-        s = { ...s, log: [...s.log, `Refinement succeeds — ${gu.name} rises to Rank ${list.target}!`] };
+        s = pushToast(s, { icon: '✦', title: T('toast.guRefined'), lines: [T('refinegu.ok', { gu: locGuName(gu), n: list.target }), T('refinegu.power', { p: cfg.rankPowerStep })] });
+        s = { ...s, log: [...s.log, T('refinegu.okLog', { gu: locGuName(gu), n: list.target })] };
       } else {
         s = grantMastery(s, 'refinement', BALANCE.mastery.xpRefineFail, 'refined', 'refine');
         if (Math.random() * 100 >= cfg.injuryChance) {
-          s = { ...s, log: [...s.log, `Refinement fails — the essence scatters. ${gu.name} survives unharmed, but the materials are lost.`] };
+          s = { ...s, log: [...s.log, T('refinegu.failSafe', { gu: locGuName(gu) })] };
         } else if (list.vital) {
           // the bond shields the Vital Gu: never death — a severe weakening instead
           s = { ...s, ownedGu: s.ownedGu.map(g => g.instanceId === inst.instanceId ? { ...g, injuredUntilDay: day + cfg.severeInjuryDays, injurySeverity: 'severe', refineBlockedUntilDay: day + cfg.refineBlockDays } : g) };
           s = startInstability(s, 'refinement', BALANCE.vital.refineRecoveryPct, cfg.severeInjuryDays * 24 * 60);
-          s = pushToast(s, { icon: '🩹', title: 'VITAL GU WEAKENED', lines: [`${gu.name} — power ${cfg.severeEffPct}%`, `Cannot refine again for ${cfg.refineBlockDays} day(s).`, `Cause: Failed Refinement — Essence recovery −${BALANCE.vital.refineRecoveryPct}% for ${cfg.severeInjuryDays} day(s).`] });
-          s = { ...s, log: [...s.log, `Refinement fails catastrophically — ${gu.name} (Vital Gu) is severely weakened, but the bond shields it from death. The aperture is unstable — essence recovery −${BALANCE.vital.refineRecoveryPct}% for ${cfg.severeInjuryDays} day(s).`] };
+          s = pushToast(s, { icon: '🩹', title: T('toast.vitalWeakened'), lines: [T('refinegu.sevLine1', { gu: locGuName(gu), p: cfg.severeEffPct }), T('refinegu.sevLine2', { d: cfg.refineBlockDays }), T('vit.causeRefine', { p: BALANCE.vital.refineRecoveryPct, d: cfg.severeInjuryDays })] });
+          s = { ...s, log: [...s.log, T('refinegu.sevLog', { gu: locGuName(gu), p: BALANCE.vital.refineRecoveryPct, d: cfg.severeInjuryDays })] };
         } else if (Math.random() * 100 < cfg.deathChance) {
           s = { ...s, ownedGu: s.ownedGu.filter(g => g.instanceId !== inst.instanceId), player: { ...s.player, equippedGu: s.player.equippedGu.filter(id => id !== inst.instanceId) } };
-          s = pushToast(s, { icon: '☠', title: 'GU DESTROYED', lines: [`${gu.name} could not withstand the refinement.`, 'It is gone from your collection.'] });
-          s = { ...s, log: [...s.log, `CRITICAL FAILURE — ${gu.name} is destroyed in the refinement furnace!`] };
+          s = pushToast(s, { icon: '☠', title: T('toast.guDestroyed'), lines: [T('refinegu.destroyedLine1', { gu: locGuName(gu) }), T('refinegu.destroyedLine2')] });
+          s = { ...s, log: [...s.log, T('refinegu.destroyedLog', { gu: locGuName(gu) })] };
         } else {
           s = { ...s, ownedGu: s.ownedGu.map(g => g.instanceId === inst.instanceId ? { ...g, injuredUntilDay: day + cfg.injuryDays, injurySeverity: 'minor', refineBlockedUntilDay: day + cfg.injuryDays } : g) };
-          s = pushToast(s, { icon: '🩹', title: 'GU INJURED', lines: [`${gu.name} — power ${cfg.injuryEffPct}%`, 'Cannot refine again until it recovers.'] });
-          s = { ...s, log: [...s.log, `Refinement fails violently — ${gu.name} is injured (power ${cfg.injuryEffPct}% for ${cfg.injuryDays} day(s)).`] };
+          s = pushToast(s, { icon: '🩹', title: T('toast.guInjured'), lines: [T('refinegu.injuredLine1', { gu: locGuName(gu), p: cfg.injuryEffPct }), T('refinegu.injuredLine2')] });
+          s = { ...s, log: [...s.log, T('refinegu.injuredLog', { gu: locGuName(gu), p: cfg.injuryEffPct, d: cfg.injuryDays })] };
         }
       }
       return advanceTime(s, BALANCE.time.refineMinutes);
