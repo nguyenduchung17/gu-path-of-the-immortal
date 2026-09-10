@@ -11,13 +11,18 @@ export const BALANCE = {
     sectBonus: 1.5,          // multiplier at the Azure Cloud Sect marker
   },
   recovery: {
-    fullRecoverySeconds: 270,     // 0 -> max essence at Rank 1
-    rankEfficiencyPerStage: 0.02, // -2% recovery time per cultivation stage
-    minRecoverySeconds: 180,
-    acceleratedMultiplier: 2,
-    acceleratedCost: 100,
-    instantCost: 300,
+    // Baseline (C-Tier) seconds for a full 0 → max recovery at Rank 1 Early.
+    // Aptitude divides this time; rank STRETCHES it (+15% per stage) so a
+    // large high-realm pool stays valuable — the rate improves with rank,
+    // but more slowly than the pool itself grows.
+    fullRecoverySeconds: 150,
+    rankTimePerStage: 0.15,
+    acceleratedMultiplier: 2,      // accelerated recovery ≈ half the time
     tickMs: 1000,
+    // Dynamic prices — stones per point of MISSING essence, never flat:
+    // costs grow with the character and fall as the aperture refills.
+    acceleratedStonesPerMissing: 0.5,
+    instantStonesPerMissing: 1,
   },
   mastery: {
     tiers: [
