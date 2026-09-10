@@ -6,6 +6,7 @@ export const DICT_TUTORIAL = {
     // ---- welcome ----
     'tut.welcome.title': 'WELCOME, CULTIVATOR',
     'tut.welcome.subtitle': 'The path to immortality begins with a single step.',
+    'tut.welcome.controls': 'After you begin: WASD / arrows move · E interact · Esc menu.',
     'tut.welcome.start': 'Start Tutorial',
     'tut.welcome.skip': 'Skip Tutorial',
     'tut.welcome.skipConfirm': 'Skip the tutorial? You can replay it later from Help — and you still receive the starter supplies.',
@@ -140,6 +141,7 @@ export const DICT_TUTORIAL = {
     // ---- màn chào ----
     'tut.welcome.title': 'CHÀO MỪNG, TU SĨ',
     'tut.welcome.subtitle': 'Đường tới trường sinh bắt đầu từ một bước chân.',
+    'tut.welcome.controls': 'Sau khi bắt đầu: WASD / phím mũi tên di chuyển · E tương tác · Esc menu.',
     'tut.welcome.start': 'Bắt Đầu Hướng Dẫn',
     'tut.welcome.skip': 'Bỏ Qua Hướng Dẫn',
     'tut.welcome.skipConfirm': 'Bỏ qua hướng dẫn? Bạn có thể xem lại sau từ Trợ Giúp — và vẫn nhận vật phẩm khởi đầu.',

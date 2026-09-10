@@ -51,8 +51,11 @@ export const NPCS = [
       ],
       buys: ['beastCore', 'fireEssence', 'shadowSilk', 'ore', 'ironOre', 'moonPetal', 'beastBlood', 'serpentGland', 'windCrystal', 'mistSilk'],
       hours: { open: 6 * 60, close: 20 * 60 },
-      gu: [{ guId: 'ironSkin', price: 60 }],                                     // low-rank Gu, ready-bound
-      guPool: [{ guId: 'thunderPalm', price: 150 }, { guId: 'spiritMoth', price: 50 }], // rare rotating stock (daily)
+      // a sensing Gu is ALWAYS in stock here — the exploration loop (rare
+      // harvests, secret paths) must be reachable any day, not only when
+      // the rotating stock happens to favor it
+      gu: [{ guId: 'ironSkin', price: 60 }, { guId: 'spiritMoth', price: 50 }],  // low-rank Gu, ready-bound
+      guPool: [{ guId: 'thunderPalm', price: 150 }], // rare rotating stock (daily)
       recipes: [{ recipeId: 'emberGu', price: 25 }, { recipeId: 'stoneShell', price: 25 }, { recipeId: 'windStep', price: 30 }],
     },
   },
