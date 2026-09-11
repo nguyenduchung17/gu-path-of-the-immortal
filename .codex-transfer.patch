@@ -1,0 +1,1830 @@
+diff --git a/jsconfig.json b/jsconfig.json
+index 3669526..eee4fc0 100644
+--- a/jsconfig.json
++++ b/jsconfig.json
+@@ -14,8 +14,8 @@
+     "allowSyntheticDefaultImports": true,
+     "esModuleInterop": true,
+     "resolveJsonModule": true,
+-    "types": []
++    "types": ["vite/client"]
+   },
+-  "include": ["src/components/**/*.js", "src/pages/**/*.jsx", "src/Layout.jsx"],
++  "include": ["src/components/**/*.js", "src/pages/**/*.jsx", "src/Layout.jsx", "src/global.d.ts"],
+   "exclude": ["node_modules", "dist", "src/vite-plugins", "src/components/ui", "src/api", "src/lib"]
+-} 
+\ No newline at end of file
++}
+diff --git a/package.json b/package.json
+index 7fdfa9c..db14605 100644
+--- a/package.json
++++ b/package.json
+@@ -8,6 +8,7 @@
+     "build": "vite build",
+     "lint": "eslint . --quiet",
+     "lint:fix": "eslint . --fix",
++    "test": "tsx --test src/**/*.test.js",
+     "typecheck": "tsc -p ./jsconfig.json",
+     "preview": "vite preview"
+   },
+@@ -67,9 +68,8 @@
+     "react-hot-toast": "^2.6.0",
+     "react-leaflet": "^4.2.1",
+     "react-markdown": "^9.0.1",
+-    "react-quill-new": "^3.8.3",
+     "react-resizable-panels": "^2.1.7",
+-    "react-router-dom": "^6.26.0",
++    "react-router-dom": "^7.18.3",
+     "recharts": "^2.15.4",
+     "sonner": "^2.0.1",
+     "tailwind-merge": "^3.0.2",
+@@ -95,6 +95,7 @@
+     "nitro": "^3.0.260610-beta",
+     "postcss": "^8.5.3",
+     "tailwindcss": "^3.4.17",
++    "tsx": "^4.23.13",
+     "typescript": "^5.8.2",
+     "vite": "^8.2.0"
+   }
+diff --git a/src/App.jsx b/src/App.jsx
+index 8f25501..b73e6ee 100644
+--- a/src/App.jsx
++++ b/src/App.jsx
+@@ -1,16 +1,20 @@
+ import { Toaster } from "@/components/ui/toaster"
+ import { QueryClientProvider } from '@tanstack/react-query'
+ import { queryClientInstance } from '@/lib/query-client'
+-import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
++import { BrowserRouter as Router, Navigate, Route, Routes } from 'react-router-dom';
+ import PageNotFound from './lib/PageNotFound';
+ import { AuthProvider, useAuth } from '@/lib/AuthContext';
+-import UserNotRegisteredError from '@/components/UserNotRegisteredError';
+ import ScrollToTop from './components/ScrollToTop';
+ // Add page imports here
+ import Game from '@/pages/Game';
++import Login from '@/pages/Login';
++import Register from '@/pages/Register';
++import ForgotPassword from '@/pages/ForgotPassword';
++import ResetPassword from '@/pages/ResetPassword';
++import ProtectedRoute from '@/components/ProtectedRoute';
+ 
+ const AuthenticatedApp = () => {
+-  const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
++  const { isLoadingAuth, isLoadingPublicSettings } = useAuth();
+ 
+   // Show loading spinner while checking app public settings or auth
+   if (isLoadingPublicSettings || isLoadingAuth) {
+@@ -21,22 +25,15 @@ const AuthenticatedApp = () => {
+     );
+   }
+ 
+-  // Handle authentication errors
+-  if (authError) {
+-    if (authError.type === 'user_not_registered') {
+-      return <UserNotRegisteredError />;
+-    } else if (authError.type === 'auth_required') {
+-      // Redirect to login automatically
+-      navigateToLogin();
+-      return null;
+-    }
+-  }
+-
+-  // Render the main app
+   return (
+     <Routes>
+-      {/* Add your page Route elements here */}
+-      <Route path="/" element={<Game />} />
++      <Route path="/login" element={<Login />} />
++      <Route path="/register" element={<Register />} />
++      <Route path="/forgot-password" element={<ForgotPassword />} />
++      <Route path="/reset-password" element={<ResetPassword />} />
++      <Route element={<ProtectedRoute unauthenticatedElement={<Navigate to="/login" replace />} />}>
++        <Route path="/" element={<Game />} />
++      </Route>
+       <Route path="*" element={<PageNotFound />} />
+     </Routes>
+   );
+@@ -58,4 +55,4 @@ function App() {
+   )
+ }
+ 
+-export default App
+\ No newline at end of file
++export default App
+diff --git a/src/api/base44Client.js b/src/api/base44Client.js
+index de614ee..2328e74 100644
+--- a/src/api/base44Client.js
++++ b/src/api/base44Client.js
+@@ -1,5 +1,5 @@
+ import { createClient } from '@base44/sdk';
+-import { appParams } from '@/lib/app-params';
++import { appParams } from '../lib/app-params.js';
+ 
+ const { appId, token, functionsVersion, appBaseUrl } = appParams;
+ 
+diff --git a/src/components/AuthLayout.jsx b/src/components/AuthLayout.jsx
+index 93f70ef..f1fcc28 100644
+--- a/src/components/AuthLayout.jsx
++++ b/src/components/AuthLayout.jsx
+@@ -1,6 +1,6 @@
+ import React from "react";
+ 
+-export default function AuthLayout({ icon: Icon, title, subtitle, footer, children }) {
++export default function AuthLayout({ icon: Icon, title, subtitle = null, footer = null, children = null }) {
+   return (
+     <div className="min-h-screen flex items-center justify-center bg-background px-4">
+       <div className="w-full max-w-md">
+diff --git a/src/components/game/BreakthroughOverlay.jsx b/src/components/game/BreakthroughOverlay.jsx
+index 810573b..229e5a8 100644
+--- a/src/components/game/BreakthroughOverlay.jsx
++++ b/src/components/game/BreakthroughOverlay.jsx
+@@ -31,7 +31,7 @@ export default function BreakthroughOverlay() {
+         </div>
+         <h2 className={`text-2xl font-bold mb-2 ${b.major ? 'text-amber-200' : 'text-emerald-200'}`}>{b.name}</h2>
+         <p className="text-xs text-stone-400 mb-4">
+-          {b.major ? 'Your meridians widen — all attributes surge. Essence fully restored.' : 'Essence fully restored. Your foundation deepens.'}
++          {b.major ? 'Your meridians widen — all attributes surge. Essence fully restored.' : 'Your foundation deepens. A portion of your Essence is restored.'}
+         </p>
+         <button onClick={() => dispatch({ type: 'DISMISS_BREAKTHROUGH' })}
+           className={`w-full py-2.5 rounded-lg text-sm font-semibold text-black ${b.major ? 'bg-amber-400 hover:bg-amber-300' : 'bg-emerald-500 hover:bg-emerald-400'}`}>
+@@ -40,4 +40,4 @@ export default function BreakthroughOverlay() {
+       </div>
+     </div>
+   );
+-}
+\ No newline at end of file
++}
+diff --git a/src/components/game/CharacterCreation.jsx b/src/components/game/CharacterCreation.jsx
+index ed5209f..6259fbb 100644
+--- a/src/components/game/CharacterCreation.jsx
++++ b/src/components/game/CharacterCreation.jsx
+@@ -121,7 +121,7 @@ export default function CharacterCreation() {
+                   </div>
+                   <div>
+                     <label className="text-xs text-stone-400 block mb-1">{t('creation.age')}</label>
+-                    <input type="number" min="10" max="80" value={age} onChange={e => setAge(e.target.value)}
++                    <input type="number" min="10" max="80" value={age} onChange={e => setAge(Number(e.target.value))}
+                       className="w-full px-2.5 py-2 rounded-lg bg-black/40 border border-stone-700 text-sm focus:border-emerald-600 outline-none" />
+                   </div>
+                 </div>
+@@ -220,4 +220,4 @@ export default function CharacterCreation() {
+       </div>
+     </div>
+   );
+-}
+\ No newline at end of file
++}
+diff --git a/src/components/game/CharacterPanel.jsx b/src/components/game/CharacterPanel.jsx
+index a7ee6ab..f553c22 100644
+--- a/src/components/game/CharacterPanel.jsx
++++ b/src/components/game/CharacterPanel.jsx
+@@ -4,7 +4,7 @@ import { useT } from '@/game/i18n/LangContext';
+ import { CULTIVATION_STAGES, BREAKTHROUGH_REQS } from '@/game/data/cultivation';
+ import { recoveryBreakdown, cultivationGain } from '@/game/config/balance';
+ import { breakthroughChecklist } from '@/game/state/gameReducer';
+-import { TERRACE, zoneAt } from '@/game/data/world';
++import { TERRACE } from '@/game/data/world';
+ import { tierOf, scoreOf, constitutionName } from '@/game/config/aptitude';
+ import EssenceSphere from './EssenceSphere';
+ import { totalGameMin, fmtRemaining } from '@/game/engine/vitalGu';
+@@ -41,8 +41,6 @@ export default function CharacterPanel({ onRecover }) {
+   const req = peak ? null : BREAKTHROUGH_REQS[g];
+   const atSect = p.x === TERRACE[0] && p.y === TERRACE[1];
+   const { cost, gain, eff } = cultivationGain(state, atSect);
+-  const inSafeZone = !!zoneAt(p.x, p.y)?.safe;
+-  const secludeOk = !state.recovery && !state.combat && !peak && p.cultivationProgress < 100 && inSafeZone;
+   const checklist = peak ? null : breakthroughChecklist(state);
+   const ready = checklist?.ok;
+   const breakthroughReady = !peak && p.cultivationProgress >= 100;
+@@ -154,14 +152,6 @@ export default function CharacterPanel({ onRecover }) {
+             </div>
+           )}
+ 
+-          <button onClick={() => dispatch({ type: 'SECLUDE' })} disabled={!secludeOk}
+-            className={`w-full py-2.5 rounded-lg text-sm font-medium transition mb-1 ${secludeOk ? 'border border-emerald-700/50 bg-emerald-900/40 text-emerald-100 hover:bg-emerald-800/50' : 'bg-stone-800 text-stone-500 cursor-not-allowed'}`}>
+-            {t('seclude.button')}
+-          </button>
+-          <div className="text-[10px] text-stone-500">
+-            {inSafeZone ? t('seclude.hint') : t('seclude.needTown')}
+-          </div>
+-
+           {!peak && (
+             <div className="rounded-lg border border-amber-800/40 bg-amber-900/10 p-3">
+               <div className="text-xs font-semibold text-amber-200 mb-1.5">
+@@ -180,7 +170,7 @@ export default function CharacterPanel({ onRecover }) {
+             </div>
+           )}
+           <p className="text-[10px] text-stone-500 mt-2">
+-            Cultivate at the ✦ terrace in town for ×1.5 progress. Essence never regenerates on its own — recover it deliberately, at inns or campsites when far afield.
++            Cultivate at the ✦ terrace in town for ×1.5 progress. Essence never regenerates on its own — use Recover Essence deliberately; campsites provide their intended safety modifier.
+           </p>
+         </div>
+       </div>
+@@ -212,4 +202,4 @@ export default function CharacterPanel({ onRecover }) {
+       </div>
+     </div>
+   );
+-}
+\ No newline at end of file
++}
+diff --git a/src/components/game/GameScreen.jsx b/src/components/game/GameScreen.jsx
+index 8d0b61e..138c4eb 100644
+--- a/src/components/game/GameScreen.jsx
++++ b/src/components/game/GameScreen.jsx
+@@ -42,6 +42,7 @@ import ScoutReport from './hud/ScoutReport';
+ import HazardBadge from './hud/HazardBadge';
+ import MiniMap from './hud/MiniMap';
+ import DashboardScreen from './DashboardScreen';
++import { validDeathRecord } from '@/game/state/saveIdentity';
+ 
+ const PANEL_META = {
+   cultivation: { titleKey: 'ui.cultivation', icon: '🧘' },
+@@ -57,7 +58,7 @@ const PANEL_META = {
+ };
+ 
+ export default function GameScreen() {
+-  const { state, dispatch, activeSlot, exitToSlots, deleteSlot } = useGame();
++  const { state, dispatch, activeSlot, exitToSlots, deleteSlot, loadSlotRaw } = useGame();
+   const { t } = useT();
+   const [panel, setPanel] = useState(null);
+   const [shop, setShop] = useState(null);
+@@ -66,6 +67,17 @@ export default function GameScreen() {
+   const [recoveryOpen, setRecoveryOpen] = useState(false);
+   const [paused, setPaused] = useState(false);
+   const [dashOpen, setDashOpen] = useState(false);
++  const storedActive = activeSlot == null ? null : loadSlotRaw(activeSlot);
++  const deathRecord = validDeathRecord(state) && storedActive?.characterId === state.characterId
++    ? state.deceased
++    : null;
++
++  useEffect(() => {
++    if (!deathRecord) return;
++    if (typeof location !== 'undefined' && ['localhost', '127.0.0.1', '0.0.0.0'].includes(location.hostname)) {
++      console.debug('[save] Loading death screen:', { characterId: state.characterId });
++    }
++  }, [deathRecord, state.characterId]);
+ 
+   // open a side panel — the staged tutorial hears which panel opened
+   const openPanel = (id) => {
+@@ -94,7 +106,7 @@ export default function GameScreen() {
+   }, [state]);
+ 
+   // game-style Esc behavior: close the topmost overlay; if nothing is open, open the system menu.
+-  const escRef = useRef({});
++  const escRef = useRef(/** @type {any} */ ({}));
+   escRef.current = {
+     panel, paused, shop, service, inn, recoveryOpen, dashOpen, openPanel,
+     busy: !!(state.combat || state.pendingEvent || state.dialogue || state.sleeping || state.deceased || state.breakthrough || state.wildEncounter),
+@@ -179,13 +191,13 @@ export default function GameScreen() {
+       {service === 'arena' && <ArenaPanel onClose={() => setService(null)} />}
+       {inn && <InnModal npcId={inn} onClose={() => setInn(null)} />}
+       {state.sleeping && <SleepOverlay />}
+-      {state.deceased && (
++      {deathRecord && (
+         <MemorialPanel
+-          record={state.deceased}
++          record={deathRecord}
+           onCloseLabel="Return to Save Slots"
+           onClose={exitToSlots}
+           onDeleteLabel="Delete Save"
+-          onDelete={() => { deleteSlot(activeSlot); exitToSlots(); }}
++          onDelete={() => deleteSlot(activeSlot)}
+         />
+       )}
+       <RecoveryModal open={recoveryOpen} onClose={() => setRecoveryOpen(false)} />
+@@ -202,4 +214,4 @@ export default function GameScreen() {
+       <TutorialOverlay />
+     </div>
+   );
+-}
+\ No newline at end of file
++}
+diff --git a/src/components/game/GuPanel.jsx b/src/components/game/GuPanel.jsx
+index 2434e50..44fdaf1 100644
+--- a/src/components/game/GuPanel.jsx
++++ b/src/components/game/GuPanel.jsx
+@@ -4,7 +4,7 @@ import { useT } from '@/game/i18n/LangContext';
+ import { GU_BY_ID } from '@/game/data/gu';
+ import { PATH_BY_ID, SYNERGIES } from '@/game/data/paths';
+ import { BALANCE } from '@/game/config/balance';
+-import { HUNGER_META, hungerBand, isVital, pickAutoFeedFood } from '@/game/engine/guLife';
++import { hungerBand, isVital, pickAutoFeedFood } from '@/game/engine/guLife';
+ import { vitalStatusOf, fmtRemaining } from '@/game/engine/vitalGu';
+ import GuCard from './gu/GuCard';
+ import RefineGuModal from './RefineGuModal';
+@@ -141,7 +141,7 @@ export default function GuPanel() {
+ 
+       <div className="grid sm:grid-cols-2 gap-2">
+         {state.ownedGu.map(inst => (
+-          <GuCard key={inst.instanceId} inst={inst} state={state} equipped={equipped.has(inst.instanceId)}
++          <GuCard key={inst.instanceId} inst={inst} equipped={equipped.has(inst.instanceId)}
+             onEquip={(id) => dispatch({ type: 'EQUIP_GU', instanceId: id })}
+             onUnequip={(id) => dispatch({ type: 'UNEQUIP_GU', instanceId: id })}
+             onRefine={(g) => setRefineId(g.instanceId)} />
+@@ -152,4 +152,4 @@ export default function GuPanel() {
+       {refineId && <RefineGuModal instanceId={refineId} onClose={() => setRefineId(null)} />}
+     </div>
+   );
+-}
+\ No newline at end of file
++}
+diff --git a/src/components/game/ShopPanel.jsx b/src/components/game/ShopPanel.jsx
+index 29edfc1..a911a89 100644
+--- a/src/components/game/ShopPanel.jsx
++++ b/src/components/game/ShopPanel.jsx
+@@ -2,7 +2,7 @@ import React, { useState } from 'react';
+ import { useGame } from '@/game/state/GameContext';
+ import { useT } from '@/game/i18n/LangContext';
+ import { NPC_BY_ID, guOfferOf } from '@/game/data/npcs';
+-import { ITEM_BY_ID, ITEMS } from '@/game/data/items';
++import { ITEM_BY_ID } from '@/game/data/items';
+ import { RECIPE_BY_ID } from '@/game/data/recipes';
+ import { GU_BY_ID } from '@/game/data/gu';
+ import { PATH_BY_ID } from '@/game/data/paths';
+@@ -135,4 +135,4 @@ export default function ShopPanel({ npcId, onClose }) {
+       </div>
+     </div>
+   );
+-}
+\ No newline at end of file
++}
+diff --git a/src/components/game/SlotSelect.jsx b/src/components/game/SlotSelect.jsx
+index 6c5c3a6..63c34b5 100644
+--- a/src/components/game/SlotSelect.jsx
++++ b/src/components/game/SlotSelect.jsx
+@@ -5,6 +5,8 @@ import LangSwitch from '@/game/i18n/LangSwitch';
+ import { CULTIVATION_STAGES } from '@/game/data/cultivation';
+ import { zoneAt } from '@/game/data/world';
+ import MemorialPanel from './MemorialPanel';
++import { validDeathRecord } from '@/game/state/saveIdentity';
++import { useAuth } from '@/lib/AuthContext';
+ 
+ const TONE = {
+   easy: 'text-emerald-300 border-emerald-700/50 bg-emerald-900/20',
+@@ -20,7 +22,8 @@ const fmtPlay = (sec) => {
+ };
+ 
+ export default function SlotSelect() {
+-  const { loadSlotRaw, startSlot, beginCreate, deleteSlot } = useGame();
++  const { loadSlotRaw, startSlot, beginCreate, deleteSlot, cloudStatus, cloudError } = useGame();
++  const { user, logout } = useAuth();
+   const { t } = useT();
+   const [, setVersion] = useState(0);
+   const [confirmDel, setConfirmDel] = useState(null);
+@@ -37,6 +40,14 @@ export default function SlotSelect() {
+           <h1 className="text-xl font-semibold text-emerald-200 tracking-wide">{t('title.game')}</h1>
+           <p className="text-[11px] text-stone-400 mt-1">{t('title.subtitle')}</p>
+           <div className="mt-3 flex justify-center"><LangSwitch /></div>
++          <div className="mt-3 flex items-center justify-center gap-3 text-[10px] text-stone-400">
++            <span>{user?.email || 'Signed in'}</span>
++            <span className={cloudStatus === 'synced' ? 'text-emerald-400' : cloudStatus === 'saving' ? 'text-amber-300' : 'text-rose-300'}>
++              {cloudStatus === 'synced' ? '☁ Cloud saved' : cloudStatus === 'saving' ? '☁ Saving…' : '☁ Local backup active'}
++            </span>
++            <button onClick={() => logout(true)} className="text-stone-300 hover:text-white underline">Log out</button>
++          </div>
++          {cloudError && <p className="mt-2 text-[10px] text-rose-300">Cloud sync problem: {cloudError}</p>}
+         </div>
+ 
+         <div className="space-y-3">
+@@ -47,7 +58,7 @@ export default function SlotSelect() {
+             const stage = s ? CULTIVATION_STAGES[Math.min(19, (s.player?.rank || 0) * 4 + (s.player?.stage || 0))] : null;
+             const zone = s ? (zoneAt(s.player?.x, s.player?.y) || {}).name : null;
+             const day = (s?.time || {}).day;
+-            const deceased = !!s?.deceased;
++            const deceased = validDeathRecord(s);
+ 
+             return (
+               <div key={i} className={`rounded-xl border p-4 ${s ? (deceased ? 'border-rose-900/60 bg-black/30' : 'border-stone-800 bg-black/20') : 'border-dashed border-stone-800'}`}>
+@@ -107,4 +118,4 @@ export default function SlotSelect() {
+       )}
+     </div>
+   );
+-}
+\ No newline at end of file
++}
+diff --git a/src/components/game/WorldView.jsx b/src/components/game/WorldView.jsx
+index ef6a3e3..2495104 100644
+--- a/src/components/game/WorldView.jsx
++++ b/src/components/game/WorldView.jsx
+@@ -24,7 +24,7 @@ const DANGER_CHIP = {
+ // The world is the app's background layer, rendered as pixel art on a canvas.
+ // Camera follows the player smoothly; movement supports diagonals and animates
+ // between cells instead of jumping. All game logic stays in the reducer.
+-export default function WorldView({ paused, inputLocked, moveLocked }) {
++export default function WorldView({ paused = false, inputLocked = false, moveLocked = false }) {
+   const { state, dispatch } = useGame();
+   const canvasRef = useRef(null);
+   const camRef = useRef(null);
+@@ -36,7 +36,7 @@ export default function WorldView({ paused, inputLocked, moveLocked }) {
+ 
+   const stateRef = useRef(state);
+   stateRef.current = state;
+-  const propsRef = useRef({});
++  const propsRef = useRef(/** @type {any} */ ({}));
+   propsRef.current = { paused, inputLocked, moveLocked };
+   const dispatchRef = useRef(dispatch);
+   dispatchRef.current = dispatch;
+@@ -195,7 +195,7 @@ export default function WorldView({ paused, inputLocked, moveLocked }) {
+       } else {
+         step.acc = 0;
+       }
+-      if (moveDbgOn) window.__guMoveDebug = { ...moveDebugOf(s, dx, dy), dtMs, acc: step.acc };
++      if (moveDbgOn) /** @type {any} */ (window).__guMoveDebug = { ...moveDebugOf(s, dx, dy), dtMs, acc: step.acc };
+ 
+       // animate the player between cells (no grid snapping)
+       const p2 = s.player;
+@@ -307,4 +307,4 @@ export default function WorldView({ paused, inputLocked, moveLocked }) {
+       </div>
+     </div>
+   );
+-}
+\ No newline at end of file
++}
+diff --git a/src/components/game/battle/BattleCommandMenu.jsx b/src/components/game/battle/BattleCommandMenu.jsx
+index 40685d9..0a8975b 100644
+--- a/src/components/game/battle/BattleCommandMenu.jsx
++++ b/src/components/game/battle/BattleCommandMenu.jsx
+@@ -2,11 +2,11 @@ import React, { useState } from 'react';
+ import { useT } from '@/game/i18n/LangContext';
+ import { sfx } from '@/game/audio/sfx';
+ import { GU_BY_ID, isKillerMove } from '@/game/data/gu';
+-import { ITEM_BY_ID, ITEMS } from '@/game/data/items';
++import { ITEMS } from '@/game/data/items';
+ import { PATH_BY_ID } from '@/game/data/paths';
+ import { ROLES, rolesOf } from '@/game/data/roles';
+ import { effectiveCost, activationChanceOf, strikeRange, guAttackRange } from '@/game/engine/combat';
+-import { kmMissing, kmName, kmBoundOf } from '@/game/engine/killerMoves';
++import { kmMissing, kmName } from '@/game/engine/killerMoves';
+ import { targetKindOf, targetLabelKey, targetSummary } from '@/game/engine/targeting';
+ 
+ // Short localized summary of what a Gu does in battle.
+@@ -248,4 +248,4 @@ export default function BattleCommandMenu({ state, combat, busy, onGu, onKm, onI
+       )}
+     </div>
+   );
+-}
+\ No newline at end of file
++}
+diff --git a/src/components/game/dashboard/SheetSyncPanel.jsx b/src/components/game/dashboard/SheetSyncPanel.jsx
+index a82a6f5..a5a2dd1 100644
+--- a/src/components/game/dashboard/SheetSyncPanel.jsx
++++ b/src/components/game/dashboard/SheetSyncPanel.jsx
+@@ -111,7 +111,7 @@ export default function SheetSyncPanel({ snapshot }) {
+       </p>
+ 
+       {authed === false ? (
+-        <button onClick={() => base44.auth.redirectToLogin()}
++        <button onClick={() => base44.auth.redirectToLogin(window.location.href)}
+           className="mt-3 px-4 py-2 rounded-lg bg-sky-700 hover:bg-sky-600 text-white text-sm">
+           Sign in to sync milestones
+         </button>
+@@ -153,4 +153,4 @@ export default function SheetSyncPanel({ snapshot }) {
+       )}
+     </section>
+   );
+-}
+\ No newline at end of file
++}
+diff --git a/src/components/game/hud/MoveDebugPanel.jsx b/src/components/game/hud/MoveDebugPanel.jsx
+index 01e2561..7688d13 100644
+--- a/src/components/game/hud/MoveDebugPanel.jsx
++++ b/src/components/game/hud/MoveDebugPanel.jsx
+@@ -7,7 +7,7 @@ export default function MoveDebugPanel({ on }) {
+   const [dbg, setDbg] = useState(null);
+   useEffect(() => {
+     if (!on) return undefined;
+-    const iv = setInterval(() => setDbg(window.__guMoveDebug || null), 250);
++    const iv = setInterval(() => setDbg(/** @type {any} */ (window).__guMoveDebug || null), 250);
+     return () => clearInterval(iv);
+   }, [on]);
+   if (!on || !dbg) return null;
+@@ -33,4 +33,4 @@ export default function MoveDebugPanel({ on }) {
+       {row('dt', `${Math.round(dbg.dtMs)} ms`)}
+     </div>
+   );
+-}
+\ No newline at end of file
++}
+diff --git a/src/components/game/hud/PauseMenu.jsx b/src/components/game/hud/PauseMenu.jsx
+index fa93bae..7570fee 100644
+--- a/src/components/game/hud/PauseMenu.jsx
++++ b/src/components/game/hud/PauseMenu.jsx
+@@ -3,7 +3,7 @@ import { useGame } from '@/game/state/GameContext';
+ import { useT } from '@/game/i18n/LangContext';
+ import LangSwitch from '@/game/i18n/LangSwitch';
+ 
+-function Entry({ onClick, children, primary, danger }) {
++function Entry({ onClick, children, primary = false, danger = false }) {
+   return (
+     <button
+       onClick={onClick}
+@@ -54,4 +54,4 @@ export default function PauseMenu({ open, onClose, onOpenPanel }) {
+       </div>
+     </div>
+   );
+-}
+\ No newline at end of file
++}
+diff --git a/src/components/ui/button.jsx b/src/components/ui/button.jsx
+index 7383248..a6961a8 100644
+--- a/src/components/ui/button.jsx
++++ b/src/components/ui/button.jsx
+@@ -34,7 +34,7 @@ const buttonVariants = cva(
+   }
+ )
+ 
+-const Button = React.forwardRef(({ className, variant, size, asChild = false, ...props }, ref) => {
++const Button = React.forwardRef(/** @type {React.ForwardRefRenderFunction<any, any>} */ (({ className, variant, size, asChild = false, ...props }, ref) => {
+   const Comp = asChild ? Slot : "button"
+   return (
+     (<Comp
+@@ -42,7 +42,7 @@ const Button = React.forwardRef(({ className, variant, size, asChild = false, ..
+       ref={ref}
+       {...props} />)
+   );
+-})
++}))
+ Button.displayName = "Button"
+ 
+ export { Button, buttonVariants }
+diff --git a/src/components/ui/input-otp.jsx b/src/components/ui/input-otp.jsx
+index 5383227..9aba027 100644
+--- a/src/components/ui/input-otp.jsx
++++ b/src/components/ui/input-otp.jsx
+@@ -4,21 +4,21 @@ import { Minus } from "lucide-react"
+ 
+ import { cn } from "@/lib/utils"
+ 
+-const InputOTP = React.forwardRef(({ className, containerClassName, ...props }, ref) => (
++const InputOTP = React.forwardRef(/** @type {React.ForwardRefRenderFunction<any, any>} */ (({ className, containerClassName, ...props }, ref) => (
+   <OTPInput
+     ref={ref}
+     containerClassName={cn("flex items-center gap-2 has-[:disabled]:opacity-50", containerClassName)}
+     className={cn("disabled:cursor-not-allowed", className)}
+     {...props} />
+-))
++)))
+ InputOTP.displayName = "InputOTP"
+ 
+-const InputOTPGroup = React.forwardRef(({ className, ...props }, ref) => (
++const InputOTPGroup = React.forwardRef(/** @type {React.ForwardRefRenderFunction<any, any>} */ (({ className, ...props }, ref) => (
+   <div ref={ref} className={cn("flex items-center", className)} {...props} />
+-))
++)))
+ InputOTPGroup.displayName = "InputOTPGroup"
+ 
+-const InputOTPSlot = React.forwardRef(({ index, className, ...props }, ref) => {
++const InputOTPSlot = React.forwardRef(/** @type {React.ForwardRefRenderFunction<any, any>} */ (({ index, className, ...props }, ref) => {
+   const inputOTPContext = React.useContext(OTPInputContext)
+   const { char, hasFakeCaret, isActive } = inputOTPContext.slots[index]
+ 
+@@ -40,14 +40,14 @@ const InputOTPSlot = React.forwardRef(({ index, className, ...props }, ref) => {
+       )}
+     </div>)
+   );
+-})
++}))
+ InputOTPSlot.displayName = "InputOTPSlot"
+ 
+-const InputOTPSeparator = React.forwardRef(({ ...props }, ref) => (
++const InputOTPSeparator = React.forwardRef(/** @type {React.ForwardRefRenderFunction<any, any>} */ (({ ...props }, ref) => (
+   <div ref={ref} role="separator" {...props}>
+     <Minus />
+   </div>
+-))
++)))
+ InputOTPSeparator.displayName = "InputOTPSeparator"
+ 
+ export { InputOTP, InputOTPGroup, InputOTPSlot, InputOTPSeparator }
+diff --git a/src/components/ui/input.jsx b/src/components/ui/input.jsx
+index 41ec05e..c991530 100644
+--- a/src/components/ui/input.jsx
++++ b/src/components/ui/input.jsx
+@@ -2,7 +2,7 @@ import * as React from "react"
+ 
+ import { cn } from "@/lib/utils"
+ 
+-const Input = React.forwardRef(({ className, type, ...props }, ref) => {
++const Input = React.forwardRef(/** @type {React.ForwardRefRenderFunction<any, any>} */ (({ className, type, ...props }, ref) => {
+   return (
+     (<input
+       type={type}
+@@ -13,7 +13,7 @@ const Input = React.forwardRef(({ className, type, ...props }, ref) => {
+       ref={ref}
+       {...props} />)
+   );
+-})
++}))
+ Input.displayName = "Input"
+ 
+ export { Input }
+diff --git a/src/components/ui/label.jsx b/src/components/ui/label.jsx
+index a1f4099..a5df5a9 100644
+--- a/src/components/ui/label.jsx
++++ b/src/components/ui/label.jsx
+@@ -8,9 +8,9 @@ const labelVariants = cva(
+   "text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+ )
+ 
+-const Label = React.forwardRef(({ className, ...props }, ref) => (
++const Label = React.forwardRef(/** @type {React.ForwardRefRenderFunction<any, any>} */ (({ className, ...props }, ref) => (
+   <LabelPrimitive.Root ref={ref} className={cn(labelVariants(), className)} {...props} />
+-))
++)))
+ Label.displayName = LabelPrimitive.Root.displayName
+ 
+ export { Label }
+diff --git a/src/game/audio/sfx.js b/src/game/audio/sfx.js
+index 9019155..76f5ec0 100644
+--- a/src/game/audio/sfx.js
++++ b/src/game/audio/sfx.js
+@@ -6,7 +6,7 @@ let muted = (() => { try { return localStorage.getItem('gu_sound_off') === '1';
+ 
+ function ensure() {
+   if (!ctxA) {
+-    const AC = window.AudioContext || window.webkitAudioContext;
++    const AC = window.AudioContext || /** @type {any} */ (window).webkitAudioContext;
+     if (!AC) return null;
+     ctxA = new AC();
+     master = ctxA.createGain();
+@@ -110,4 +110,4 @@ export function audioNodes() {
+ // first user gesture resumes the audio context (autoplay policies)
+ export function primeAudio() {
+   ensure();
+-}
+\ No newline at end of file
++}
+diff --git a/src/game/data/appearance.js b/src/game/data/appearance.js
+index 3068f84..1eb99fa 100644
+--- a/src/game/data/appearance.js
++++ b/src/game/data/appearance.js
+@@ -42,6 +42,7 @@ export const ACCESSORIES = [
+ ];
+ 
+ export const DEFAULT_APPEARANCE = {
++  preset: null,
+   body: 'male', hair: 'short', hairColor: '#141414', skin: '#e8b88a', eyes: '#3a2a18',
+   outfit: 'robe', outfitPrimary: '#2f7a52', outfitSecondary: '#c9a45a', accessory: 'none',
+ };
+@@ -78,4 +79,4 @@ export const PRESETS = [
+ export function appearanceOf(playerOrApp) {
+   const app = playerOrApp?.appearance || playerOrApp || {};
+   return { ...DEFAULT_APPEARANCE, ...app };
+-}
+\ No newline at end of file
++}
+diff --git a/src/game/data/items.js b/src/game/data/items.js
+index a353235..e23f6a3 100644
+--- a/src/game/data/items.js
++++ b/src/game/data/items.js
+@@ -82,7 +82,7 @@ export function foodValueOf(it) {
+     + (v.rarity[it.rarity] || 0);
+   return Math.max(1, Math.round(raw * (v.roleAdj[it.role] || 1)));
+ }
+-for (const it of ITEMS) if (it.category === 'food' && !('value' in it)) it.value = foodValueOf(it);
++for (const it of /** @type {any[]} */ (ITEMS)) if (it.category === 'food' && !('value' in it)) it.value = foodValueOf(it);
+ 
+ export const ITEM_BY_ID = Object.fromEntries(ITEMS.map(i => [i.id, i]));
+-export const ITEM_CATEGORIES = ['materials', 'medicine', 'food', 'guFood', 'guGear', 'questItems'];
+\ No newline at end of file
++export const ITEM_CATEGORIES = ['materials', 'medicine', 'food', 'guFood', 'guGear', 'questItems'];
+diff --git a/src/game/data/npcs.js b/src/game/data/npcs.js
+index 62b65b9..0d85e2f 100644
+--- a/src/game/data/npcs.js
++++ b/src/game/data/npcs.js
+@@ -186,7 +186,7 @@ const MASTER_SHOPS = {
+ 
+ // Hidden masters join the roster (worldRenderer draws their aura + "???" tag).
+ for (const m of MASTERS) {
+-  NPCS.push({
++  /** @type {any[]} */ (NPCS).push({
+     id: m.id, name: m.name, role: m.role, mentor: true, hidden: m.hidden,
+     greeting: m.greeting, look: m.look, hours: m.hours, master: true,
+     shop: MASTER_SHOPS[m.id] || undefined,
+@@ -209,4 +209,4 @@ export function guOfferOf(npc, state) {
+   if (!npc?.shop?.guPool?.length) return null;
+   const day = state?.time?.day || 1;
+   return npc.shop.guPool[day % npc.shop.guPool.length];
+-}
+\ No newline at end of file
++}
+diff --git a/src/game/engine/combat.js b/src/game/engine/combat.js
+index 41b3f56..467f154 100644
+--- a/src/game/engine/combat.js
++++ b/src/game/engine/combat.js
+@@ -32,6 +32,7 @@ import { ENEMY_BY_ID } from '../data/enemies';
+ import { ITEM_BY_ID } from '../data/items';
+ import { PATH_BY_ID, SYNERGIES } from '../data/paths';
+ import { applyEffects, applyFoodBuff } from './effects';
++import { mutateEssence, ESSENCE_REASON } from './essence';
+ import { grantMastery, bonusOf } from './mastery';
+ import { BALANCE, DIFFICULTIES } from '../config/balance';
+ import { applyDeath } from './death';
+@@ -233,7 +234,7 @@ export function initCombat(enemyId, player, opts = {}) {
+   // pack leader buff (#11): while the leader lives, its packmates fight harder
+   const leader = enemies.find(e => e.packRole === 'leader' || ENEMY_BY_ID[e.defId]?.packLeader);
+   if (leader) {
+-    const lb = ENEMY_BY_ID[leader.defId].leaderBuff || {};
++    const lb = /** @type {any} */ (ENEMY_BY_ID[leader.defId].leaderBuff || {});
+     for (const e of enemies) {
+       if (e === leader || !e.packId || e.packId !== leader.packId) continue;
+       if (lb.dmgPct) e.attack = Math.max(1, Math.round(e.attack * (1 + lb.dmgPct / 100)));
+@@ -492,7 +493,7 @@ function applyGu(gu, player, enemy, pSt, eSt, combat, push, fx, syn, weather, mu
+     if (selfFx && e.essenceRecovery && Math.random() * 100 < e.essenceRecovery.chance) {
+       const er = e.essenceRecovery;
+       const amt = er.min + Math.floor(Math.random() * (er.max - er.min + 1));
+-      player.primevalEssence = Math.min(player.maxPrimevalEssence, player.primevalEssence + amt);
++      mutateEssence(player, { delta: amt, reason: ESSENCE_REASON.GU_EFFECT, source: 'water-flow' });
+       push(T('cmt.essenceFlow', { n: amt }));
+     }
+     // Killer fire feasts on burning foes — consuming the Burn for a burst
+@@ -577,7 +578,7 @@ function applyGu(gu, player, enemy, pSt, eSt, combat, push, fx, syn, weather, mu
+     push(T('cmt.barrier', { gu: locGuName(gu), p: power }));
+   }
+   if (selfFx && e.heal) { const h = Math.max(1, Math.floor(e.heal.power * mul * (1 + (fx.healPct || 0) / 100))); player.hp = Math.min(player.maxHp, player.hp + h); push(T('cmt.heal', { gu: locGuName(gu), n: h })); }
+-  if (selfFx && e.essence) { const r = Math.max(1, Math.round(e.essence.power * mul)); player.primevalEssence = Math.min(player.maxPrimevalEssence, player.primevalEssence + r); push(T('cmt.essence', { gu: locGuName(gu), n: r })); }
++  if (selfFx && e.essence) { const r = Math.max(1, Math.round(e.essence.power * mul)); mutateEssence(player, { delta: r, reason: ESSENCE_REASON.GU_EFFECT, source: gu.id }); push(T('cmt.essence', { gu: locGuName(gu), n: r })); }
+   if (e.control) {
+     if (enemy.immune?.includes('control')) push(T('cmt.controlImmune', { enemy: dispOf(enemy) }));
+     else { eSt.push({ type: 'control', power: Math.max(1, Math.floor(e.control.power * mul * (1 + (fx.controlPct || 0) / 100))), duration: e.control.duration }); push(T('cmt.controlBound', { gu: locGuName(gu), enemy: dispOf(enemy) })); meaningful = true; }
+@@ -965,7 +966,7 @@ function executeRoundInner(state, action, hpBefore) {
+     if (!it || !it.use || !it.combatUsable) return state;
+     if ((state.inventory[it.category]?.[action.itemId] || 0) <= 0) return state;
+     if (it.use.hp) player.hp = Math.min(player.maxHp, player.hp + it.use.hp);
+-    if (it.use.essence) player.primevalEssence = Math.min(player.maxPrimevalEssence, player.primevalEssence + it.use.essence);
++    if (it.use.essence) mutateEssence(player, { delta: it.use.essence, reason: ESSENCE_REASON.ITEM, source: it.id });
+     if (it.use.cure && pSt.some(s => it.use.cure.includes(s.type))) {
+       pSt = pSt.filter(s => !it.use.cure.includes(s.type));
+       push(T('cmt.cured'));
+@@ -1015,14 +1016,14 @@ function executeRoundInner(state, action, hpBefore) {
+     combat.revealed = true;
+     combat.scouted = true;
+     const regen = Math.min(player.maxPrimevalEssence - player.primevalEssence, oc.essence);
+-    player.primevalEssence += regen;
++    mutateEssence(player, { delta: regen, reason: ESSENCE_REASON.COMBAT_TECHNIQUE, source: 'observe' });
+     pSt.push({ type: 'focus', power: oc.focusPct, duration: 3 });
+     push(T('cmt.observe', { enemy: dispOf(target), n: regen, p: oc.focusPct }));
+   } else if (action.type === 'defend') {
+     const dc = cfg.defend;
+     pSt.push({ type: 'guard', power: dc.dmgRedPct, duration: 1 });
+     const regen = Math.ceil(player.maxPrimevalEssence * dc.essenceRegenPct / 100);
+-    player.primevalEssence = Math.min(player.maxPrimevalEssence, player.primevalEssence + regen);
++    mutateEssence(player, { delta: regen, reason: ESSENCE_REASON.COMBAT_TECHNIQUE, source: 'defend' });
+     push(T('cmt.defend', { pct: dc.dmgRedPct, n: regen }));
+   } else if (action.type === 'gu') {
+     const inst = state.ownedGu.find(g => g.instanceId === action.guInstanceId);
+@@ -1033,7 +1034,7 @@ function executeRoundInner(state, action, hpBefore) {
+     const cost = effectiveCost(gu, state, inst);
+     if (player.primevalEssence < cost) { push(T('cmt.noEssence')); return { ...state, combat: { ...combat, log } }; }
+     if ((cooldowns[inst.instanceId] || 0) > 0) { push(T('cmt.cd', { gu: locGuName(gu) })); return { ...state, combat: { ...combat, log } }; }
+-    player.primevalEssence -= cost;
++    mutateEssence(player, { delta: -cost, reason: ESSENCE_REASON.GU_COST, source: gu.id });
+     cooldowns[inst.instanceId] = gu.cooldown;
+     actAdvancePct = gu.effect.advance?.pct || 0;
+     actSelfDelayPct = gu.effect.selfDelay?.pct || 0;
+@@ -1108,7 +1109,7 @@ function executeRoundInner(state, action, hpBefore) {
+     const cdKey = kmCdKey(move);
+     if ((cooldowns[cdKey] || 0) > 0) { push(T('cmt.cd', { gu: entry.gu.name })); return { ...state, combat: { ...combat, log } }; }
+     if (player.primevalEssence < entry.gu.energyCost) { push(T('cmt.noEssence')); return { ...state, combat: { ...combat, log } }; }
+-    player.primevalEssence -= entry.gu.energyCost;
++    mutateEssence(player, { delta: -entry.gu.energyCost, reason: ESSENCE_REASON.KILLER_MOVE_COST, source: move.id });
+     cooldowns[cdKey] = entry.gu.cooldown;
+     if (Math.random() * 100 > kmActivationOf(combat, entry)) {
+       push(T('cmt.killerFail', { gu: entry.gu.name }));
+@@ -1242,4 +1243,4 @@ function executeRoundInner(state, action, hpBefore) {
+   let s = { ...state, combat: { ...combat, enemy: combat.enemy, playerStatuses: pSt, cooldowns, log, revealed: combat.revealed }, player };
+   s = applyPendingMastery(s, pending);
+   return s;
+-}
+\ No newline at end of file
++}
+diff --git a/src/game/engine/death.js b/src/game/engine/death.js
+index 9a4b61c..b73fbba 100644
+--- a/src/game/engine/death.js
++++ b/src/game/engine/death.js
+@@ -6,6 +6,7 @@ import { diffOf } from '../config/balance';
+ import { INNS, CAMP_CELLS, zoneAt, isWalkable } from '../data/world';
+ import { CULTIVATION_STAGES } from '../data/cultivation';
+ import { T, locStageName, locZoneName } from '../i18n/tr';
++import { changeEssence, ESSENCE_REASON } from './essence';
+ 
+ const cheb = (a, b) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
+ 
+@@ -61,17 +62,28 @@ export function applyDeath(state, combat, player, cause) {
+   const mem = memorialOf(state);
+ 
+   if (d.permadeath) {
++    const deathTimestamp = Date.now();
+     return {
+       ...state,
++      status: 'DECEASED',
+       player,
+       combat: { ...combat, over: true, result: 'defeat' },
+-      deceased: { cause, at: mem },
++      deceased: {
++        characterId: state.characterId,
++        deathCause: cause,
++        deathLocation: mem.place,
++        deathTimestamp,
++        memorialStats: mem,
++        // Backward-compatible names used by the existing memorial UI.
++        cause,
++        at: mem,
++      },
+       log: [...state.log, T('dth.permadeath', { name: player.name, day, place: mem.place })],
+     };
+   }
+ 
+   const at = { x: player.x, y: player.y };
+-  const spot = d.respawn === 'nearestInn' ? nearestInn(state, at) : randomSpawn(state, at);
++  const spot = /** @type {any} */ (d.respawn === 'nearestInn' ? nearestInn(state, at) : randomSpawn(state, at));
+   const spotZone = zoneAt(spot.x, spot.y);
+   const placeName = spot.name || (spotZone ? locZoneName(spotZone) : T('dth.wilds'));
+ 
+@@ -80,7 +92,10 @@ export function applyDeath(state, combat, player, cause) {
+   p.y = spot.spawn ? spot.spawn[1] : spot.y;
+   p.currentArea = 'greenValleyRegion';
+   p.hp = Math.max(1, Math.floor(p.maxHp * (d.respawn === 'nearestInn' ? 0.6 : 0.3)));
+-  p.primevalEssence = Math.min(player.primevalEssence, Math.floor(player.maxPrimevalEssence * 0.2));
++  Object.assign(p, changeEssence(p, {
++    setTo: Math.min(player.primevalEssence, Math.floor(player.maxPrimevalEssence * 0.2)),
++    reason: ESSENCE_REASON.DEATH_PENALTY,
++  }));
+   p.cultivationProgress = Math.max(0, Math.floor((p.cultivationProgress || 0) * (1 - (d.progressLoss || 0))));
+   p.spiritStones = Math.floor(p.spiritStones * (1 - (d.stonesLoss || 0)));
+ 
+@@ -113,4 +128,4 @@ export function applyDeath(state, combat, player, cause) {
+     combat: { ...combat, over: true, result: 'defeat' },
+     log: [...state.log, T('dth.wake', { place: placeName, summary })],
+   };
+-}
+\ No newline at end of file
++}
+diff --git a/src/game/engine/effects.js b/src/game/engine/effects.js
+index a40b8d0..daf5805 100644
+--- a/src/game/engine/effects.js
++++ b/src/game/engine/effects.js
+@@ -4,6 +4,7 @@ import { RECIPES } from '../data/recipes';
+ import { learnRecipe, discoverPath, learnClue } from './mastery';
+ import { diffOf } from '../config/balance';
+ import { T, locGuName } from '../i18n/tr';
++import { changeEssence, ESSENCE_REASON } from './essence';
+ 
+ let _idc = 0;
+ const newInstanceId = () => 'g' + Date.now().toString(36) + (_idc++).toString(36);
+@@ -42,7 +43,11 @@ export function applyEffects(state, effects) {
+   };
+ 
+   if (effects.hp) player.hp = Math.min(player.maxHp, Math.max(0, player.hp + effects.hp));
+-  if (effects.essence) player.primevalEssence = Math.min(player.maxPrimevalEssence, Math.max(0, player.primevalEssence + effects.essence));
++  if (effects.essence) player = changeEssence(player, {
++    delta: effects.essence,
++    reason: effects.essenceReason || ESSENCE_REASON.EFFECT,
++    source: effects.essenceSource,
++  });
+   if (effects.insight) {
+     // Realm Insight — earned out in the world, scaled by difficulty. Gaining
+     // it is meaningful activity, so cultivation diminishing returns reset.
+@@ -94,4 +99,4 @@ export function applyEffects(state, effects) {
+   return next;
+ }
+ 
+-export { newInstanceId };
+\ No newline at end of file
++export { newInstanceId };
+diff --git a/src/game/engine/exploration.js b/src/game/engine/exploration.js
+index 8819f9f..5a3730c 100644
+--- a/src/game/engine/exploration.js
++++ b/src/game/engine/exploration.js
+@@ -13,6 +13,7 @@ import { proficiencyOf, recordUse } from './proficiency';
+ import { revealFog } from './guLife';
+ import { WORLD_RESOURCES, WORLD, HIDDEN_PATHS, HAZARDS, hazardAt, LANDMARKS } from '../data/world';
+ import { T, locGuName, locEnemyName, locHiddenPathName, locHazardName, locLandmarkName, locPathName } from '../i18n/tr';
++import { changeEssence, ESSENCE_REASON } from './essence';
+ 
+ const cheb = (ax, ay, bx, by) => Math.max(Math.abs(ax - bx), Math.abs(ay - by));
+ 
+@@ -177,7 +178,7 @@ export function applyExploreGu(state, inst) {
+     return {
+       state: {
+         ...rec.state,
+-        player: { ...rec.state.player, primevalEssence: rec.state.player.primevalEssence - ex.essence },
++        player: changeEssence(rec.state.player, { delta: -ex.essence, reason: ESSENCE_REASON.EXPLORATION_COST, source: gu.id }),
+         exploreFx: { ...(rec.state.exploreFx || {}), ...fxPatch },
+         exploreCd: { ...(rec.state.exploreCd || {}), [inst.instanceId]: now + ex.cooldown },
+       },
+@@ -315,4 +316,4 @@ export function ambushOf(state, e, initiatedByPlayer) {
+     return { amb: 'enemy' };
+   }
+   return { amb: null };
+-}
+\ No newline at end of file
++}
+diff --git a/src/game/engine/killerMoves.js b/src/game/engine/killerMoves.js
+index 405f267..1cc4d2d 100644
+--- a/src/game/engine/killerMoves.js
++++ b/src/game/engine/killerMoves.js
+@@ -18,6 +18,7 @@ import { BALANCE } from '../config/balance';
+ import { masteryOf, grantMastery } from './mastery';
+ import { guCondition } from './guLife';
+ import { applyEffects } from './effects';
++import { ESSENCE_REASON } from './essence';
+ import { totalGameMin } from './vitalGu';
+ import { advanceTime } from './time';
+ import { T, locGuName, locPathName } from '../i18n/tr';
+@@ -328,7 +329,12 @@ export function researchKillerMove(state, coreId, supportIds, blueprintId, minig
+   if (p.spiritStones < pv.researchCost.stones) return { state, reason: T('km.errStones', { n: pv.researchCost.stones }) };
+ 
+   // pay the research cost
+-  s = applyEffects(s, { essence: -pv.researchCost.essence, spiritStones: -pv.researchCost.stones });
++  s = applyEffects(s, {
++    essence: -pv.researchCost.essence,
++    essenceReason: ESSENCE_REASON.KILLER_MOVE_COST,
++    essenceSource: 'research',
++    spiritStones: -pv.researchCost.stones,
++  });
+   const day = s.time?.day || 1;
+   const allIds = [coreId, ...supports.map(i => i.instanceId)];
+ 
+@@ -525,4 +531,4 @@ export const kmPseudoGu = (move) => ({
+   energyCost: move.essence || 0,
+   cooldown: move.cooldown || 2,
+   effect: move.synth || { attack: { power: 1, range: move.damage || [1, 1] } },
+-});
+\ No newline at end of file
++});
+diff --git a/src/game/gfx/characterSprites.js b/src/game/gfx/characterSprites.js
+index 74c910f..7e8275d 100644
+--- a/src/game/gfx/characterSprites.js
++++ b/src/game/gfx/characterSprites.js
+@@ -212,7 +212,7 @@ const NPC_ACC = ['none', 'scarf', 'belt', 'shoulderCloth', 'headband'];
+ 
+ export function npcAppearance(id) {
+   const pick = (arr, salt) => arr[Math.floor(hashStr(`${id}:${salt}`) * arr.length) % arr.length];
+-  const look = NPC_BY_ID[id]?.look || {}; // role-specific looks override the picks
++  const look = /** @type {any} */ (NPC_BY_ID[id]?.look || {}); // role-specific looks override the picks
+   return {
+     body: look.body || pick(['male', 'female'], 'b'),
+     hair: look.hair || pick(NPC_HAIR, 'h'),
+@@ -229,4 +229,4 @@ export function npcAppearance(id) {
+ // Old saves: fall back to the default cultivator look.
+ export function sheetFor(player) {
+   return getCharacterSheet({ ...DEFAULT_APPEARANCE, ...(player?.appearance || {}) });
+-}
+\ No newline at end of file
++}
+diff --git a/src/game/i18n/extra.js b/src/game/i18n/extra.js
+index c4f1b6a..d5e5cb7 100644
+--- a/src/game/i18n/extra.js
++++ b/src/game/i18n/extra.js
+@@ -132,11 +132,6 @@ export const DICT_EXTRA = {
+     'battle.tabUtility': 'UTILITY',
+     'battle.strikeHint': 'Free attack — costs no essence, chips the enemy guard.',
+ 
+-    // ---- secluded cultivation ----
+-    'seclude.button': '🏯 Secluded Cultivation',
+-    'seclude.hint': 'Seal yourself away: cultivation sessions with overnight essence recovery until your aperture is ready to break through. Requires a settlement; in-game days pass.',
+-    'seclude.needTown': 'Secluded cultivation requires the safety of a settlement.',
+-
+     // ---- enemy intent ----
+     // ---- realm insight & cultivation rebalance ----
+     'cult.insight': 'Realm Insight',
+@@ -296,11 +291,6 @@ export const DICT_EXTRA = {
+     'battle.tabUtility': 'TIỆN ÍCH',
+     'battle.strikeHint': 'Đòn đánh miễn phí — không tốn chân nguyên, phá hộ địch.',
+ 
+-    // ---- bế quan tu luyện ----
+-    'seclude.button': '🏯 Bế Quan Tu Luyện',
+-    'seclude.hint': 'Bế quan: liên tục tu luyện, hồi phục chân nguyên qua đêm cho đến khi khiếu đầy sẵn sàng đột phá. Cần nơi an toàn; ngày trong game trôi qua.',
+-    'seclude.needTown': 'Bế quan cần sự an toàn của trấn/xã.',
+-
+     // ---- ý định của địch ----
+     // ---- cảm ngộ & cân bằng tu luyện ----
+     'cult.insight': 'Cảm Ngộ',
+@@ -331,4 +321,4 @@ export const DICT_EXTRA = {
+     'intent.venom': 'nọc',
+     'intent.terrain': 'Địa Hình',
+   },
+-};
+\ No newline at end of file
++};
+diff --git a/src/game/i18n/log.js b/src/game/i18n/log.js
+index a2b40c2..702ddd6 100644
+--- a/src/game/i18n/log.js
++++ b/src/game/i18n/log.js
+@@ -27,7 +27,6 @@ export const DICT_LOG = {
+     'toast.objUpdated': 'OBJECTIVE UPDATED', 'toast.objComplete': 'OBJECTIVES COMPLETE',
+     'toast.questComplete': 'QUEST COMPLETE', 'toast.questAccepted': 'QUEST ACCEPTED',
+     'toast.breakthroughReady': 'BREAKTHROUGH READY',
+-    'toast.seclude': 'SECLUDED CULTIVATION COMPLETE',
+     'toast.guRefined': 'GU REFINED', 'toast.vitalWeakened': 'VITAL GU WEAKENED',
+     'toast.guDestroyed': 'GU DESTROYED', 'toast.guInjured': 'GU INJURED',
+     'toast.wildCaptured': 'WILD GU CAPTURED', 'toast.vital': 'VITAL GU — CỔ BẢN MỆNH',
+@@ -163,12 +162,6 @@ export const DICT_LOG = {
+     'cult.cultivatedTerrace': 'You cultivate. (+{gain}% progress · terrace bonus)',
+     'cult.breakthroughReady1': 'Your aperture brims with essence — a new stage awaits.',
+     'cult.breakthroughReady2': 'Open Cultivation (C) to break through.',
+-    'cult.secludeFull': 'Your aperture already brims with essence — break through first.',
+-    'cult.secludeNeedTown': 'Seclusion requires the safety of a settlement — wilds would tear your meditation apart.',
+-    'cult.secluded': 'You emerge from seclusion: {sessions} cultivation sessions across {nights} night(s){terrace}. Progress: {progress}%. At the terrace.',
+-    'cult.secludedPlain': 'You emerge from seclusion: {sessions} cultivation sessions across {nights} night(s). Progress: {progress}%.',
+-    'cult.secludeToast1': '{sessions} sessions · {nights} night(s) of seclusion.',
+-    'cult.secludeToast2': 'Your aperture brims — a breakthrough awaits.',
+     'cult.notReady': 'You are not ready to break through.',
+     'cult.majorOk': 'MAJOR BREAKTHROUGH! You ascend to {stage}!',
+     'cult.minorOk': 'Breakthrough — you steady yourself at {stage}.',
+@@ -433,7 +426,6 @@ export const DICT_LOG = {
+     'toast.objUpdated': 'MỤC TIÊU CẬP NHẬT', 'toast.objComplete': 'MỤC TIÊU HOÀN TẤT',
+     'toast.questComplete': 'NHIỆM VỤ HOÀN THÀNH', 'toast.questAccepted': 'ĐÃ NHẬN NHIỆM VỤ',
+     'toast.breakthroughReady': 'SẴN SÀNG ĐỘT PHÁ',
+-    'toast.seclude': 'BẾ QUAN HOÀN TẤT',
+     'toast.guRefined': 'CỔ TRÙNG ĐÃ LUYỆN', 'toast.vitalWeakened': 'CỔ BẢN MỆNH SUY YẾU',
+     'toast.guDestroyed': 'CỔ TRÙNG BỊ HỦY', 'toast.guInjured': 'CỔ TRÙNG BỊ THƯƠNG',
+     'toast.wildCaptured': 'ĐÃ THU PHỤ CỔ TRÙNG HOANG DÃ', 'toast.vital': 'CỔ BẢN MỆNH',
+@@ -569,12 +561,6 @@ export const DICT_LOG = {
+     'cult.cultivatedTerrace': 'Bạn tu luyện. (+{gain}% tiến độ · linh đài gia trì)',
+     'cult.breakthroughReady1': 'Không khiếu tràn đầy chân nguyên — một cảnh giới mới chờ đợi.',
+     'cult.breakthroughReady2': 'Mở Tu Luyện (C) để đột phá.',
+-    'cult.secludeFull': 'Không khiếu của bạn đã tràn đầy chân nguyên — hãy đột phá trước.',
+-    'cult.secludeNeedTown': 'Bế quan cần sự an toàn của trấn/xã — hoang dã sẽ xé nát nhập tĩnh của bạn.',
+-    'cult.secluded': 'Bạn ra khỏi bế quan: {sessions} buổi tu luyện trong {nights} đêm — tại linh đài. Tiến độ: {progress}%.',
+-    'cult.secludedPlain': 'Bạn ra khỏi bế quan: {sessions} buổi tu luyện trong {nights} đêm. Tiến độ: {progress}%.',
+-    'cult.secludeToast1': '{sessions} buổi · {nights} đêm bế quan.',
+-    'cult.secludeToast2': 'Không khiếu tràn đầy — đột phá đang chờ.',
+     'cult.notReady': 'Bạn chưa sẵn sàng đột phá.',
+     'cult.majorOk': 'ĐỘT PHÁ ĐẠI CẢNH! Bạn thăng lên {stage}!',
+     'cult.minorOk': 'Đột phá — bạn vững vàng tại {stage}.',
+@@ -815,4 +801,4 @@ export const DICT_LOG = {
+     'guType.Control': 'Khống Chế', 'guType.Healing': 'Hồi Phục', 'guType.Summon': 'Triệu Hồi',
+     'guType.Investigation': 'Trinh Sát', 'guType.Support': 'Hỗ Trợ',
+   },
+-};
+\ No newline at end of file
++};
+diff --git a/src/game/i18n/tr.js b/src/game/i18n/tr.js
+index e055166..f2da4ba 100644
+--- a/src/game/i18n/tr.js
++++ b/src/game/i18n/tr.js
+@@ -33,7 +33,7 @@ const MISSING_EN = new Set();
+ 
+ export function browserLang() {
+   try {
+-    const nav = (navigator.language || navigator.userLanguage || 'en').toLowerCase();
++    const nav = (navigator.language || /** @type {any} */ (navigator).userLanguage || 'en').toLowerCase();
+     return nav.startsWith('vi') ? 'vi' : 'en';
+   } catch { return 'en'; }
+ }
+@@ -171,5 +171,5 @@ export function auditLocalization() {
+   return report;
+ }
+ try {
+-  if (typeof window !== 'undefined') window.__locAudit = auditLocalization;
+-} catch {}
+\ No newline at end of file
++  if (typeof window !== 'undefined') /** @type {any} */ (window).__locAudit = auditLocalization;
++} catch {}
+diff --git a/src/game/i18n/tutorialDict.js b/src/game/i18n/tutorialDict.js
+index 2b76830..368a4ad 100644
+--- a/src/game/i18n/tutorialDict.js
++++ b/src/game/i18n/tutorialDict.js
+@@ -108,7 +108,7 @@ export const DICT_TUTORIAL = {
+     'codex.replayBtn': 'Replay',
+     'pause.help': '❓ Help & Codex',
+     'codex.essence.title': 'What is Essence?',
+-    'codex.essence.body': 'The energy that powers Gu, cultivation and refinement. It never regenerates on its own — recover it from the Cultivation menu, an inn stay, or paid recovery.',
++    'codex.essence.body': 'The energy that powers Gu, cultivation and refinement. It never regenerates on its own — use Recover Essence in the Cultivation menu, paid recovery, or an explicitly designed item or Gu effect.',
+     'codex.cultivation.title': 'What is Cultivation?',
+     'codex.cultivation.body': 'Spending Essence in the Cultivation menu fills your progress. At 100% you can attempt a Breakthrough to the next stage: more HP, more Essence, higher stats.',
+ 'codex.insight.title': 'What is Realm Insight?',
+@@ -245,7 +245,7 @@ export const DICT_TUTORIAL = {
+     'codex.replayBtn': 'Xem Lại',
+     'pause.help': '❓ Trợ Giúp',
+     'codex.essence.title': 'Chân Nguyên là gì?',
+-    'codex.essence.body': 'Năng lượng thúc đẩy Cổ Trùng, tu luyện và luyện chế. Nó không bao giờ tự hồi phục — hãy hồi từ menu Tu Luyện, ngủ trọ hoặc trả phí hồi phục.',
++    'codex.essence.body': 'Năng lượng thúc đẩy Cổ Trùng, tu luyện và luyện chế. Nó không bao giờ tự hồi phục — hãy dùng Hồi Phục Chân Nguyên trong menu Tu Luyện, trả phí hồi phục, hoặc hiệu ứng vật phẩm hay Cổ Trùng được thiết kế rõ ràng.',
+     'codex.cultivation.title': 'Tu Luyện là gì?',
+     'codex.cultivation.body': 'Tiêu hao Chân Nguyên trong menu Tu Luyện để tăng tiến độ. Đạt 100% có thể Đột Phá lên tầng kế tiếp: nhiều máu, chân nguyên và chỉ số hơn.',
+     'codex.insight.title': 'Cảm Ngộ là gì?',
+@@ -275,4 +275,4 @@ export const DICT_TUTORIAL = {
+     'codex.contribution.title': 'Điểm Cống Hiến',
+     'codex.contribution.body': 'Kiếm từ nhiệm vụ cho trấn; đổi tại Ngân Khố lấy cổ phương và vật phẩm hiếm. Đó là địa vị với một tổ chức, không phải tiền tệ.',
+   },
+-};
+\ No newline at end of file
++};
+diff --git a/src/game/state/GameContext.jsx b/src/game/state/GameContext.jsx
+index 28c4a1f..5884d7b 100644
+--- a/src/game/state/GameContext.jsx
++++ b/src/game/state/GameContext.jsx
+@@ -1,40 +1,66 @@
+-import React, { createContext, useContext, useReducer, useEffect, useCallback, useState } from 'react';
++import React, { createContext, useContext, useReducer, useEffect, useCallback, useRef, useState } from 'react';
+ import { gameReducer } from './gameReducer';
+ import { migrateSave } from './migrate';
+ import { recoveryRatePerSec } from '../config/balance';
+ import { totalGameMin } from '../engine/vitalGu';
+ import { ENEMY_BY_ID } from '../data/enemies';
+ import { persistCombatEnemyState } from '../engine/combat';
++import { newCharacterId, newCreationSessionId, validDeathRecord, withSaveIdentity } from './saveIdentity';
++import { changeEssence, ESSENCE_REASON } from '../engine/essence';
++import { useAuth } from '@/lib/AuthContext';
++import {
++  cloudRecordToSave, deleteCloudSlot, listCloudSaveRecords, newerSave,
++  prepareSavePayload, upsertCloudSave,
++} from './cloudSaves';
+ 
+ const GameContext = createContext(null);
+ export const SLOT_COUNT = 5;
+ const LEGACY_KEY = 'gu_path_of_the_immortal_v1';
+-const slotKey = (i) => `gu_slot_${i}`;
++const legacySlotKey = (i) => `gu_slot_${i}`;
++const safeScope = (scope) => String(scope || 'guest').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 96);
++const slotKey = (scope, i) => `gu_user_${safeScope(scope)}_slot_${i}`;
++const tombstoneKey = (scope, i) => `gu_user_${safeScope(scope)}_deleted_slot_${i}`;
+ 
+-function loadSlotRaw(i) {
+-  try { const r = localStorage.getItem(slotKey(i)); return r ? JSON.parse(r) : null; } catch { return null; }
++function loadSlotRaw(i, scope) {
++  try {
++    const r = localStorage.getItem(slotKey(scope, i));
++    return r ? migrateSave(withSaveIdentity(JSON.parse(r), i)) : null;
++  } catch { return null; }
+ }
+ 
+-function saveSlot(i, s) {
++function saveSlot(i, s, scope, savedAt = Date.now()) {
+   try {
+-    localStorage.setItem(slotKey(i), JSON.stringify({ ...s, toasts: [], breakthrough: null }));
++    const prepared = prepareSavePayload(withSaveIdentity(s, i), i, savedAt);
++    localStorage.setItem(slotKey(scope, i), JSON.stringify(prepared));
++    return prepared;
+   } catch (err) {
+     // silent data loss is the worst failure mode a save system can have —
+     // surface it so it shows in the runtime logs
+     console.warn('[save] failed to write slot', i, err);
++    return null;
++  }
++}
++
++function devLog(...args) {
++  if (typeof location !== 'undefined' && ['localhost', '127.0.0.1', '0.0.0.0'].includes(location.hostname)) {
++    console.debug('[save]', ...args);
+   }
+ }
+ 
+ // One-time: adopt the old pre-slot single save file (if any) as Save Slot 1.
+-function adoptLegacySave() {
++function adoptLegacySave(scope) {
+   try {
++    for (let i = 1; i <= SLOT_COUNT; i += 1) {
++      const oldKey = legacySlotKey(i);
++      const raw = localStorage.getItem(oldKey);
++      if (raw && !loadSlotRaw(i, scope)) saveSlot(i, JSON.parse(raw), scope);
++      if (raw) localStorage.removeItem(oldKey);
++    }
+     const raw = localStorage.getItem(LEGACY_KEY);
+-    if (!raw || loadSlotRaw(1)) return;
+-    const s = migrateSave(JSON.parse(raw));
+-    saveSlot(1, { ...s, slot: 1 });
++    if (raw && !loadSlotRaw(1, scope)) saveSlot(1, migrateSave(JSON.parse(raw)), scope);
++    if (raw) localStorage.removeItem(LEGACY_KEY);
+   } catch {}
+ }
+-if (typeof window !== 'undefined') adoptLegacySave();
+ 
+ // After a page refresh: clear stale UI state, settle any unfinished sleep, and
+ // grant essence accrued while recovery was running offline (capped at max).
+@@ -67,10 +93,11 @@ function normalize(raw) {
+   if (s.recovery) {
+     const rate = recoveryRatePerSec(s.player, s.recovery.mode, totalGameMin(s.time));
+     const elapsed = Math.max(0, (Date.now() - (s.recovery.startedAt || Date.now())) / 1000);
+-    const essence = Math.min(s.player.maxPrimevalEssence, (s.player.primevalEssence || 0) + rate * elapsed);
++    const player = changeEssence(s.player, { delta: rate * elapsed, reason: ESSENCE_REASON.OFFLINE_RECOVERY });
++    const essence = player.primevalEssence;
+     s = {
+       ...s,
+-      player: { ...s.player, primevalEssence: essence },
++      player,
+       recovery: essence >= s.player.maxPrimevalEssence ? null : { ...s.recovery, startedAt: Date.now() },
+     };
+   }
+@@ -78,51 +105,171 @@ function normalize(raw) {
+ }
+ 
+ export function GameProvider({ children }) {
++  const { user, isAuthenticated } = useAuth();
++  const accountScope = user?.id || user?.email || 'guest';
+   const [activeSlot, setActiveSlot] = useState(null);
+   const [createSlot, setCreateSlot] = useState(null);
+-  const [state, dispatch] = useReducer(gameReducer, null, () => ({ noSave: true }));
++  const [creationSessionId, setCreationSessionId] = useState(null);
++  const [cloudReady, setCloudReady] = useState(false);
++  const [cloudStatus, setCloudStatus] = useState('loading');
++  const [cloudError, setCloudError] = useState(null);
++  const cloudRecords = useRef(new Map());
++  const [state, dispatch] = useReducer(/** @type {React.Reducer<any, any>} */ (gameReducer), null, () => ({ noSave: true }));
++
++  const readSlot = useCallback((i) => loadSlotRaw(i, accountScope), [accountScope]);
++
++  // Reconcile this browser with the signed-in account. Newest-write wins per
++  // slot; RLS ensures the server only returns records created by this user.
++  useEffect(() => {
++    let cancelled = false;
++    if (!isAuthenticated || !user) {
++      setCloudReady(true);
++      setCloudStatus('offline');
++      return () => { cancelled = true; };
++    }
++    setCloudReady(false);
++    setCloudStatus('loading');
++    setCloudError(null);
++    adoptLegacySave(accountScope);
++    listCloudSaveRecords().then(async records => {
++      for (let i = 1; i <= SLOT_COUNT; i += 1) {
++        const local = loadSlotRaw(i, accountScope);
++        let record = records.get(i);
++        const deletedAt = Number(localStorage.getItem(tombstoneKey(accountScope, i)) || 0);
++        if (!local && record && deletedAt >= (record.clientUpdatedAt || 0)) {
++          await deleteCloudSlot(i, record);
++          records.delete(i);
++          localStorage.removeItem(tombstoneKey(accountScope, i));
++          record = null;
++        }
++        const winner = newerSave(local, record);
++        if (!winner) continue;
++        if (winner !== local) {
++          saveSlot(i, cloudRecordToSave(record), accountScope, record.clientUpdatedAt || Date.now());
++        } else if (!record || (local.savedAt || 0) > (record.clientUpdatedAt || 0)) {
++          const uploaded = await upsertCloudSave(prepareSavePayload(local, i, local.savedAt || Date.now()), record);
++          records.set(i, uploaded);
++        }
++      }
++      if (!cancelled) {
++        cloudRecords.current = new Map(records);
++        setCloudStatus('synced');
++        setCloudReady(true);
++      }
++    }).catch(error => {
++      console.warn('[save] cloud sync unavailable; local saves remain active', error);
++      if (!cancelled) {
++        setCloudError(error?.message || 'Cloud sync is unavailable');
++        setCloudStatus('offline');
++        setCloudReady(true);
++      }
++    });
++    return () => { cancelled = true; };
++  }, [accountScope, isAuthenticated, user]);
+ 
+   // persist the active slot on every game-state change
+   useEffect(() => {
+-    if (activeSlot != null && state && !state.noSave) saveSlot(activeSlot, state);
+-  }, [state, activeSlot]);
++    if (activeSlot == null || !state || state.noSave) return undefined;
++    const saved = saveSlot(activeSlot, state, accountScope);
++    if (!saved || !isAuthenticated) return undefined;
++    setCloudStatus('saving');
++    const timer = setTimeout(() => {
++      upsertCloudSave(saved, cloudRecords.current.get(activeSlot)).then(record => {
++        cloudRecords.current.set(activeSlot, record);
++        setCloudStatus('synced');
++        setCloudError(null);
++      }).catch(error => {
++        console.warn('[save] cloud upload failed; local save preserved', error);
++        setCloudError(error?.message || 'Cloud upload failed');
++        setCloudStatus('offline');
++      });
++    }, 1200);
++    return () => clearTimeout(timer);
++  }, [state, activeSlot, accountScope, isAuthenticated]);
+ 
+   const startSlot = useCallback((i) => {
+-    const raw = loadSlotRaw(i);
+-    if (!raw || raw.deceased) return false;
++    const raw = readSlot(i);
++    if (!raw || validDeathRecord(raw)) return false;
+     dispatch({ type: 'LOAD', state: normalize(raw) });
+     setActiveSlot(i);
++    setCreateSlot(null);
++    setCreationSessionId(null);
+     return true;
+-  }, []);
++  }, [readSlot]);
+ 
+-  const beginCreate = useCallback((i) => setCreateSlot(i), []);
+-  const cancelCreate = useCallback(() => setCreateSlot(null), []);
++  const beginCreate = useCallback((i) => {
++    dispatch({ type: 'RESET' });
++    setActiveSlot(null);
++    setCreationSessionId(newCreationSessionId());
++    setCreateSlot(i);
++  }, []);
++  const cancelCreate = useCallback(() => {
++    dispatch({ type: 'RESET' });
++    setCreateSlot(null);
++    setCreationSessionId(null);
++  }, []);
+   const finishCreate = useCallback((name, gender, age, difficulty, appearance, aptitude, starterGuId) => {
+     const slot = createSlot;
+-    dispatch({ type: 'NEW_GAME', name, gender, age, difficulty, slot, appearance, aptitude, starterGuId });
++    if (slot == null) return false;
++    const characterId = newCharacterId();
++    try { localStorage.removeItem(tombstoneKey(accountScope, slot)); } catch {}
++    devLog('Creating new character:', { slotId: slot, characterId });
++    dispatch({ type: 'NEW_GAME', name, gender, age, difficulty, slot, appearance, aptitude, starterGuId, creationSessionId, characterId });
+     setCreateSlot(null);
++    setCreationSessionId(null);
+     setActiveSlot(slot);
+-  }, [createSlot]);
++    return true;
++  }, [accountScope, createSlot, creationSessionId]);
+ 
+   const deleteSlot = useCallback((i) => {
+-    try { localStorage.removeItem(slotKey(i)); } catch {}
+-  }, []);
++    const deleted = readSlot(i);
++    devLog('Deleting save:', { slotId: i, characterId: deleted?.characterId || null });
++    try { localStorage.removeItem(slotKey(accountScope, i)); } catch {}
++    try { localStorage.setItem(tombstoneKey(accountScope, i), String(Date.now())); } catch {}
++    if (isAuthenticated) {
++      deleteCloudSlot(i, cloudRecords.current.get(i)).then(() => {
++        cloudRecords.current.delete(i);
++        try { localStorage.removeItem(tombstoneKey(accountScope, i)); } catch {}
++        setCloudStatus('synced');
++      }).catch(error => {
++        console.warn('[save] cloud deletion failed', error);
++        setCloudError(error?.message || 'Cloud deletion failed');
++        setCloudStatus('offline');
++      });
++    }
++    if (deleted?.deceased) devLog('Clearing death state:', { characterId: deleted.characterId });
++    dispatch({ type: 'RESET' });
++    setActiveSlot(null);
++    setCreateSlot(null);
++    setCreationSessionId(null);
++  }, [accountScope, isAuthenticated, readSlot]);
+ 
+-  const exitToSlots = useCallback(() => setActiveSlot(null), []);
++  const exitToSlots = useCallback(() => {
++    if (activeSlot != null && state && !state.noSave) saveSlot(activeSlot, state, accountScope);
++    if (state?.deceased) devLog('Clearing death state:', { characterId: state.characterId });
++    dispatch({ type: 'RESET' });
++    setActiveSlot(null);
++    setCreateSlot(null);
++    setCreationSessionId(null);
++  }, [accountScope, activeSlot, state]);
+ 
+   const reset = useCallback(() => {
+     if (activeSlot != null) {
+-      try { localStorage.removeItem(slotKey(activeSlot)); } catch {}
++      try { localStorage.removeItem(slotKey(accountScope, activeSlot)); } catch {}
++      if (isAuthenticated) deleteCloudSlot(activeSlot, cloudRecords.current.get(activeSlot)).catch(() => {});
+     }
+     setActiveSlot(null);
++    setCreateSlot(null);
++    setCreationSessionId(null);
+     dispatch({ type: 'RESET' });
+-  }, [activeSlot]);
++  }, [accountScope, activeSlot, isAuthenticated]);
+ 
+   return (
+     <GameContext.Provider value={{
+       state, dispatch,
+-      activeSlot, createSlot,
+-      loadSlotRaw, startSlot,
++      activeSlot, createSlot, creationSessionId,
++      loadSlotRaw: readSlot, startSlot,
++      cloudReady, cloudStatus, cloudError,
+       beginCreate, cancelCreate, finishCreate,
+       deleteSlot, exitToSlots, reset,
+     }}>
+@@ -135,4 +282,4 @@ export function useGame() {
+   const ctx = useContext(GameContext);
+   if (!ctx) throw new Error('useGame must be used within GameProvider');
+   return ctx;
+-}
+\ No newline at end of file
++}
+diff --git a/src/game/state/createGame.js b/src/game/state/createGame.js
+index 8d49c0f..ee87505 100644
+--- a/src/game/state/createGame.js
++++ b/src/game/state/createGame.js
+@@ -16,12 +16,13 @@ import { initialEnemies } from '../data/world';
+ import { DEFAULT_APPEARANCE } from '../data/appearance';
+ import { kmSeed } from '../engine/killerMoves';
+ import { T, locPathName, locGuName } from '../i18n/tr';
++import { newCharacterId } from './saveIdentity';
+ 
+ const START_STAGE = CULTIVATION_STAGES[0];
+ 
+ export function globalStage(p) { return p.rank * 4 + (p.stage || 0); }
+ 
+-export function createNewGame(name, gender, age, difficulty, slot, appearance, aptitude, starterGuId) {
++export function createNewGame(name, gender, age, difficulty, slot, appearance, aptitude, starterGuId, creationSessionId, characterId) {
+   const starter = starterGuOf(starterGuId);
+   const apt = normalizeAptitude(
+     aptitude && typeof aptitude.score === 'number' ? aptitude : { score: rollAptitudeScore(), constitution: rollConstitution() }
+@@ -29,9 +30,13 @@ export function createNewGame(name, gender, age, difficulty, slot, appearance, a
+   const essenceCap = essenceCapFor(START_STAGE.maxEssence, apt);
+   const starterFood = foodOf(starter);
+   const fresh = {
+-    version: 17,
++    version: 19,
+     difficulty: DIFFICULTIES[difficulty] ? difficulty : 'standard',
+     slot: slot || 1,
++    slotId: slot || 1,
++    characterId: characterId || newCharacterId(),
++    creationSessionId: creationSessionId || null,
++    status: 'ALIVE',
+     time: { day: BALANCE.time.startDay, min: BALANCE.time.startMinutes },
+     playtimeSec: 0,
+     deceased: null,
+@@ -42,6 +47,7 @@ export function createNewGame(name, gender, age, difficulty, slot, appearance, a
+       aptitude: apt,
+       hp: START_STAGE.maxHp, maxHp: START_STAGE.maxHp,
+       primevalEssence: essenceCap, maxPrimevalEssence: essenceCap,
++      essenceHistory: [],
+       willpower: 10,
+       strength: 6, agility: 6, perception: 6, intelligence: 6, luck: 6,
+       x: 42, y: 44, currentArea: 'greenValleyRegion', facing: 'down',
+@@ -85,4 +91,4 @@ export function createNewGame(name, gender, age, difficulty, slot, appearance, a
+   // STRENGTH PATH (Lực Đạo): a strength starter enjoys the level-1 vitality
+   // bonus from its first breath; other cultivators gain it when they learn it
+   return { ...fresh, player: syncVitality(fresh.player, starter.path === 'strength' ? 1 : 0) };
+-}
+\ No newline at end of file
++}
+diff --git a/src/game/state/gameReducer.js b/src/game/state/gameReducer.js
+index f6ad38f..ed95220 100644
+--- a/src/game/state/gameReducer.js
++++ b/src/game/state/gameReducer.js
+@@ -10,7 +10,7 @@ import { advanceTime, phaseOf } from '../engine/time';
+ import { applyEffects } from '../engine/effects';
+ import { grantMastery, learnRecipe, bonusOf, learnClue, CLUE_RANK } from '../engine/mastery';
+ import { CULTIVATION_STAGES, BREAKTHROUGH_REQS } from '../data/cultivation';
+-import { BALANCE, DIFFICULTIES, diffOf, shopPrice, recoveryCosts, cultivationCost, cultStreakEff, cultivationGain } from '../config/balance';
++import { BALANCE, DIFFICULTIES, diffOf, shopPrice, recoveryCosts, cultivationCost, cultivationGain } from '../config/balance';
+ import { RECIPE_BY_ID } from '../data/recipes';
+ import {
+   WORLD, zoneAt, isWalkable, DEFAULT_ZONE, LANDMARKS, WORLD_RESOURCES,
+@@ -21,7 +21,7 @@ import { MISSION_BY_ID } from '../data/missions';
+ import { CONTRIBUTION_OFFERS } from '../data/contribution';
+ import { ARENA_BY_ID } from '../data/arena';
+ import { DEFAULT_APPEARANCE } from '../data/appearance';
+-import { essenceCapFor, cultivateMulOf, normalizeAptitude, rollAptitudeScore, rollConstitution } from '../config/aptitude';
++import { essenceCapFor, normalizeAptitude, rollAptitudeScore, rollConstitution } from '../config/aptitude';
+ import { starterGuOf } from '../data/starterGu';
+ import { syncVitality, strengthLevelOf } from '../engine/strength';
+ import { SPECIES_BY_ID, wildCombatDef, captureChanceOf, initialWildGu } from '../data/wildGu';
+@@ -40,6 +40,7 @@ import { tutorialObserve } from '../engine/tutorial';
+ // Killer Move actions are centralized in the engine.
+ import { kmAction } from '../engine/killerMoves';
+ import { createNewGame, globalStage } from './createGame';
++import { changeEssence, ESSENCE_REASON } from '../engine/essence';
+ 
+ // createNewGame and globalStage live in ./createGame — imported below.
+ 
+@@ -206,12 +207,12 @@ function wildGuAfterEncounter(state, worldId, gone) {
+ 
+ function baseReducer(state, action) {
+   // a deceased (True Cultivation) character can no longer act — only leave or reset
+-  if (state && state.deceased && !['LOAD', 'RESET', 'END_COMBAT'].includes(action.type)) return state;
++  if (state && state.deceased && !['LOAD', 'NEW_GAME', 'RESET', 'END_COMBAT'].includes(action.type)) return state;
+   switch (action.type) {
+     case 'LOAD':
+       return action.state;
+     case 'NEW_GAME':
+-      return createNewGame(action.name, action.gender, action.age, action.difficulty, action.slot, action.appearance, action.aptitude, action.starterGuId);
++      return createNewGame(action.name, action.gender, action.age, action.difficulty, action.slot, action.appearance, action.aptitude, action.starterGuId, action.creationSessionId, action.characterId);
+     case 'RESET':
+       return { noSave: true };
+ 
+@@ -643,6 +644,8 @@ function baseReducer(state, action) {
+       const refFx = bonusOf(state, 'refinement');
+       let s = applyEffects(state, {
+         essence: -list.essenceCost,
++        essenceReason: ESSENCE_REASON.REFINEMENT_COST,
++        essenceSource: r.id,
+         spiritStones: -r.stones,
+         removeItems: r.materials,
+       });
+@@ -674,8 +677,7 @@ function baseReducer(state, action) {
+       if (p.primevalEssence < cost) return { ...state, log: [...state.log, T('cult.noEssence')] };
+       const progress = Math.min(100, (p.cultivationProgress || 0) + gain);
+       const np = {
+-        ...p,
+-        primevalEssence: p.primevalEssence - cost,
++        ...changeEssence(p, { delta: -cost, reason: ESSENCE_REASON.CULTIVATION_COST }),
+         cultivationProgress: progress,
+         totalInsight: (p.totalInsight || 0) + gain,
+         cultStreak: (p.cultStreak || 0) + 1,
+@@ -690,74 +692,6 @@ function baseReducer(state, action) {
+       return advanceTime(s, BALANCE.time.cultivateMinutes);
+     }
+ 
+-    // ---------- Secluded cultivation (closed-door training) ----------
+-    // One click compresses the cultivate → recover grind into a batch of
+-    // sessions separated by nights of deep meditation. All per-session
+-    // balance is honored (essence cost, progress gain, terrace bonus) and
+-    // the whole span is paid in game time via advanceTime (days pass, Gu
+-    // hunger ticks) — only the real-time waiting is removed.
+-    case 'SECLUDE': {
+-      if (busy(state)) return state;
+-      const p = state.player;
+-      const g = globalStage(p);
+-      if (g >= 19) return state;
+-      if ((p.cultivationProgress || 0) >= 100) return { ...state, log: [...state.log, T('cult.secludeFull')] };
+-      if (!(zoneAt(p.x, p.y) || DEFAULT_ZONE).safe) return { ...state, log: [...state.log, T('cult.secludeNeedTown')] };
+-      const cfg = BALANCE.cultivation;
+-      const cost = cultivationCost(p);
+-      const atSect = WORLD.tiles[p.y] && WORLD.tiles[p.y][p.x] === '*';
+-      const t = state.time || { day: BALANCE.time.startDay, min: BALANCE.time.startMinutes };
+-      const startAbs = t.day * 1440 + t.min;
+-      let abs = startAbs;
+-      let progress = p.cultivationProgress || 0;
+-      let essence = p.primevalEssence;
+-      let insight = p.totalInsight || 0;
+-      let streak = p.cultStreak || 0;
+-      let sessions = 0, nights = 0;
+-      let guard = 0;
+-      while (progress < 100 && nights < 10 && guard++ < 500) {
+-        if (essence < cost) {
+-          // a night of deep meditation refills the aperture by morning
+-          const dayStart = Math.floor(abs / 1440) * 1440;
+-          let wake = dayStart + BALANCE.time.sleepToMinutes;
+-          if (wake <= abs) wake += 1440;
+-          abs = wake;
+-          essence = p.maxPrimevalEssence;
+-          nights++;
+-          continue;
+-        }
+-        // every balance rule of a single session applies here too — including
+-        // the diminishing-returns streak for back-to-back cultivation
+-        const factor = (cfg.stageFactor[p.stage || 0] ?? 0.45) * cfg.rankFactor ** p.rank;
+-        const gain = Math.max(1, Math.min(cfg.progressCap, Math.floor(
+-          (cfg.progressBase + p.intelligence * cfg.progressPerInt) * factor * cultivateMulOf(p.aptitude)
+-          * (atSect ? cfg.sectBonus : 1) * cultStreakEff(streak) * diffOf(state).cultProgressMul)));
+-        progress = Math.min(100, progress + gain);
+-        essence -= cost;
+-        insight += gain;
+-        sessions++;
+-        streak++;
+-        abs += BALANCE.time.cultivateMinutes;
+-      }
+-      if (progress >= 100 && essence < p.maxPrimevalEssence) {
+-        // one final night: emerge with a full aperture so the breakthrough
+-        // requirements (essence held) are always met on the spot
+-        const dayStart = Math.floor(abs / 1440) * 1440;
+-        let wake = dayStart + BALANCE.time.sleepToMinutes;
+-        if (wake <= abs) wake += 1440;
+-        abs = wake;
+-        essence = p.maxPrimevalEssence;
+-        nights++;
+-      }
+-      let s = { ...state, player: { ...p, primevalEssence: essence, cultivationProgress: progress, totalInsight: insight, cultStreak: streak } };
+-      s = advanceTime(s, abs - startAbs);
+-      s = { ...s, log: [...s.log, atSect ? T('cult.secluded', { sessions, nights, progress: Math.floor(progress) }) : T('cult.secludedPlain', { sessions, nights, progress: Math.floor(progress) })] };
+-      if (progress >= 100 && (p.cultivationProgress || 0) < 100) {
+-        s = pushToast(s, { icon: '🏯', title: T('toast.seclude'), lines: [T('cult.secludeToast1', { sessions, nights }), T('cult.secludeToast2')] });
+-      }
+-      return s;
+-    }
+-
+     case 'BREAKTHROUGH': {
+       if (busy(state)) return state;
+       const p = state.player;
+@@ -768,6 +702,7 @@ function baseReducer(state, action) {
+       const req = BREAKTHROUGH_REQS[g];
+       let s = applyEffects(state, {
+         essence: -req.essence,
++        essenceReason: ESSENCE_REASON.BREAKTHROUGH_COST,
+         spiritStones: -(req.stones || 0),
+         removeItems: req.items || {},
+         insight: -(req.insight || 0),
+@@ -789,9 +724,12 @@ function baseReducer(state, action) {
+       np.maxPrimevalEssence = essenceCapFor(st.maxEssence, np.aptitude);
+       // only a major rank breakthrough fully restores the aperture — minors
+       // refill just a fraction, so chained breakthroughs are never free
+-      np.primevalEssence = major
++      Object.assign(np, changeEssence(np, { setTo: major
+         ? np.maxPrimevalEssence
+-        : Math.max(np.primevalEssence, Math.round(np.maxPrimevalEssence * BALANCE.cultivation.minorEssenceRestorePct / 100));
++        : Math.max(np.primevalEssence, Math.round(np.maxPrimevalEssence * BALANCE.cultivation.minorEssenceRestorePct / 100)),
++        reason: ESSENCE_REASON.BREAKTHROUGH_RESTORE,
++        source: major ? 'major' : 'minor',
++      }));
+       const statGain = major ? 2 : 1;
+       np.strength += statGain; np.agility += statGain; np.perception += statGain; np.intelligence += statGain;
+       s = {
+@@ -831,11 +769,12 @@ function baseReducer(state, action) {
+     case 'RECOVERY_TICK': {
+       if (!state.recovery) return state;
+       const p = state.player;
+-      const essence = Math.min(p.maxPrimevalEssence, p.primevalEssence + (action.amount || 0));
++      const player = changeEssence(p, { delta: action.amount || 0, reason: ESSENCE_REASON.ACTIVE_RECOVERY });
++      const essence = player.primevalEssence;
+       const done = essence >= p.maxPrimevalEssence;
+       return advanceTime({
+         ...state,
+-        player: { ...p, primevalEssence: essence },
++        player,
+         recovery: done ? null : state.recovery,
+         log: done ? [...state.log, T('rec.done')] : state.log,
+       }, BALANCE.time.recoveryMinutesPerTick);
+@@ -878,7 +817,7 @@ function baseReducer(state, action) {
+       if (p.spiritStones < costs.instant) return { ...state, log: [...state.log, T('rec.noStonesInstant')] };
+       return {
+         ...state,
+-        player: { ...p, spiritStones: p.spiritStones - costs.instant, primevalEssence: p.maxPrimevalEssence },
++        player: { ...changeEssence(p, { setTo: p.maxPrimevalEssence, reason: ESSENCE_REASON.PAID_RECOVERY }), spiritStones: p.spiritStones - costs.instant },
+         recovery: null,
+         log: [...state.log, T('rec.instant', { n: costs.instant })],
+       };
+@@ -896,6 +835,7 @@ function baseReducer(state, action) {
+       }
+       return applyEffects(state, {
+         hp: it.use.hp || 0, essence: it.use.essence || 0,
++        essenceReason: ESSENCE_REASON.ITEM, essenceSource: it.id,
+         foodBuff: it.use.buff || null,
+         removeItems: { [action.itemId]: 1 }, message: T('item.used', { name: locItemName(it) }),
+       });
+@@ -1051,7 +991,12 @@ function baseReducer(state, action) {
+     case 'CHOOSE_EVENT': {
+       const ev = EVENT_BY_ID[state.pendingEvent];
+       const opt = ev.options[action.optionIndex];
+-      let s = applyEffects(state, { ...opt.effects, message: locEventMsg(ev, action.optionIndex) || undefined });
++      let s = applyEffects(state, {
++        ...opt.effects,
++        essenceReason: opt.effects?.essence ? ESSENCE_REASON.EVENT : undefined,
++        essenceSource: ev.id,
++        message: locEventMsg(ev, action.optionIndex) || undefined,
++      });
+       // recognition-trial offers accept their trial quest through the same
+       // centralized quest system as every other quest (#6, #8) — acceptQuest
+       // itself refuses duplicates, so double-clicks can never double-issue (#15)
+@@ -1199,7 +1144,13 @@ function baseReducer(state, action) {
+       const list = refineGuChecklist(state, inst);
+       if (!list.ok) return { ...state, log: [...state.log, T('refinegu.refused')] };
+       const day = state.time?.day || 1;
+-      let s = applyEffects(state, { essence: -list.essenceCost, spiritStones: -list.stonesCost, removeItems: list.materials });
++      let s = applyEffects(state, {
++        essence: -list.essenceCost,
++        essenceReason: ESSENCE_REASON.REFINEMENT_COST,
++        essenceSource: gu.id,
++        spiritStones: -list.stonesCost,
++        removeItems: list.materials,
++      });
+       if (Math.random() * 100 < list.chance) {
+         s = { ...s, ownedGu: s.ownedGu.map(g => g.instanceId === inst.instanceId ? { ...g, rank: list.target } : g) };
+         s = applyEffects(s, { insight: BALANCE.insight.refineGu });
+@@ -1298,4 +1249,4 @@ export function gameReducer(state, action) {
+   return tutorialObserve(capped, action);
+ }
+ 
+-export { objectiveMet, globalStage };
+\ No newline at end of file
++export { objectiveMet, globalStage };
+diff --git a/src/game/state/migrate.js b/src/game/state/migrate.js
+index 5aaf0f5..1421dbb 100644
+--- a/src/game/state/migrate.js
++++ b/src/game/state/migrate.js
+@@ -11,6 +11,8 @@ import { seedFog } from '../engine/guLife';
+ import { normalizeAptitude, essenceCapFor } from '../config/aptitude';
+ import { normalizeQuestState } from '../engine/questEngine';
+ import { LEADER_LINKS, isLeaderDef } from '../data/packs';
++import { withSaveIdentity } from './saveIdentity';
++import { changeEssence, ESSENCE_REASON } from '../engine/essence';
+ 
+ // v4 aptitudes were flat strings — map them onto the v5 numeric scale.
+ const LEGACY_APTITUDE = { Dull: 3, Ordinary: 5, Good: 6.5, Outstanding: 8, Heavenly: 9.5 };
+@@ -97,12 +99,10 @@ export function migrateSave(old) {
+     s = {
+       ...s,
+       version: 5,
+-      player: {
+-        ...p,
+-        aptitude: apt,
+-        maxPrimevalEssence: cap,
+-        primevalEssence: Math.min(p.primevalEssence ?? cap, cap),
+-      },
++      player: changeEssence({ ...p, aptitude: apt, maxPrimevalEssence: cap }, {
++        setTo: Math.min(p.primevalEssence ?? cap, cap),
++        reason: ESSENCE_REASON.SAVE_MIGRATION,
++      }),
+       log: [...(s.log || []), 'Your aperture settles — cultivation aptitude now shapes your essence.'],
+     };
+   }
+@@ -169,7 +169,10 @@ export function migrateSave(old) {
+     s = {
+       ...s,
+       version: 10,
+-      player: { ...p, maxPrimevalEssence: cap, primevalEssence: Math.min(p.primevalEssence ?? cap, cap) },
++      player: changeEssence({ ...p, maxPrimevalEssence: cap }, {
++        setTo: Math.min(p.primevalEssence ?? cap, cap),
++        reason: ESSENCE_REASON.SAVE_MIGRATION,
++      }),
+       log: [...(s.log || []), 'Your aperture widens — primeval essence flows deeper and truer to your aptitude.'],
+     };
+   }
+@@ -285,7 +288,16 @@ export function migrateSave(old) {
+     };
+   }
+ 
++  if (s.version < 18) {
++    s = { ...withSaveIdentity(s), version: 18 };
++  }
++
++  if (s.version < 19) {
++    s = { ...s, version: 19, player: { ...s.player, essenceHistory: s.player?.essenceHistory || [] } };
++  }
++
+   // Self-heal the quest state on every load: legacy shapes become per-quest
+-  // records and hunt progress is rebuilt from the kill tally.
+-  return normalizeQuestState(s);
+-}
+\ No newline at end of file
++  // records and hunt progress is rebuilt from the kill tally. Identity is also
++  // revalidated every time so stale death records from older builds are ignored.
++  return normalizeQuestState(withSaveIdentity(s));
++}
+diff --git a/src/lib/AuthContext.jsx b/src/lib/AuthContext.jsx
+index ce9bdb5..54cf9b7 100644
+--- a/src/lib/AuthContext.jsx
++++ b/src/lib/AuthContext.jsx
+@@ -2,7 +2,7 @@ import React, { createContext, useState, useContext, useEffect } from 'react';
+ import { base44 } from '@/api/base44Client';
+ import { appParams } from '@/lib/app-params';
+ 
+-const AuthContext = createContext();
++const AuthContext = createContext(null);
+ 
+ export const AuthProvider = ({ children }) => {
+   const [user, setUser] = useState(null);
+@@ -65,6 +65,7 @@ export const AuthProvider = ({ children }) => {
+         }
+         setIsLoadingPublicSettings(false);
+         setIsLoadingAuth(false);
++        setAuthChecked(true);
+       }
+     } catch (error) {
+       console.error('Unexpected error:', error);
+@@ -74,6 +75,7 @@ export const AuthProvider = ({ children }) => {
+       });
+       setIsLoadingPublicSettings(false);
+       setIsLoadingAuth(false);
++      setAuthChecked(true);
+     }
+   };
+ 
+diff --git a/src/lib/app-params.js b/src/lib/app-params.js
+index 6f6424b..3334a24 100644
+--- a/src/lib/app-params.js
++++ b/src/lib/app-params.js
+@@ -14,11 +14,12 @@ const getAppParams = () => {
+ 	if (isClearAccessTokenRequested()) {
+ 		clearStoredAccessToken();
+ 	}
++	const env = /** @type {Record<string, string | undefined>} */ (import.meta.env || {});
+ 	return {
+-		appId: import.meta.env.VITE_BASE44_APP_ID,
++		appId: env.VITE_BASE44_APP_ID,
+ 		token: getAccessToken(),
+-		functionsVersion: import.meta.env.VITE_BASE44_FUNCTIONS_VERSION,
+-		appBaseUrl: import.meta.env.VITE_BASE44_APP_BASE_URL,
++		functionsVersion: env.VITE_BASE44_FUNCTIONS_VERSION,
++		appBaseUrl: env.VITE_BASE44_APP_BASE_URL,
+ 	}
+ }
+ 
+diff --git a/src/pages/Game.jsx b/src/pages/Game.jsx
+index 1a447a9..ddd57ca 100644
+--- a/src/pages/Game.jsx
++++ b/src/pages/Game.jsx
+@@ -16,8 +16,11 @@ export default function Game() {
+ }
+ 
+ function GameRoot() {
+-  const { state, activeSlot, createSlot } = useGame();
+-  if (createSlot != null) return <CharacterCreation />;
++  const { state, activeSlot, createSlot, creationSessionId, cloudReady } = useGame();
++  if (!cloudReady) {
++    return <div className="min-h-screen bg-[#0d1410] text-emerald-200 flex items-center justify-center">Synchronizing saves…</div>;
++  }
++  if (createSlot != null) return <CharacterCreation key={creationSessionId} />;
+   if (activeSlot == null || !state || state.noSave) return <SlotSelect />;
+   return <GameScreen />;
+-}
+\ No newline at end of file
++}
+diff --git a/src/pages/OAuthConsent.jsx b/src/pages/OAuthConsent.jsx
+index 8fb9ca5..31b07eb 100644
+--- a/src/pages/OAuthConsent.jsx
++++ b/src/pages/OAuthConsent.jsx
+@@ -34,7 +34,7 @@ export default function OAuthConsent() {
+         // bearer token) so the server can list the granted tools for a
+         // signed-in user — the same auth the approve/deny call sends; without
+         // it the display request is anonymous and shows no tools.
+-        const infoHeaders = {};
++        const infoHeaders = /** @type {Record<string, string>} */ ({});
+         if (appParams.token) infoHeaders.Authorization = "Bearer " + appParams.token;
+         const res = await fetch(
+           `/api/apps/${appParams.appId}/mcp/consent-info?handle=${encodeURIComponent(ctx)}`,
