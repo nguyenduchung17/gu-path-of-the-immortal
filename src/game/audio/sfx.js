@@ -6,7 +6,7 @@ let muted = (() => { try { return localStorage.getItem('gu_sound_off') === '1'; 
 
 function ensure() {
   if (!ctxA) {
-    const AC = window.AudioContext || window.webkitAudioContext;
+    const AC = window.AudioContext || /** @type {any} */ (window).webkitAudioContext;
     if (!AC) return null;
     ctxA = new AC();
     master = ctxA.createGain();

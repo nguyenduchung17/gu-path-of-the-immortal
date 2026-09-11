@@ -42,6 +42,7 @@ import ScoutReport from './hud/ScoutReport';
 import HazardBadge from './hud/HazardBadge';
 import MiniMap from './hud/MiniMap';
 import DashboardScreen from './DashboardScreen';
+import { validDeathRecord } from '@/game/state/saveIdentity';
 
 const PANEL_META = {
   cultivation: { titleKey: 'ui.cultivation', icon: '🧘' },
@@ -57,7 +58,7 @@ const PANEL_META = {
 };
 
 export default function GameScreen() {
-  const { state, dispatch, activeSlot, exitToSlots, deleteSlot } = useGame();
+  const { state, dispatch, activeSlot, exitToSlots, deleteSlot, loadSlotRaw } = useGame();
   const { t } = useT();
   const [panel, setPanel] = useState(null);
   const [shop, setShop] = useState(null);
@@ -66,6 +67,17 @@ export default function GameScreen() {
   const [recoveryOpen, setRecoveryOpen] = useState(false);
   const [paused, setPaused] = useState(false);
   const [dashOpen, setDashOpen] = useState(false);
+  const storedActive = activeSlot == null ? null : loadSlotRaw(activeSlot);
+  const deathRecord = validDeathRecord(state) && storedActive?.characterId === state.characterId
+    ? state.deceased
+    : null;
+
+  useEffect(() => {
+    if (!deathRecord) return;
+    if (typeof location !== 'undefined' && ['localhost', '127.0.0.1', '0.0.0.0'].includes(location.hostname)) {
+      console.debug('[save] Loading death screen:', { characterId: state.characterId });
+    }
+  }, [deathRecord, state.characterId]);
 
   // open a side panel — the staged tutorial hears which panel opened
   const openPanel = (id) => {
@@ -94,7 +106,7 @@ export default function GameScreen() {
   }, [state]);
 
   // game-style Esc behavior: close the topmost overlay; if nothing is open, open the system menu.
-  const escRef = useRef({});
+  const escRef = useRef(/** @type {any} */ ({}));
   escRef.current = {
     panel, paused, shop, service, inn, recoveryOpen, dashOpen, openPanel,
     busy: !!(state.combat || state.pendingEvent || state.dialogue || state.sleeping || state.deceased || state.breakthrough || state.wildEncounter),
@@ -179,13 +191,13 @@ export default function GameScreen() {
       {service === 'arena' && <ArenaPanel onClose={() => setService(null)} />}
       {inn && <InnModal npcId={inn} onClose={() => setInn(null)} />}
       {state.sleeping && <SleepOverlay />}
-      {state.deceased && (
+      {deathRecord && (
         <MemorialPanel
-          record={state.deceased}
+          record={deathRecord}
           onCloseLabel="Return to Save Slots"
           onClose={exitToSlots}
           onDeleteLabel="Delete Save"
-          onDelete={() => { deleteSlot(activeSlot); exitToSlots(); }}
+          onDelete={() => deleteSlot(activeSlot)}
         />
       )}
       <RecoveryModal open={recoveryOpen} onClose={() => setRecoveryOpen(false)} />

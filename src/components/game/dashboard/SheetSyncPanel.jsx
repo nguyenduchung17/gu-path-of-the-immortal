@@ -111,7 +111,7 @@ export default function SheetSyncPanel({ snapshot }) {
       </p>
 
       {authed === false ? (
-        <button onClick={() => base44.auth.redirectToLogin()}
+        <button onClick={() => base44.auth.redirectToLogin(window.location.href)}
           className="mt-3 px-4 py-2 rounded-lg bg-sky-700 hover:bg-sky-600 text-white text-sm">
           Sign in to sync milestones
         </button>

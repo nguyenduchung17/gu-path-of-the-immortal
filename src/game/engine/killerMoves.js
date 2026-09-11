@@ -18,6 +18,7 @@ import { BALANCE } from '../config/balance';
 import { masteryOf, grantMastery } from './mastery';
 import { guCondition } from './guLife';
 import { applyEffects } from './effects';
+import { ESSENCE_REASON } from './essence';
 import { totalGameMin } from './vitalGu';
 import { advanceTime } from './time';
 import { T, locGuName, locPathName } from '../i18n/tr';
@@ -328,7 +329,12 @@ export function researchKillerMove(state, coreId, supportIds, blueprintId, minig
   if (p.spiritStones < pv.researchCost.stones) return { state, reason: T('km.errStones', { n: pv.researchCost.stones }) };
 
   // pay the research cost
-  s = applyEffects(s, { essence: -pv.researchCost.essence, spiritStones: -pv.researchCost.stones });
+  s = applyEffects(s, {
+    essence: -pv.researchCost.essence,
+    essenceReason: ESSENCE_REASON.KILLER_MOVE_COST,
+    essenceSource: 'research',
+    spiritStones: -pv.researchCost.stones,
+  });
   const day = s.time?.day || 1;
   const allIds = [coreId, ...supports.map(i => i.instanceId)];
 

@@ -82,7 +82,7 @@ export function foodValueOf(it) {
     + (v.rarity[it.rarity] || 0);
   return Math.max(1, Math.round(raw * (v.roleAdj[it.role] || 1)));
 }
-for (const it of ITEMS) if (it.category === 'food' && !('value' in it)) it.value = foodValueOf(it);
+for (const it of /** @type {any[]} */ (ITEMS)) if (it.category === 'food' && !('value' in it)) it.value = foodValueOf(it);
 
 export const ITEM_BY_ID = Object.fromEntries(ITEMS.map(i => [i.id, i]));
 export const ITEM_CATEGORIES = ['materials', 'medicine', 'food', 'guFood', 'guGear', 'questItems'];

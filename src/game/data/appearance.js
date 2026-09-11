@@ -42,6 +42,7 @@ export const ACCESSORIES = [
 ];
 
 export const DEFAULT_APPEARANCE = {
+  preset: null,
   body: 'male', hair: 'short', hairColor: '#141414', skin: '#e8b88a', eyes: '#3a2a18',
   outfit: 'robe', outfitPrimary: '#2f7a52', outfitSecondary: '#c9a45a', accessory: 'none',
 };

@@ -7,7 +7,7 @@ export default function MoveDebugPanel({ on }) {
   const [dbg, setDbg] = useState(null);
   useEffect(() => {
     if (!on) return undefined;
-    const iv = setInterval(() => setDbg(window.__guMoveDebug || null), 250);
+    const iv = setInterval(() => setDbg(/** @type {any} */ (window).__guMoveDebug || null), 250);
     return () => clearInterval(iv);
   }, [on]);
   if (!on || !dbg) return null;

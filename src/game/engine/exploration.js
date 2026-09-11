@@ -13,6 +13,7 @@ import { proficiencyOf, recordUse } from './proficiency';
 import { revealFog } from './guLife';
 import { WORLD_RESOURCES, WORLD, HIDDEN_PATHS, HAZARDS, hazardAt, LANDMARKS } from '../data/world';
 import { T, locGuName, locEnemyName, locHiddenPathName, locHazardName, locLandmarkName, locPathName } from '../i18n/tr';
+import { changeEssence, ESSENCE_REASON } from './essence';
 
 const cheb = (ax, ay, bx, by) => Math.max(Math.abs(ax - bx), Math.abs(ay - by));
 
@@ -177,7 +178,7 @@ export function applyExploreGu(state, inst) {
     return {
       state: {
         ...rec.state,
-        player: { ...rec.state.player, primevalEssence: rec.state.player.primevalEssence - ex.essence },
+        player: changeEssence(rec.state.player, { delta: -ex.essence, reason: ESSENCE_REASON.EXPLORATION_COST, source: gu.id }),
         exploreFx: { ...(rec.state.exploreFx || {}), ...fxPatch },
         exploreCd: { ...(rec.state.exploreCd || {}), [inst.instanceId]: now + ex.cooldown },
       },

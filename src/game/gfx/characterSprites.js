@@ -212,7 +212,7 @@ const NPC_ACC = ['none', 'scarf', 'belt', 'shoulderCloth', 'headband'];
 
 export function npcAppearance(id) {
   const pick = (arr, salt) => arr[Math.floor(hashStr(`${id}:${salt}`) * arr.length) % arr.length];
-  const look = NPC_BY_ID[id]?.look || {}; // role-specific looks override the picks
+  const look = /** @type {any} */ (NPC_BY_ID[id]?.look || {}); // role-specific looks override the picks
   return {
     body: look.body || pick(['male', 'female'], 'b'),
     hair: look.hair || pick(NPC_HAIR, 'h'),

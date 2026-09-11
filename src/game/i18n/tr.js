@@ -33,7 +33,7 @@ const MISSING_EN = new Set();
 
 export function browserLang() {
   try {
-    const nav = (navigator.language || navigator.userLanguage || 'en').toLowerCase();
+    const nav = (navigator.language || /** @type {any} */ (navigator).userLanguage || 'en').toLowerCase();
     return nav.startsWith('vi') ? 'vi' : 'en';
   } catch { return 'en'; }
 }
@@ -171,5 +171,5 @@ export function auditLocalization() {
   return report;
 }
 try {
-  if (typeof window !== 'undefined') window.__locAudit = auditLocalization;
+  if (typeof window !== 'undefined') /** @type {any} */ (window).__locAudit = auditLocalization;
 } catch {}

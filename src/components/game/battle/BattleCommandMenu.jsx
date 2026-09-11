@@ -2,11 +2,11 @@ import React, { useState } from 'react';
 import { useT } from '@/game/i18n/LangContext';
 import { sfx } from '@/game/audio/sfx';
 import { GU_BY_ID, isKillerMove } from '@/game/data/gu';
-import { ITEM_BY_ID, ITEMS } from '@/game/data/items';
+import { ITEMS } from '@/game/data/items';
 import { PATH_BY_ID } from '@/game/data/paths';
 import { ROLES, rolesOf } from '@/game/data/roles';
 import { effectiveCost, activationChanceOf, strikeRange, guAttackRange } from '@/game/engine/combat';
-import { kmMissing, kmName, kmBoundOf } from '@/game/engine/killerMoves';
+import { kmMissing, kmName } from '@/game/engine/killerMoves';
 import { targetKindOf, targetLabelKey, targetSummary } from '@/game/engine/targeting';
 
 // Short localized summary of what a Gu does in battle.

@@ -4,7 +4,7 @@ import { useT } from '@/game/i18n/LangContext';
 import { GU_BY_ID } from '@/game/data/gu';
 import { PATH_BY_ID, SYNERGIES } from '@/game/data/paths';
 import { BALANCE } from '@/game/config/balance';
-import { HUNGER_META, hungerBand, isVital, pickAutoFeedFood } from '@/game/engine/guLife';
+import { hungerBand, isVital, pickAutoFeedFood } from '@/game/engine/guLife';
 import { vitalStatusOf, fmtRemaining } from '@/game/engine/vitalGu';
 import GuCard from './gu/GuCard';
 import RefineGuModal from './RefineGuModal';
@@ -141,7 +141,7 @@ export default function GuPanel() {
 
       <div className="grid sm:grid-cols-2 gap-2">
         {state.ownedGu.map(inst => (
-          <GuCard key={inst.instanceId} inst={inst} state={state} equipped={equipped.has(inst.instanceId)}
+          <GuCard key={inst.instanceId} inst={inst} equipped={equipped.has(inst.instanceId)}
             onEquip={(id) => dispatch({ type: 'EQUIP_GU', instanceId: id })}
             onUnequip={(id) => dispatch({ type: 'UNEQUIP_GU', instanceId: id })}
             onRefine={(g) => setRefineId(g.instanceId)} />

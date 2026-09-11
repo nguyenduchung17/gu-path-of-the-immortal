@@ -186,7 +186,7 @@ const MASTER_SHOPS = {
 
 // Hidden masters join the roster (worldRenderer draws their aura + "???" tag).
 for (const m of MASTERS) {
-  NPCS.push({
+  /** @type {any[]} */ (NPCS).push({
     id: m.id, name: m.name, role: m.role, mentor: true, hidden: m.hidden,
     greeting: m.greeting, look: m.look, hours: m.hours, master: true,
     shop: MASTER_SHOPS[m.id] || undefined,

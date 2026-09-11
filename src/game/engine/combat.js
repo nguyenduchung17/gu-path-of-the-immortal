@@ -32,6 +32,7 @@ import { ENEMY_BY_ID } from '../data/enemies';
 import { ITEM_BY_ID } from '../data/items';
 import { PATH_BY_ID, SYNERGIES } from '../data/paths';
 import { applyEffects, applyFoodBuff } from './effects';
+import { mutateEssence, ESSENCE_REASON } from './essence';
 import { grantMastery, bonusOf } from './mastery';
 import { BALANCE, DIFFICULTIES } from '../config/balance';
 import { applyDeath } from './death';
@@ -233,7 +234,7 @@ export function initCombat(enemyId, player, opts = {}) {
   // pack leader buff (#11): while the leader lives, its packmates fight harder
   const leader = enemies.find(e => e.packRole === 'leader' || ENEMY_BY_ID[e.defId]?.packLeader);
   if (leader) {
-    const lb = ENEMY_BY_ID[leader.defId].leaderBuff || {};
+    const lb = /** @type {any} */ (ENEMY_BY_ID[leader.defId].leaderBuff || {});
     for (const e of enemies) {
       if (e === leader || !e.packId || e.packId !== leader.packId) continue;
       if (lb.dmgPct) e.attack = Math.max(1, Math.round(e.attack * (1 + lb.dmgPct / 100)));
@@ -492,7 +493,7 @@ function applyGu(gu, player, enemy, pSt, eSt, combat, push, fx, syn, weather, mu
     if (selfFx && e.essenceRecovery && Math.random() * 100 < e.essenceRecovery.chance) {
       const er = e.essenceRecovery;
       const amt = er.min + Math.floor(Math.random() * (er.max - er.min + 1));
-      player.primevalEssence = Math.min(player.maxPrimevalEssence, player.primevalEssence + amt);
+      mutateEssence(player, { delta: amt, reason: ESSENCE_REASON.GU_EFFECT, source: 'water-flow' });
       push(T('cmt.essenceFlow', { n: amt }));
     }
     // Killer fire feasts on burning foes — consuming the Burn for a burst
@@ -577,7 +578,7 @@ function applyGu(gu, player, enemy, pSt, eSt, combat, push, fx, syn, weather, mu
     push(T('cmt.barrier', { gu: locGuName(gu), p: power }));
   }
   if (selfFx && e.heal) { const h = Math.max(1, Math.floor(e.heal.power * mul * (1 + (fx.healPct || 0) / 100))); player.hp = Math.min(player.maxHp, player.hp + h); push(T('cmt.heal', { gu: locGuName(gu), n: h })); }
-  if (selfFx && e.essence) { const r = Math.max(1, Math.round(e.essence.power * mul)); player.primevalEssence = Math.min(player.maxPrimevalEssence, player.primevalEssence + r); push(T('cmt.essence', { gu: locGuName(gu), n: r })); }
+  if (selfFx && e.essence) { const r = Math.max(1, Math.round(e.essence.power * mul)); mutateEssence(player, { delta: r, reason: ESSENCE_REASON.GU_EFFECT, source: gu.id }); push(T('cmt.essence', { gu: locGuName(gu), n: r })); }
   if (e.control) {
     if (enemy.immune?.includes('control')) push(T('cmt.controlImmune', { enemy: dispOf(enemy) }));
     else { eSt.push({ type: 'control', power: Math.max(1, Math.floor(e.control.power * mul * (1 + (fx.controlPct || 0) / 100))), duration: e.control.duration }); push(T('cmt.controlBound', { gu: locGuName(gu), enemy: dispOf(enemy) })); meaningful = true; }
@@ -965,7 +966,7 @@ function executeRoundInner(state, action, hpBefore) {
     if (!it || !it.use || !it.combatUsable) return state;
     if ((state.inventory[it.category]?.[action.itemId] || 0) <= 0) return state;
     if (it.use.hp) player.hp = Math.min(player.maxHp, player.hp + it.use.hp);
-    if (it.use.essence) player.primevalEssence = Math.min(player.maxPrimevalEssence, player.primevalEssence + it.use.essence);
+    if (it.use.essence) mutateEssence(player, { delta: it.use.essence, reason: ESSENCE_REASON.ITEM, source: it.id });
     if (it.use.cure && pSt.some(s => it.use.cure.includes(s.type))) {
       pSt = pSt.filter(s => !it.use.cure.includes(s.type));
       push(T('cmt.cured'));
@@ -1015,14 +1016,14 @@ function executeRoundInner(state, action, hpBefore) {
     combat.revealed = true;
     combat.scouted = true;
     const regen = Math.min(player.maxPrimevalEssence - player.primevalEssence, oc.essence);
-    player.primevalEssence += regen;
+    mutateEssence(player, { delta: regen, reason: ESSENCE_REASON.COMBAT_TECHNIQUE, source: 'observe' });
     pSt.push({ type: 'focus', power: oc.focusPct, duration: 3 });
     push(T('cmt.observe', { enemy: dispOf(target), n: regen, p: oc.focusPct }));
   } else if (action.type === 'defend') {
     const dc = cfg.defend;
     pSt.push({ type: 'guard', power: dc.dmgRedPct, duration: 1 });
     const regen = Math.ceil(player.maxPrimevalEssence * dc.essenceRegenPct / 100);
-    player.primevalEssence = Math.min(player.maxPrimevalEssence, player.primevalEssence + regen);
+    mutateEssence(player, { delta: regen, reason: ESSENCE_REASON.COMBAT_TECHNIQUE, source: 'defend' });
     push(T('cmt.defend', { pct: dc.dmgRedPct, n: regen }));
   } else if (action.type === 'gu') {
     const inst = state.ownedGu.find(g => g.instanceId === action.guInstanceId);
@@ -1033,7 +1034,7 @@ function executeRoundInner(state, action, hpBefore) {
     const cost = effectiveCost(gu, state, inst);
     if (player.primevalEssence < cost) { push(T('cmt.noEssence')); return { ...state, combat: { ...combat, log } }; }
     if ((cooldowns[inst.instanceId] || 0) > 0) { push(T('cmt.cd', { gu: locGuName(gu) })); return { ...state, combat: { ...combat, log } }; }
-    player.primevalEssence -= cost;
+    mutateEssence(player, { delta: -cost, reason: ESSENCE_REASON.GU_COST, source: gu.id });
     cooldowns[inst.instanceId] = gu.cooldown;
     actAdvancePct = gu.effect.advance?.pct || 0;
     actSelfDelayPct = gu.effect.selfDelay?.pct || 0;
@@ -1108,7 +1109,7 @@ function executeRoundInner(state, action, hpBefore) {
     const cdKey = kmCdKey(move);
     if ((cooldowns[cdKey] || 0) > 0) { push(T('cmt.cd', { gu: entry.gu.name })); return { ...state, combat: { ...combat, log } }; }
     if (player.primevalEssence < entry.gu.energyCost) { push(T('cmt.noEssence')); return { ...state, combat: { ...combat, log } }; }
-    player.primevalEssence -= entry.gu.energyCost;
+    mutateEssence(player, { delta: -entry.gu.energyCost, reason: ESSENCE_REASON.KILLER_MOVE_COST, source: move.id });
     cooldowns[cdKey] = entry.gu.cooldown;
     if (Math.random() * 100 > kmActivationOf(combat, entry)) {
       push(T('cmt.killerFail', { gu: entry.gu.name }));

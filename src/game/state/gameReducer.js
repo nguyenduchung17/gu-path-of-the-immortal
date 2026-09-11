@@ -10,7 +10,7 @@ import { advanceTime, phaseOf } from '../engine/time';
 import { applyEffects } from '../engine/effects';
 import { grantMastery, learnRecipe, bonusOf, learnClue, CLUE_RANK } from '../engine/mastery';
 import { CULTIVATION_STAGES, BREAKTHROUGH_REQS } from '../data/cultivation';
-import { BALANCE, DIFFICULTIES, diffOf, shopPrice, recoveryCosts, cultivationCost, cultStreakEff, cultivationGain } from '../config/balance';
+import { BALANCE, DIFFICULTIES, diffOf, shopPrice, recoveryCosts, cultivationCost, cultivationGain } from '../config/balance';
 import { RECIPE_BY_ID } from '../data/recipes';
 import {
   WORLD, zoneAt, isWalkable, DEFAULT_ZONE, LANDMARKS, WORLD_RESOURCES,
@@ -21,7 +21,7 @@ import { MISSION_BY_ID } from '../data/missions';
 import { CONTRIBUTION_OFFERS } from '../data/contribution';
 import { ARENA_BY_ID } from '../data/arena';
 import { DEFAULT_APPEARANCE } from '../data/appearance';
-import { essenceCapFor, cultivateMulOf, normalizeAptitude, rollAptitudeScore, rollConstitution } from '../config/aptitude';
+import { essenceCapFor, normalizeAptitude, rollAptitudeScore, rollConstitution } from '../config/aptitude';
 import { starterGuOf } from '../data/starterGu';
 import { syncVitality, strengthLevelOf } from '../engine/strength';
 import { SPECIES_BY_ID, wildCombatDef, captureChanceOf, initialWildGu } from '../data/wildGu';
@@ -40,6 +40,7 @@ import { tutorialObserve } from '../engine/tutorial';
 // Killer Move actions are centralized in the engine.
 import { kmAction } from '../engine/killerMoves';
 import { createNewGame, globalStage } from './createGame';
+import { changeEssence, ESSENCE_REASON } from '../engine/essence';
 
 // createNewGame and globalStage live in ./createGame — imported below.
 
@@ -206,12 +207,12 @@ function wildGuAfterEncounter(state, worldId, gone) {
 
 function baseReducer(state, action) {
   // a deceased (True Cultivation) character can no longer act — only leave or reset
-  if (state && state.deceased && !['LOAD', 'RESET', 'END_COMBAT'].includes(action.type)) return state;
+  if (state && state.deceased && !['LOAD', 'NEW_GAME', 'RESET', 'END_COMBAT'].includes(action.type)) return state;
   switch (action.type) {
     case 'LOAD':
       return action.state;
     case 'NEW_GAME':
-      return createNewGame(action.name, action.gender, action.age, action.difficulty, action.slot, action.appearance, action.aptitude, action.starterGuId);
+      return createNewGame(action.name, action.gender, action.age, action.difficulty, action.slot, action.appearance, action.aptitude, action.starterGuId, action.creationSessionId, action.characterId);
     case 'RESET':
       return { noSave: true };
 
@@ -643,6 +644,8 @@ function baseReducer(state, action) {
       const refFx = bonusOf(state, 'refinement');
       let s = applyEffects(state, {
         essence: -list.essenceCost,
+        essenceReason: ESSENCE_REASON.REFINEMENT_COST,
+        essenceSource: r.id,
         spiritStones: -r.stones,
         removeItems: r.materials,
       });
@@ -674,8 +677,7 @@ function baseReducer(state, action) {
       if (p.primevalEssence < cost) return { ...state, log: [...state.log, T('cult.noEssence')] };
       const progress = Math.min(100, (p.cultivationProgress || 0) + gain);
       const np = {
-        ...p,
-        primevalEssence: p.primevalEssence - cost,
+        ...changeEssence(p, { delta: -cost, reason: ESSENCE_REASON.CULTIVATION_COST }),
         cultivationProgress: progress,
         totalInsight: (p.totalInsight || 0) + gain,
         cultStreak: (p.cultStreak || 0) + 1,
@@ -690,74 +692,6 @@ function baseReducer(state, action) {
       return advanceTime(s, BALANCE.time.cultivateMinutes);
     }
 
-    // ---------- Secluded cultivation (closed-door training) ----------
-    // One click compresses the cultivate → recover grind into a batch of
-    // sessions separated by nights of deep meditation. All per-session
-    // balance is honored (essence cost, progress gain, terrace bonus) and
-    // the whole span is paid in game time via advanceTime (days pass, Gu
-    // hunger ticks) — only the real-time waiting is removed.
-    case 'SECLUDE': {
-      if (busy(state)) return state;
-      const p = state.player;
-      const g = globalStage(p);
-      if (g >= 19) return state;
-      if ((p.cultivationProgress || 0) >= 100) return { ...state, log: [...state.log, T('cult.secludeFull')] };
-      if (!(zoneAt(p.x, p.y) || DEFAULT_ZONE).safe) return { ...state, log: [...state.log, T('cult.secludeNeedTown')] };
-      const cfg = BALANCE.cultivation;
-      const cost = cultivationCost(p);
-      const atSect = WORLD.tiles[p.y] && WORLD.tiles[p.y][p.x] === '*';
-      const t = state.time || { day: BALANCE.time.startDay, min: BALANCE.time.startMinutes };
-      const startAbs = t.day * 1440 + t.min;
-      let abs = startAbs;
-      let progress = p.cultivationProgress || 0;
-      let essence = p.primevalEssence;
-      let insight = p.totalInsight || 0;
-      let streak = p.cultStreak || 0;
-      let sessions = 0, nights = 0;
-      let guard = 0;
-      while (progress < 100 && nights < 10 && guard++ < 500) {
-        if (essence < cost) {
-          // a night of deep meditation refills the aperture by morning
-          const dayStart = Math.floor(abs / 1440) * 1440;
-          let wake = dayStart + BALANCE.time.sleepToMinutes;
-          if (wake <= abs) wake += 1440;
-          abs = wake;
-          essence = p.maxPrimevalEssence;
-          nights++;
-          continue;
-        }
-        // every balance rule of a single session applies here too — including
-        // the diminishing-returns streak for back-to-back cultivation
-        const factor = (cfg.stageFactor[p.stage || 0] ?? 0.45) * cfg.rankFactor ** p.rank;
-        const gain = Math.max(1, Math.min(cfg.progressCap, Math.floor(
-          (cfg.progressBase + p.intelligence * cfg.progressPerInt) * factor * cultivateMulOf(p.aptitude)
-          * (atSect ? cfg.sectBonus : 1) * cultStreakEff(streak) * diffOf(state).cultProgressMul)));
-        progress = Math.min(100, progress + gain);
-        essence -= cost;
-        insight += gain;
-        sessions++;
-        streak++;
-        abs += BALANCE.time.cultivateMinutes;
-      }
-      if (progress >= 100 && essence < p.maxPrimevalEssence) {
-        // one final night: emerge with a full aperture so the breakthrough
-        // requirements (essence held) are always met on the spot
-        const dayStart = Math.floor(abs / 1440) * 1440;
-        let wake = dayStart + BALANCE.time.sleepToMinutes;
-        if (wake <= abs) wake += 1440;
-        abs = wake;
-        essence = p.maxPrimevalEssence;
-        nights++;
-      }
-      let s = { ...state, player: { ...p, primevalEssence: essence, cultivationProgress: progress, totalInsight: insight, cultStreak: streak } };
-      s = advanceTime(s, abs - startAbs);
-      s = { ...s, log: [...s.log, atSect ? T('cult.secluded', { sessions, nights, progress: Math.floor(progress) }) : T('cult.secludedPlain', { sessions, nights, progress: Math.floor(progress) })] };
-      if (progress >= 100 && (p.cultivationProgress || 0) < 100) {
-        s = pushToast(s, { icon: '🏯', title: T('toast.seclude'), lines: [T('cult.secludeToast1', { sessions, nights }), T('cult.secludeToast2')] });
-      }
-      return s;
-    }
-
     case 'BREAKTHROUGH': {
       if (busy(state)) return state;
       const p = state.player;
@@ -768,6 +702,7 @@ function baseReducer(state, action) {
       const req = BREAKTHROUGH_REQS[g];
       let s = applyEffects(state, {
         essence: -req.essence,
+        essenceReason: ESSENCE_REASON.BREAKTHROUGH_COST,
         spiritStones: -(req.stones || 0),
         removeItems: req.items || {},
         insight: -(req.insight || 0),
@@ -789,9 +724,12 @@ function baseReducer(state, action) {
       np.maxPrimevalEssence = essenceCapFor(st.maxEssence, np.aptitude);
       // only a major rank breakthrough fully restores the aperture — minors
       // refill just a fraction, so chained breakthroughs are never free
-      np.primevalEssence = major
+      Object.assign(np, changeEssence(np, { setTo: major
         ? np.maxPrimevalEssence
-        : Math.max(np.primevalEssence, Math.round(np.maxPrimevalEssence * BALANCE.cultivation.minorEssenceRestorePct / 100));
+        : Math.max(np.primevalEssence, Math.round(np.maxPrimevalEssence * BALANCE.cultivation.minorEssenceRestorePct / 100)),
+        reason: ESSENCE_REASON.BREAKTHROUGH_RESTORE,
+        source: major ? 'major' : 'minor',
+      }));
       const statGain = major ? 2 : 1;
       np.strength += statGain; np.agility += statGain; np.perception += statGain; np.intelligence += statGain;
       s = {
@@ -831,11 +769,12 @@ function baseReducer(state, action) {
     case 'RECOVERY_TICK': {
       if (!state.recovery) return state;
       const p = state.player;
-      const essence = Math.min(p.maxPrimevalEssence, p.primevalEssence + (action.amount || 0));
+      const player = changeEssence(p, { delta: action.amount || 0, reason: ESSENCE_REASON.ACTIVE_RECOVERY });
+      const essence = player.primevalEssence;
       const done = essence >= p.maxPrimevalEssence;
       return advanceTime({
         ...state,
-        player: { ...p, primevalEssence: essence },
+        player,
         recovery: done ? null : state.recovery,
         log: done ? [...state.log, T('rec.done')] : state.log,
       }, BALANCE.time.recoveryMinutesPerTick);
@@ -878,7 +817,7 @@ function baseReducer(state, action) {
       if (p.spiritStones < costs.instant) return { ...state, log: [...state.log, T('rec.noStonesInstant')] };
       return {
         ...state,
-        player: { ...p, spiritStones: p.spiritStones - costs.instant, primevalEssence: p.maxPrimevalEssence },
+        player: { ...changeEssence(p, { setTo: p.maxPrimevalEssence, reason: ESSENCE_REASON.PAID_RECOVERY }), spiritStones: p.spiritStones - costs.instant },
         recovery: null,
         log: [...state.log, T('rec.instant', { n: costs.instant })],
       };
@@ -896,6 +835,7 @@ function baseReducer(state, action) {
       }
       return applyEffects(state, {
         hp: it.use.hp || 0, essence: it.use.essence || 0,
+        essenceReason: ESSENCE_REASON.ITEM, essenceSource: it.id,
         foodBuff: it.use.buff || null,
         removeItems: { [action.itemId]: 1 }, message: T('item.used', { name: locItemName(it) }),
       });
@@ -1051,7 +991,12 @@ function baseReducer(state, action) {
     case 'CHOOSE_EVENT': {
       const ev = EVENT_BY_ID[state.pendingEvent];
       const opt = ev.options[action.optionIndex];
-      let s = applyEffects(state, { ...opt.effects, message: locEventMsg(ev, action.optionIndex) || undefined });
+      let s = applyEffects(state, {
+        ...opt.effects,
+        essenceReason: opt.effects?.essence ? ESSENCE_REASON.EVENT : undefined,
+        essenceSource: ev.id,
+        message: locEventMsg(ev, action.optionIndex) || undefined,
+      });
       // recognition-trial offers accept their trial quest through the same
       // centralized quest system as every other quest (#6, #8) — acceptQuest
       // itself refuses duplicates, so double-clicks can never double-issue (#15)
@@ -1199,7 +1144,13 @@ function baseReducer(state, action) {
       const list = refineGuChecklist(state, inst);
       if (!list.ok) return { ...state, log: [...state.log, T('refinegu.refused')] };
       const day = state.time?.day || 1;
-      let s = applyEffects(state, { essence: -list.essenceCost, spiritStones: -list.stonesCost, removeItems: list.materials });
+      let s = applyEffects(state, {
+        essence: -list.essenceCost,
+        essenceReason: ESSENCE_REASON.REFINEMENT_COST,
+        essenceSource: gu.id,
+        spiritStones: -list.stonesCost,
+        removeItems: list.materials,
+      });
       if (Math.random() * 100 < list.chance) {
         s = { ...s, ownedGu: s.ownedGu.map(g => g.instanceId === inst.instanceId ? { ...g, rank: list.target } : g) };
         s = applyEffects(s, { insight: BALANCE.insight.refineGu });

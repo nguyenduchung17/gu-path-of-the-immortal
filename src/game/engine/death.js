@@ -6,6 +6,7 @@ import { diffOf } from '../config/balance';
 import { INNS, CAMP_CELLS, zoneAt, isWalkable } from '../data/world';
 import { CULTIVATION_STAGES } from '../data/cultivation';
 import { T, locStageName, locZoneName } from '../i18n/tr';
+import { changeEssence, ESSENCE_REASON } from './essence';
 
 const cheb = (a, b) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
 
@@ -61,17 +62,28 @@ export function applyDeath(state, combat, player, cause) {
   const mem = memorialOf(state);
 
   if (d.permadeath) {
+    const deathTimestamp = Date.now();
     return {
       ...state,
+      status: 'DECEASED',
       player,
       combat: { ...combat, over: true, result: 'defeat' },
-      deceased: { cause, at: mem },
+      deceased: {
+        characterId: state.characterId,
+        deathCause: cause,
+        deathLocation: mem.place,
+        deathTimestamp,
+        memorialStats: mem,
+        // Backward-compatible names used by the existing memorial UI.
+        cause,
+        at: mem,
+      },
       log: [...state.log, T('dth.permadeath', { name: player.name, day, place: mem.place })],
     };
   }
 
   const at = { x: player.x, y: player.y };
-  const spot = d.respawn === 'nearestInn' ? nearestInn(state, at) : randomSpawn(state, at);
+  const spot = /** @type {any} */ (d.respawn === 'nearestInn' ? nearestInn(state, at) : randomSpawn(state, at));
   const spotZone = zoneAt(spot.x, spot.y);
   const placeName = spot.name || (spotZone ? locZoneName(spotZone) : T('dth.wilds'));
 
@@ -80,7 +92,10 @@ export function applyDeath(state, combat, player, cause) {
   p.y = spot.spawn ? spot.spawn[1] : spot.y;
   p.currentArea = 'greenValleyRegion';
   p.hp = Math.max(1, Math.floor(p.maxHp * (d.respawn === 'nearestInn' ? 0.6 : 0.3)));
-  p.primevalEssence = Math.min(player.primevalEssence, Math.floor(player.maxPrimevalEssence * 0.2));
+  Object.assign(p, changeEssence(p, {
+    setTo: Math.min(player.primevalEssence, Math.floor(player.maxPrimevalEssence * 0.2)),
+    reason: ESSENCE_REASON.DEATH_PENALTY,
+  }));
   p.cultivationProgress = Math.max(0, Math.floor((p.cultivationProgress || 0) * (1 - (d.progressLoss || 0))));
   p.spiritStones = Math.floor(p.spiritStones * (1 - (d.stonesLoss || 0)));
 

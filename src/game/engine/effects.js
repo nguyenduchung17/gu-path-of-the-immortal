@@ -4,6 +4,7 @@ import { RECIPES } from '../data/recipes';
 import { learnRecipe, discoverPath, learnClue } from './mastery';
 import { diffOf } from '../config/balance';
 import { T, locGuName } from '../i18n/tr';
+import { changeEssence, ESSENCE_REASON } from './essence';
 
 let _idc = 0;
 const newInstanceId = () => 'g' + Date.now().toString(36) + (_idc++).toString(36);
@@ -42,7 +43,11 @@ export function applyEffects(state, effects) {
   };
 
   if (effects.hp) player.hp = Math.min(player.maxHp, Math.max(0, player.hp + effects.hp));
-  if (effects.essence) player.primevalEssence = Math.min(player.maxPrimevalEssence, Math.max(0, player.primevalEssence + effects.essence));
+  if (effects.essence) player = changeEssence(player, {
+    delta: effects.essence,
+    reason: effects.essenceReason || ESSENCE_REASON.EFFECT,
+    source: effects.essenceSource,
+  });
   if (effects.insight) {
     // Realm Insight — earned out in the world, scaled by difficulty. Gaining
     // it is meaningful activity, so cultivation diminishing returns reset.

@@ -121,7 +121,7 @@ export default function CharacterCreation() {
                   </div>
                   <div>
                     <label className="text-xs text-stone-400 block mb-1">{t('creation.age')}</label>
-                    <input type="number" min="10" max="80" value={age} onChange={e => setAge(e.target.value)}
+                    <input type="number" min="10" max="80" value={age} onChange={e => setAge(Number(e.target.value))}
                       className="w-full px-2.5 py-2 rounded-lg bg-black/40 border border-stone-700 text-sm focus:border-emerald-600 outline-none" />
                   </div>
                 </div>

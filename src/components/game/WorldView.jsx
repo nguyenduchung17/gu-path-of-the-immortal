@@ -24,7 +24,7 @@ const DANGER_CHIP = {
 // The world is the app's background layer, rendered as pixel art on a canvas.
 // Camera follows the player smoothly; movement supports diagonals and animates
 // between cells instead of jumping. All game logic stays in the reducer.
-export default function WorldView({ paused, inputLocked, moveLocked }) {
+export default function WorldView({ paused = false, inputLocked = false, moveLocked = false }) {
   const { state, dispatch } = useGame();
   const canvasRef = useRef(null);
   const camRef = useRef(null);
@@ -36,7 +36,7 @@ export default function WorldView({ paused, inputLocked, moveLocked }) {
 
   const stateRef = useRef(state);
   stateRef.current = state;
-  const propsRef = useRef({});
+  const propsRef = useRef(/** @type {any} */ ({}));
   propsRef.current = { paused, inputLocked, moveLocked };
   const dispatchRef = useRef(dispatch);
   dispatchRef.current = dispatch;
@@ -195,7 +195,7 @@ export default function WorldView({ paused, inputLocked, moveLocked }) {
       } else {
         step.acc = 0;
       }
-      if (moveDbgOn) window.__guMoveDebug = { ...moveDebugOf(s, dx, dy), dtMs, acc: step.acc };
+      if (moveDbgOn) /** @type {any} */ (window).__guMoveDebug = { ...moveDebugOf(s, dx, dy), dtMs, acc: step.acc };
 
       // animate the player between cells (no grid snapping)
       const p2 = s.player;

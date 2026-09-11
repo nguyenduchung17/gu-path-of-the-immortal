@@ -16,8 +16,11 @@ export default function Game() {
 }
 
 function GameRoot() {
-  const { state, activeSlot, createSlot } = useGame();
-  if (createSlot != null) return <CharacterCreation />;
+  const { state, activeSlot, createSlot, creationSessionId, cloudReady } = useGame();
+  if (!cloudReady) {
+    return <div className="min-h-screen bg-[#0d1410] text-emerald-200 flex items-center justify-center">Synchronizing saves…</div>;
+  }
+  if (createSlot != null) return <CharacterCreation key={creationSessionId} />;
   if (activeSlot == null || !state || state.noSave) return <SlotSelect />;
   return <GameScreen />;
 }

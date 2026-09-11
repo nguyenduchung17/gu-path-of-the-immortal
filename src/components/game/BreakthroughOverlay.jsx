@@ -31,7 +31,7 @@ export default function BreakthroughOverlay() {
         </div>
         <h2 className={`text-2xl font-bold mb-2 ${b.major ? 'text-amber-200' : 'text-emerald-200'}`}>{b.name}</h2>
         <p className="text-xs text-stone-400 mb-4">
-          {b.major ? 'Your meridians widen — all attributes surge. Essence fully restored.' : 'Essence fully restored. Your foundation deepens.'}
+          {b.major ? 'Your meridians widen — all attributes surge. Essence fully restored.' : 'Your foundation deepens. A portion of your Essence is restored.'}
         </p>
         <button onClick={() => dispatch({ type: 'DISMISS_BREAKTHROUGH' })}
           className={`w-full py-2.5 rounded-lg text-sm font-semibold text-black ${b.major ? 'bg-amber-400 hover:bg-amber-300' : 'bg-emerald-500 hover:bg-emerald-400'}`}>

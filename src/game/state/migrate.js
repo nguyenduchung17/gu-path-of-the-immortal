@@ -11,6 +11,8 @@ import { seedFog } from '../engine/guLife';
 import { normalizeAptitude, essenceCapFor } from '../config/aptitude';
 import { normalizeQuestState } from '../engine/questEngine';
 import { LEADER_LINKS, isLeaderDef } from '../data/packs';
+import { withSaveIdentity } from './saveIdentity';
+import { changeEssence, ESSENCE_REASON } from '../engine/essence';
 
 // v4 aptitudes were flat strings — map them onto the v5 numeric scale.
 const LEGACY_APTITUDE = { Dull: 3, Ordinary: 5, Good: 6.5, Outstanding: 8, Heavenly: 9.5 };
@@ -97,12 +99,10 @@ export function migrateSave(old) {
     s = {
       ...s,
       version: 5,
-      player: {
-        ...p,
-        aptitude: apt,
-        maxPrimevalEssence: cap,
-        primevalEssence: Math.min(p.primevalEssence ?? cap, cap),
-      },
+      player: changeEssence({ ...p, aptitude: apt, maxPrimevalEssence: cap }, {
+        setTo: Math.min(p.primevalEssence ?? cap, cap),
+        reason: ESSENCE_REASON.SAVE_MIGRATION,
+      }),
       log: [...(s.log || []), 'Your aperture settles — cultivation aptitude now shapes your essence.'],
     };
   }
@@ -169,7 +169,10 @@ export function migrateSave(old) {
     s = {
       ...s,
       version: 10,
-      player: { ...p, maxPrimevalEssence: cap, primevalEssence: Math.min(p.primevalEssence ?? cap, cap) },
+      player: changeEssence({ ...p, maxPrimevalEssence: cap }, {
+        setTo: Math.min(p.primevalEssence ?? cap, cap),
+        reason: ESSENCE_REASON.SAVE_MIGRATION,
+      }),
       log: [...(s.log || []), 'Your aperture widens — primeval essence flows deeper and truer to your aptitude.'],
     };
   }
@@ -285,7 +288,16 @@ export function migrateSave(old) {
     };
   }
 
+  if (s.version < 18) {
+    s = { ...withSaveIdentity(s), version: 18 };
+  }
+
+  if (s.version < 19) {
+    s = { ...s, version: 19, player: { ...s.player, essenceHistory: s.player?.essenceHistory || [] } };
+  }
+
   // Self-heal the quest state on every load: legacy shapes become per-quest
-  // records and hunt progress is rebuilt from the kill tally.
-  return normalizeQuestState(s);
+  // records and hunt progress is rebuilt from the kill tally. Identity is also
+  // revalidated every time so stale death records from older builds are ignored.
+  return normalizeQuestState(withSaveIdentity(s));
 }

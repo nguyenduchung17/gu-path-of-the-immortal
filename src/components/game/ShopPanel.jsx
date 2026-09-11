@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useGame } from '@/game/state/GameContext';
 import { useT } from '@/game/i18n/LangContext';
 import { NPC_BY_ID, guOfferOf } from '@/game/data/npcs';
-import { ITEM_BY_ID, ITEMS } from '@/game/data/items';
+import { ITEM_BY_ID } from '@/game/data/items';
 import { RECIPE_BY_ID } from '@/game/data/recipes';
 import { GU_BY_ID } from '@/game/data/gu';
 import { PATH_BY_ID } from '@/game/data/paths';

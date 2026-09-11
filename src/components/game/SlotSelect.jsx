@@ -5,6 +5,8 @@ import LangSwitch from '@/game/i18n/LangSwitch';
 import { CULTIVATION_STAGES } from '@/game/data/cultivation';
 import { zoneAt } from '@/game/data/world';
 import MemorialPanel from './MemorialPanel';
+import { validDeathRecord } from '@/game/state/saveIdentity';
+import { useAuth } from '@/lib/AuthContext';
 
 const TONE = {
   easy: 'text-emerald-300 border-emerald-700/50 bg-emerald-900/20',
@@ -20,7 +22,8 @@ const fmtPlay = (sec) => {
 };
 
 export default function SlotSelect() {
-  const { loadSlotRaw, startSlot, beginCreate, deleteSlot } = useGame();
+  const { loadSlotRaw, startSlot, beginCreate, deleteSlot, cloudStatus, cloudError } = useGame();
+  const { user, logout } = useAuth();
   const { t } = useT();
   const [, setVersion] = useState(0);
   const [confirmDel, setConfirmDel] = useState(null);
@@ -37,6 +40,14 @@ export default function SlotSelect() {
           <h1 className="text-xl font-semibold text-emerald-200 tracking-wide">{t('title.game')}</h1>
           <p className="text-[11px] text-stone-400 mt-1">{t('title.subtitle')}</p>
           <div className="mt-3 flex justify-center"><LangSwitch /></div>
+          <div className="mt-3 flex items-center justify-center gap-3 text-[10px] text-stone-400">
+            <span>{user?.email || 'Signed in'}</span>
+            <span className={cloudStatus === 'synced' ? 'text-emerald-400' : cloudStatus === 'saving' ? 'text-amber-300' : 'text-rose-300'}>
+              {cloudStatus === 'synced' ? '☁ Cloud saved' : cloudStatus === 'saving' ? '☁ Saving…' : '☁ Local backup active'}
+            </span>
+            <button onClick={() => logout(true)} className="text-stone-300 hover:text-white underline">Log out</button>
+          </div>
+          {cloudError && <p className="mt-2 text-[10px] text-rose-300">Cloud sync problem: {cloudError}</p>}
         </div>
 
         <div className="space-y-3">
@@ -47,7 +58,7 @@ export default function SlotSelect() {
             const stage = s ? CULTIVATION_STAGES[Math.min(19, (s.player?.rank || 0) * 4 + (s.player?.stage || 0))] : null;
             const zone = s ? (zoneAt(s.player?.x, s.player?.y) || {}).name : null;
             const day = (s?.time || {}).day;
-            const deceased = !!s?.deceased;
+            const deceased = validDeathRecord(s);
 
             return (
               <div key={i} className={`rounded-xl border p-4 ${s ? (deceased ? 'border-rose-900/60 bg-black/30' : 'border-stone-800 bg-black/20') : 'border-dashed border-stone-800'}`}>

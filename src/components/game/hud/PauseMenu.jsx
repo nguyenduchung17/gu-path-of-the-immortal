@@ -3,7 +3,7 @@ import { useGame } from '@/game/state/GameContext';
 import { useT } from '@/game/i18n/LangContext';
 import LangSwitch from '@/game/i18n/LangSwitch';
 
-function Entry({ onClick, children, primary, danger }) {
+function Entry({ onClick, children, primary = false, danger = false }) {
   return (
     <button
       onClick={onClick}

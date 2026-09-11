@@ -16,12 +16,13 @@ import { initialEnemies } from '../data/world';
 import { DEFAULT_APPEARANCE } from '../data/appearance';
 import { kmSeed } from '../engine/killerMoves';
 import { T, locPathName, locGuName } from '../i18n/tr';
+import { newCharacterId } from './saveIdentity';
 
 const START_STAGE = CULTIVATION_STAGES[0];
 
 export function globalStage(p) { return p.rank * 4 + (p.stage || 0); }
 
-export function createNewGame(name, gender, age, difficulty, slot, appearance, aptitude, starterGuId) {
+export function createNewGame(name, gender, age, difficulty, slot, appearance, aptitude, starterGuId, creationSessionId, characterId) {
   const starter = starterGuOf(starterGuId);
   const apt = normalizeAptitude(
     aptitude && typeof aptitude.score === 'number' ? aptitude : { score: rollAptitudeScore(), constitution: rollConstitution() }
@@ -29,9 +30,13 @@ export function createNewGame(name, gender, age, difficulty, slot, appearance, a
   const essenceCap = essenceCapFor(START_STAGE.maxEssence, apt);
   const starterFood = foodOf(starter);
   const fresh = {
-    version: 17,
+    version: 19,
     difficulty: DIFFICULTIES[difficulty] ? difficulty : 'standard',
     slot: slot || 1,
+    slotId: slot || 1,
+    characterId: characterId || newCharacterId(),
+    creationSessionId: creationSessionId || null,
+    status: 'ALIVE',
     time: { day: BALANCE.time.startDay, min: BALANCE.time.startMinutes },
     playtimeSec: 0,
     deceased: null,
@@ -42,6 +47,7 @@ export function createNewGame(name, gender, age, difficulty, slot, appearance, a
       aptitude: apt,
       hp: START_STAGE.maxHp, maxHp: START_STAGE.maxHp,
       primevalEssence: essenceCap, maxPrimevalEssence: essenceCap,
+      essenceHistory: [],
       willpower: 10,
       strength: 6, agility: 6, perception: 6, intelligence: 6, luck: 6,
       x: 42, y: 44, currentArea: 'greenValleyRegion', facing: 'down',
