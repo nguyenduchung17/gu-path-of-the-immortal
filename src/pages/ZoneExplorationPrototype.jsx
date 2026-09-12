@@ -326,7 +326,7 @@ function ZoneCombatOverlay({ state, setState, t }) {
   );
 }
 
-function ThingList({ title, items, t, actionLabel, onAction }) {
+function ThingList({ title, items, t, actionLabel = null, onAction = null }) {
   return (
     <div className="mb-3">
       <div className="mb-1 text-xs font-semibold text-amber-100">{title}</div>
