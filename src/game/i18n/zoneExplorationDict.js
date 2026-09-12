@@ -165,7 +165,7 @@ export const DICT_ZONE_EXPLORATION = {
     'zone.log.move': 'Bạn di chuyển trong khu vực.',
     'zone.log.tooFar': 'Chỗ đó ở quá xa. Hãy đi tới gần trước.',
     'zone.log.inspect': 'Bạn quan sát khu vực.',
-    'zone.log.engage': 'Đã giao chiến với kẻ địch. Card combat bắt đầu.'
+    'zone.log.engage': 'Đã giao chiến với kẻ địch. Card combat bắt đầu.',
     'zone.log.victoryReturn': 'Thắng lợi. Bạn quay lại đúng khu vực cũ, và kẻ địch bị hạ đã biến mất trong session này.',
     'zone.log.fleeReturn': 'Bạn chạy về khu vực. Kẻ địch vẫn còn sống.',
     'zone.log.defeatReturn': 'Thua trong prototype. Tạm thời quay lại an toàn; luật tử vong/độ khó đầy đủ có thể nối vào sau.',
