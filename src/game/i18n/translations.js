@@ -4,6 +4,8 @@
 
 import { DICT_EXTRA } from './extra';
 import { DICT_TUTORIAL } from './tutorialDict';
+import { DICT_CARD_COMBAT } from './cardCombatDict';
+import { DICT_ZONE_EXPLORATION } from './zoneExplorationDict';
 
 export const LANGUAGES = [
   { id: 'en', label: 'English' },
@@ -668,5 +670,5 @@ export const DICT = {
 };
 
 // v8 systems — wild Gu, hunger, Vital Gu, risky refinement, fog of war
-DICT.en = { ...DICT.en, ...DICT_EXTRA.en, ...DICT_TUTORIAL.en };
-DICT.vi = { ...DICT.vi, ...DICT_EXTRA.vi, ...DICT_TUTORIAL.vi };
+DICT.en = { ...DICT.en, ...DICT_EXTRA.en, ...DICT_TUTORIAL.en, ...DICT_CARD_COMBAT.en, ...DICT_ZONE_EXPLORATION.en };
+DICT.vi = { ...DICT.vi, ...DICT_EXTRA.vi, ...DICT_TUTORIAL.vi, ...DICT_CARD_COMBAT.vi, ...DICT_ZONE_EXPLORATION.vi };
