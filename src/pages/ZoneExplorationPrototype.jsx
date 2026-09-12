@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Map, RotateCcw, Swords } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -65,6 +65,56 @@ function ZoneExplorationPrototypeInner() {
     setState((current) => gatherResource(current, resourceId));
   };
 
+  const inspectEntity = (entity) => {
+    primeAudio();
+    sfx('ui');
+    setState((current) => ({
+      ...current,
+      lastMessageKey: entity.roleKey || entity.key || 'zone.log.inspect',
+    }));
+  };
+
+  const handleCellClick = (cell) => {
+    if (state.mode !== 'explore' || cell.hasPlayer) return;
+    const dx = cell.x - state.player.x;
+    const dy = cell.y - state.player.y;
+    const distance = Math.abs(dx) + Math.abs(dy);
+    if (distance > 1) {
+      primeAudio();
+      sfx('fail');
+      setState((current) => ({ ...current, lastMessageKey: 'zone.log.tooFar' }));
+      return;
+    }
+    if (cell.entity?.encounterId) startEnemy(cell.entity.id);
+    else if (cell.entity?.type === 'resource') gather(cell.entity.id);
+    else if (cell.entity?.type === 'npc') inspectEntity(cell.entity);
+    else move(dx, dy);
+  };
+
+  useEffect(() => {
+    const onKeyDown = (event) => {
+      if (state.mode !== 'explore') return;
+      if (event.target?.tagName === 'INPUT' || event.target?.tagName === 'TEXTAREA') return;
+      const key = event.key.toLowerCase();
+      const directions = {
+        arrowup: [0, -1],
+        w: [0, -1],
+        arrowdown: [0, 1],
+        s: [0, 1],
+        arrowleft: [-1, 0],
+        a: [-1, 0],
+        arrowright: [1, 0],
+        d: [1, 0],
+      };
+      const direction = directions[key];
+      if (!direction) return;
+      event.preventDefault();
+      move(direction[0], direction[1]);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [state.mode]);
+
   return (
     <div className="min-h-screen bg-[#15110d] text-stone-100">
       <div className="relative overflow-hidden border-b border-amber-200/10 bg-[radial-gradient(circle_at_top,_rgba(52,211,153,0.16),_transparent_32%),linear-gradient(135deg,_#1b140f,_#10201b_58%,_#12131e)]">
@@ -79,6 +129,7 @@ function ZoneExplorationPrototypeInner() {
             </div>
             <h1 className="text-2xl font-semibold tracking-wide text-amber-100">{t('zone.prototype.title')}</h1>
             <p className="mt-1 max-w-2xl text-sm text-stone-300">{t('zone.prototype.subtitle')}</p>
+            <p className="mt-2 text-xs text-emerald-100/80">{t('zone.prototype.controlsHint')}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Link to="/prototype/card-combat">
@@ -121,10 +172,7 @@ function ZoneExplorationPrototypeInner() {
                   <button
                     key={`${cell.x}-${cell.y}`}
                     title={cell.entity ? t(cell.entity.key) : t(`zone.tile.${cell.tile}`)}
-                    onClick={() => {
-                      if (cell.entity?.encounterId) startEnemy(cell.entity.id);
-                      if (cell.entity?.type === 'resource') gather(cell.entity.id);
-                    }}
+                    onClick={() => handleCellClick(cell)}
                     className={`relative flex h-12 w-12 items-center justify-center rounded-lg border text-lg transition hover:ring-1 hover:ring-amber-200/40 ${TILE_STYLE[cell.tile] || TILE_STYLE.ground}`}
                   >
                     {cell.hasPlayer ? (
@@ -188,7 +236,7 @@ function ZoneExplorationPrototypeInner() {
           </Panel>
 
           <Panel title={t('zone.prototype.visibleThings')}>
-            <ThingList title={t('zone.prototype.npcs')} items={entities.npcs} t={t} />
+            <ThingList title={t('zone.prototype.npcs')} items={entities.npcs} t={t} actionLabel={t('zone.prototype.talk')} onAction={(item) => inspectEntity(item)} />
             <ThingList title={t('zone.prototype.enemies')} items={entities.enemies} t={t} actionLabel={t('zone.prototype.engage')} onAction={(item) => startEnemy(item.id)} />
             <ThingList title={t('zone.prototype.resources')} items={entities.resources} t={t} actionLabel={t('zone.prototype.gather')} onAction={(item) => gather(item.id)} />
             <ThingList title={t('zone.prototype.exits')} items={entities.exits} t={t} />
