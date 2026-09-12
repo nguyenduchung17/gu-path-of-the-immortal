@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useGame, SLOT_COUNT } from '@/game/state/GameContext';
 import { useT } from '@/game/i18n/LangContext';
 import LangSwitch from '@/game/i18n/LangSwitch';
@@ -40,6 +41,15 @@ export default function SlotSelect() {
           <h1 className="text-xl font-semibold text-emerald-200 tracking-wide">{t('title.game')}</h1>
           <p className="text-[11px] text-stone-400 mt-1">{t('title.subtitle')}</p>
           <div className="mt-3 flex justify-center"><LangSwitch /></div>
+          <div className="mt-3 flex flex-wrap justify-center gap-2">
+            <Link
+              to="/prototype/zone-exploration"
+              className="inline-flex items-center justify-center rounded-lg border border-emerald-400/30 bg-emerald-300/10 px-3 py-2 text-xs font-medium text-emerald-100 hover:bg-emerald-300/20"
+              title={t('zone.prototype.subtitle')}
+            >
+              {t('zone.prototype.badge')}: {t('zone.prototype.title')}
+            </Link>
+          </div>
           <div className="mt-3 flex items-center justify-center gap-3 text-[10px] text-stone-400">
             <span>{user?.email || 'Signed in'}</span>
             <span className={cloudStatus === 'synced' ? 'text-emerald-400' : cloudStatus === 'saving' ? 'text-amber-300' : 'text-rose-300'}>
