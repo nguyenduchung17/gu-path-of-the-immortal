@@ -1,5 +1,5 @@
-import { createCardCombatState } from '@/game/card-combat/prototypeEngine';
-import { SAMPLE_LOADOUT } from '@/game/card-combat/prototypeData';
+import { createCardCombatState } from '../card-combat/prototypeEngine';
+import { SAMPLE_LOADOUT } from '../card-combat/prototypeData';
 import { ZONE_IDS, ZONE_ORDER, ZONES } from './prototypeData';
 
 function cellKey(x, y) {
